@@ -1,0 +1,12 @@
+[project]
+name = "phase4-check"
+version = "0.1.0"
+description = "Phase 4 디스패처 동작 확인용 스모크 테스트 프로젝트"
+requires-python = ">=3.9"
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
