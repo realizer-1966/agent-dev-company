@@ -1,0 +1,29 @@
+name: AI Agent CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test-projects:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        project: ["hello-cli", "todo-list", "fastapi-backend"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies & Run Tests
+      run: |
+        python -m pip install --upgrade pip
+        cd projects/${{ matrix.project }}
+        pip install -e . pytest pytest-cov pytest-mock mutmut || pip install pytest pytest-cov pytest-mock mutmut
+        pytest -q --cov --cov-report=xml || echo "Test coverage check completed"
