@@ -1,7 +1,7 @@
 # Agent Dev Company 🤖🏢
 
 전 직원이 AI 에이전트(Hermes 프로필)인 가상 개발회사.
-대표(사용자)가 발주하면 PM → Dev → Reviewer 에이전트가 협업해 소프트웨어를 설계·구현·리뷰·납품한다.
+대표(사용자)가 발주하면 PM → Dev → QA → Reviewer 에이전트가 협업해 소프트웨어를 설계·구현·테스트·리뷰·납품한다.
 
 ## 조직도
 
@@ -10,6 +10,7 @@
 | CEO (대표) | `default` | 의사결정, 최종 승인, 납품 검수 |
 | PM | `pm` | 요구사항 분석, 티켓 분해, 배정, 일정 관리 |
 | Dev | `dev` | TDD 구현, 테스트, 커밋 |
+| QA | `qa` | 테스트 실행, 버그 리포트, 품질 검증 |
 | Reviewer | `reviewer` | 코드 리뷰, 품질 게이트, 승인/반려 |
 
 ## 업무 흐름
@@ -22,8 +23,9 @@ backlog → ready → in_progress → review → done
 2. 티켓을 ready로 올리고 담당자 배정 (`kanban assign`)
 3. 게이트웨이 디스패처가 담당 프로필을 자동 실행
 4. Dev가 구현·테스트·커밋 후 완료 처리
-5. Reviewer가 리뷰 후 승인(complete) 또는 반려(block)
-6. CEO가 최종 검수 후 납품
+5. QA가 테스트 실행, 버그 리포트 작성
+6. Reviewer가 리뷰 후 승인(complete) 또는 반려(block)
+7. CEO가 최종 검수 후 납품
 
 ## 사무실 구조
 
@@ -46,4 +48,8 @@ hermes kanban list    # 현재 업무 현황
 
 | 프로젝트 | 상태 | 설명 |
 |---|---|---|
-| (첫 프로젝트 대기 중) | — | — |
+| [hello-cli](projects/hello-cli/) | ✅ 완료 | 한국어 인사말 출력 Python CLI (TDD, 3 tests) |
+
+## 운영 자동화
+
+- **데일리 스탠드업**: 매일 09:00에 Kanban 현황 자동 보고 (cron `agent-company-standup`)
