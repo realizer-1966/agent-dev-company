@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>할 일 관리</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); }
+    .card { box-shadow: 0 10px 30px rgba(0,0,0,0.08); border-radius: 1.5rem; }
+    .fade-in { animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+  <div class="card bg-white p-8 w-full max-w-xl fade-in">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="text-3xl font-bold text-slate-800">📝 할 일 관리</h1>
+        <p class="text-slate-500 text-sm mt-1" id="count">총 0개 · 완료 0개</p>
+      </div>
+      <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center text-2xl">✅</div>
+    </div>
+
+    <!-- 입력 폼 -->
+    <form id="addForm" class="flex gap-2 mb-6">
+      <input type="text" id="newTodo" placeholder="새 할 일 입력..."
+             class="flex-1 px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-green-400 focus:outline-none transition" autocomplete="off">
+      <button type="submit" class="px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition">
+        추가
+      </button>
+    </form>
+
+    <!-- 목록 -->
+    <ul id="todoList" class="space-y-3 max-h-96 overflow-y-auto"></ul>
+    <p id="emptyMsg" class="text-center text-slate-400 py-8 hidden">아직 할 일이 없어요. 위에 추가해 보세요! 🚀</p>
+
+    <!-- 필터 -->
+    <div class="flex gap-2 mt-6 text-sm text-slate-600">
+      <button data-filter="all" class="filter-btn px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 transition">전체</button>
+      <button data-filter="active" class="filter-btn px-3 py-1.5 rounded-lg hover:bg-slate-200 transition">진행중</button>
+      <button data-filter="done" class="filter-btn px-3 py-1.5 rounded-lg hover:bg-slate-200 transition">완료</button>
+      <button id="clearDone" class="ml-auto px-3 py-1.5 rounded-lg text-red-500 hover:bg-red-50 transition">완료 항목 지우기</button>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'todo_web_todos';
+    let todos = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    let filter = 'all';
+
+    const list = document.getElementById('todoList');
+    const count = document.getElementById('count');
+    const emptyMsg = document.getElementById('emptyMsg');
+    const form = document.getElementById('addForm');
+    const input = document.getElementById('newTodo');
+
+    function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(todos)); }
+
+    function escapeHtml(s) {
+      return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function render() {
+      const done = todos.filter(t => t.done).length;
+      count.textContent = `총 ${todos.length}개 · 완료 ${done}개`;
+      emptyMsg.classList.toggle('hidden', todos.length > 0);
+      list.innerHTML = '';
+      todos.forEach(todo => {
+        if (filter === 'active' && todo.done) return;
+        if (filter === 'done' && !todo.done) return;
+        const li = document.createElement('li');
+        li.className = 'flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition fade-in';
+        const check = document.createElement('button');
+        check.className = 'w-7 h-7 rounded-full border-2 flex items-center justify-center text-white transition ' +
+          (todo.done ? 'bg-green-500 border-green-500' : 'border-slate-300 hover:border-green-400');
+        check.textContent = todo.done ? '✓' : '';
+        check.onclick = () => { todo.done = !todo.done; save(); render(); };
+        const span = document.createElement('span');
+        span.textContent = todo.title;
+        span.className = 'flex-1 ' + (todo.done ? 'line-through text-slate-400' : 'text-slate-700');
+        const del = document.createElement('button');
+        del.className = 'text-red-400 hover:text-red-600 px-2 transition';
+        del.textContent = '🗑️';
+        del.onclick = () => { todos = todos.filter(t => t !== todo); save(); render(); };
+        li.appendChild(check); li.appendChild(span); li.appendChild(del);
+        list.appendChild(li);
+      });
+    }
+
+    form.onsubmit = (e) => {
+      e.preventDefault();
+      const title = input.value.trim();
+      if (!title) return;
+      todos.push({ title, done: false });
+      save(); render();
+      input.value = '';
+      input.focus();
+    };
+
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.onclick = () => {
+        filter = btn.dataset.filter;
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('bg-slate-100'));
+        btn.classList.add('bg-slate-100');
+        render();
+      };
+    });
+
+    document.getElementById('clearDone').onclick = () => {
+      todos = todos.filter(t => !t.done);
+      save(); render();
+    };
+
+    render();
+  </script>
+</body>
+</html>
