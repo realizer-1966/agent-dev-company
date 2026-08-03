@@ -26,4 +26,4 @@ jobs:
         python -m pip install --upgrade pip
         cd projects/${{ matrix.project }}
         pip install -e . pytest pytest-cov pytest-mock mutmut || pip install pytest pytest-cov pytest-mock mutmut
-        pytest -q --cov --cov-report=xml || echo "Test coverage check completed"
+        pytest -q --cov --cov-report=xml

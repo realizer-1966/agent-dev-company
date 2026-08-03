@@ -49,7 +49,8 @@ hermes kanban list    # 현재 업무 현황
 | 프로젝트 | 상태 | 설명 |
 |---|---|---|
 | [hello-cli](projects/hello-cli/) | ✅ 완료 | 한국어 인사말 출력 Python CLI (TDD, 3 tests) |
-| [todo-list](projects/todo-list/) | ✅ 완료 | 할일 관리 CLI (add/list/done/remove, JSON 저장, 21 tests) |
+| [todo-list](projects/todo-list/) | ✅ 완료 | 할일 관리 CLI (add/list/done/remove, JSON 저장, 30 tests) |
+| [fastapi-backend](projects/fastapi-backend/) | ✅ 완료 | FastAPI 웹 백엔드 (RESTful API, TDD, 5 tests) |
 
 ## 운영 자동화
 
