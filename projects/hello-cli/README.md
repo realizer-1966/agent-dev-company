@@ -15,7 +15,7 @@ projects/hello-cli/
 └── README.md
 ```
 
-## 사용법
+## 실행 방법 (명령어 포함)
 
 ```bash
 # CLI로 인사말 출력
@@ -27,7 +27,7 @@ from hello_cli import greet
 greet("홍길동")  # => "안녕하세요, 홍길동!"
 ```
 
-## 테스트
+## 테스트 방법
 
 ```bash
 python -m pytest -q
