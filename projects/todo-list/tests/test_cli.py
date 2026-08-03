@@ -1,7 +1,10 @@
 """Tests for todo-list CLI commands using Click's CliRunner."""
 import json
 import os
+import subprocess
+import sys
 import tempfile
+from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
@@ -166,3 +169,22 @@ def test_cli_categories_command(runner, temp_todo_path):
     assert result.exit_code == 0
     assert "업무" in result.output
     assert "개인" in result.output
+
+
+# ── __main__ 모듈 실행 테스트 ──
+
+def test_cli_module_executable_as_main():
+    """`python -m todo_list.cli --help` should run and exit 0.
+
+    이 테스트는 cli.py에 `if __name__ == "__main__"` 블록이 존재해야
+    통과한다. (python -m으로 실행 시 진입점이 필요하기 때문)
+    """
+    project_dir = Path(__file__).resolve().parent.parent
+    result = subprocess.run(
+        [sys.executable, "-m", "todo_list.cli", "--help"],
+        cwd=project_dir,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "Usage" in result.stdout

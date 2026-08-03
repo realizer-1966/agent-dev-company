@@ -98,3 +98,7 @@ def categories(ctx):
     for cat in cats:
         count = len([t for t in tl.list() if t.get("category", "일반") == cat])
         click.echo(f"  [{cat}] ({count}개)")
+
+
+if __name__ == "__main__":
+    main()
