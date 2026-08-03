@@ -1,0 +1,12 @@
+[project]
+name = "hello-cli"
+version = "0.1.0"
+description = "greet(name) 함수로 인사말을 출력하는 Python CLI 도구"
+requires-python = ">=3.9"
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
