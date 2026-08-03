@@ -132,3 +132,37 @@ def test_cli_add_and_list_integration(runner, temp_todo_path):
     # List should show only 2 items (ids may differ)
     tl = TodoList(data_path=temp_todo_path)
     assert len(tl.list()) == 2
+
+
+# ── 카테고리 CLI 테스트 ──
+
+def test_cli_add_with_category(runner, temp_todo_path):
+    """add command with --category option."""
+    result = runner.invoke(main, ["--data-path", temp_todo_path, "add", "--category", "업무", "Task A"])
+    assert result.exit_code == 0
+    assert "업무" in result.output
+    tl = TodoList(data_path=temp_todo_path)
+    assert tl.list()[0]["category"] == "업무"
+
+
+def test_cli_list_by_category(runner, temp_todo_path):
+    """list --by-category should show grouped output."""
+    tl = TodoList(data_path=temp_todo_path)
+    tl.add("Work 1", category="업무")
+    tl.add("Work 2", category="업무")
+    tl.add("Personal", category="개인")
+    result = runner.invoke(main, ["--data-path", temp_todo_path, "list", "--by-category"])
+    assert result.exit_code == 0
+    assert "업무" in result.output
+    assert "개인" in result.output
+
+
+def test_cli_categories_command(runner, temp_todo_path):
+    """categories command should list unique categories."""
+    tl = TodoList(data_path=temp_todo_path)
+    tl.add("A", category="업무")
+    tl.add("B", category="개인")
+    result = runner.invoke(main, ["--data-path", temp_todo_path, "categories"])
+    assert result.exit_code == 0
+    assert "업무" in result.output
+    assert "개인" in result.output

@@ -103,6 +103,43 @@ class TestTodoList:
         assert len(items) == 1
         assert items[0]["text"] == "Load me"
 
+    # ── 카테고리 기능 테스트 ──
+
+    def test_add_with_category(self, todo_list):
+        """add() with category should store it."""
+        todo = todo_list.add("Buy milk", category="집")
+        assert todo["category"] == "집"
+
+    def test_add_defaults_to_general_category(self, todo_list):
+        """add() without category should default to '일반'."""
+        todo = todo_list.add("Buy milk")
+        assert todo["category"] == "일반"
+
+    def test_list_by_category(self, todo_list):
+        """list_by_category() should return todos grouped by category."""
+        todo_list.add("Task A", category="업무")
+        todo_list.add("Task B", category="업무")
+        todo_list.add("Task C", category="개인")
+        grouped = todo_list.list_by_category()
+        assert "업무" in grouped
+        assert "개인" in grouped
+        assert len(grouped["업무"]) == 2
+        assert len(grouped["개인"]) == 1
+
+    def test_categories_returns_unique_list(self, todo_list):
+        """categories() should return all unique category names."""
+        todo_list.add("A", category="업무")
+        todo_list.add("B", category="개인")
+        todo_list.add("C", category="업무")
+        cats = todo_list.categories()
+        assert sorted(cats) == ["개인", "업무"]
+
+    def test_categories_includes_default(self, todo_list):
+        """categories() should include '일반' when todos exist without explicit category."""
+        todo_list.add("Just a task")
+        cats = todo_list.categories()
+        assert "일반" in cats
+
     def test_auto_creates_file_if_missing(self):
         """TodoList should create the JSON file if it doesn't exist."""
         with tempfile.TemporaryDirectory() as tmpdir:

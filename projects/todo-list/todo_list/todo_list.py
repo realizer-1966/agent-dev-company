@@ -1,4 +1,6 @@
 """TodoList class — JSON file-based todo list manager."""
+from __future__ import annotations
+
 import json
 import os
 from datetime import datetime, timezone
@@ -37,7 +39,7 @@ class TodoList:
         """Return all todos."""
         return self._read()
 
-    def add(self, text: str) -> dict:
+    def add(self, text: str, category: str = "일반") -> dict:
         """Add a new todo and return it."""
         todos = self._read()
         new_id = max((t["id"] for t in todos), default=0) + 1
@@ -45,11 +47,29 @@ class TodoList:
             "id": new_id,
             "text": text,
             "done": False,
+            "category": category,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
         todos.append(todo)
         self._write(todos)
         return todo
+
+    def list_by_category(self) -> dict[str, list[dict]]:
+        """Return todos grouped by category."""
+        todos = self._read()
+        grouped: dict[str, list[dict]] = {}
+        for todo in todos:
+            cat = todo.get("category", "일반")
+            grouped.setdefault(cat, []).append(todo)
+        return grouped
+
+    def categories(self) -> list[str]:
+        """Return all unique category names."""
+        todos = self._read()
+        cats = set()
+        for todo in todos:
+            cats.add(todo.get("category", "일반"))
+        return sorted(cats)
 
     def done(self, todo_id: int) -> dict:
         """Mark a todo as done and return the updated todo."""
