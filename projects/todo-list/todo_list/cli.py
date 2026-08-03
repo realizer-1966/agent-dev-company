@@ -1,23 +1,17 @@
-"""CLI for todo-list — add and list commands."""
-import sys
-from datetime import datetime
+"""CLI entry point for todo-list using Click."""
+from datetime import datetime, timezone
 
 import click
 
 from todo_list.todo_list import TodoList
 
 
-def _format_date(iso_str: str) -> str:
-    """Format ISO datetime string to YYYY-MM-DD."""
-    try:
-        dt = datetime.fromisoformat(iso_str)
-        return dt.strftime("%Y-%m-%d")
-    except (ValueError, TypeError):
-        return iso_str[:10] if iso_str else ""
-
-
 @click.group()
-@click.option("--data-path", default=None, help="Path to the JSON data file.")
+@click.option(
+    "--data-path",
+    default=None,
+    help="Path to the JSON data file (default: todos.json in project root).",
+)
 @click.pass_context
 def main(ctx, data_path):
     """A simple CLI todo-list manager."""
@@ -29,29 +23,50 @@ def main(ctx, data_path):
 @click.argument("text")
 @click.pass_context
 def add(ctx, text):
-    """Add a new todo item."""
-    if not text.strip():
-        click.echo("오류: 할일 내용이 비어있습니다.", err=True)
-        sys.exit(1)
-    todo_list = ctx.obj["todo_list"]
-    todo = todo_list.add(text)
-    click.echo(f"추가됨: [{todo['id']}] {todo['text']}")
+    """Add a new todo."""
+    tl = ctx.obj["todo_list"]
+    todo = tl.add(text)
+    click.echo(f"할일 추가됨: [{todo['id']}] {todo['text']}")
 
 
 @main.command()
 @click.pass_context
 def list(ctx):
-    """List all todo items."""
-    todo_list = ctx.obj["todo_list"]
-    todos = todo_list.list()
-    if not todos:
+    """List all todos."""
+    tl = ctx.obj["todo_list"]
+    items = tl.list()
+    if not items:
         click.echo("할일이 없습니다.")
         return
-    for todo in todos:
-        status = "✓" if todo["done"] else " "
-        date = _format_date(todo.get("created_at", ""))
-        click.echo(f"[{todo['id']}] [{status}] {todo['text']} ({date})")
+    for todo in items:
+        done_mark = "✓" if todo["done"] else " "
+        created = datetime.fromisoformat(todo["created_at"]).strftime("%Y-%m-%d")
+        click.echo(f"[{todo['id']}] [{done_mark}] {todo['text']} ({created})")
 
 
-if __name__ == "__main__":
-    main()
+@main.command()
+@click.argument("todo_id", type=int)
+@click.pass_context
+def done(ctx, todo_id):
+    """Mark a todo as done."""
+    tl = ctx.obj["todo_list"]
+    try:
+        todo = tl.done(todo_id)
+        click.echo(f"할일 완료: [{todo['id']}] {todo['text']}")
+    except ValueError as e:
+        click.echo(str(e), err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("todo_id", type=int)
+@click.pass_context
+def remove(ctx, todo_id):
+    """Remove a todo."""
+    tl = ctx.obj["todo_list"]
+    try:
+        tl.remove(todo_id)
+        click.echo(f"할일 삭제됨: [{todo_id}]")
+    except ValueError as e:
+        click.echo(str(e), err=True)
+        raise click.Abort()
