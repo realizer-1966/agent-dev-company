@@ -14,5 +14,11 @@ dependencies = [
 [project.scripts]
 todo = "todo_list.cli:main"
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=7.0",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
