@@ -123,7 +123,7 @@
       const { names, options, rungs, results, paths, revealed } = state;
       const n = names.length;
       const W = 720, H = 440;
-      const padX = 60, topPad = 78, botPad = 78;
+      const padX = 60, topPad = 92, botPad = 78;
       const usable = W - padX * 2;
       const colW = usable / (n - 1 || 1);
       const topY = topPad, botY = H - botPad;
@@ -149,17 +149,24 @@
         svg += `<line x1="${rp.x1}" y1="${rp.y}" x2="${rp.x2}" y2="${rp.y}" stroke="#6366f1" stroke-width="5" class="ladder-line"/>`;
       });
 
-      // 참가자 이름 (상단 배지)
+      // 참가자 이름 (상단 배지) — 공개 시엔 "이름 → 결과" 2줄로 확장
       const badgeColors = ['#ef4444','#f97316','#f59e0b','#10b981','#06b6d4','#3b82f6','#8b5cf6','#ec4899','#84cc16','#14b8a6','#6366f1','#f43f5e'];
+      const badgeH = revealed ? 54 : 30;
+      const badgeTop = topY - (revealed ? 72 : 48);
       names.forEach((name, i) => {
         const x = padX + i * colW;
         const color = badgeColors[i % badgeColors.length];
         const badgeW = Math.min(120, colW * 0.9);
-        const badgeH = 30;
-        svg += `<rect x="${x - badgeW/2}" y="${topY - 48}" width="${badgeW}" height="${badgeH}" rx="15" fill="${color}" opacity="0.95"/>`;
-        svg += `<text x="${x}" y="${topY - 27}" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">${escapeHtml(name)}</text>`;
+        svg += `<rect x="${x - badgeW/2}" y="${badgeTop}" width="${badgeW}" height="${badgeH}" rx="15" fill="${color}" opacity="0.95"/>`;
+        if (revealed) {
+          svg += `<text x="${x}" y="${badgeTop + 21}" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">${escapeHtml(name)}</text>`;
+          svg += `<line x1="${x - badgeW*0.25}" y1="${badgeTop + 27}" x2="${x + badgeW*0.25}" y2="${badgeTop + 27}" stroke="#ffffff" stroke-width="1.5" opacity="0.55"/>`;
+          svg += `<text x="${x}" y="${badgeTop + 43}" text-anchor="middle" font-size="13" font-weight="800" fill="#ffffff">→ ${escapeHtml(options[results[i]])}</text>`;
+        } else {
+          svg += `<text x="${x}" y="${topY - 27}" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">${escapeHtml(name)}</text>`;
+        }
         // 배지에서 세로줄로 이어지는 짧은 연결선
-        svg += `<line x1="${x}" y1="${topY - 18}" x2="${x}" y2="${topY}" stroke="${color}" stroke-width="3" opacity="0.6"/>`;
+        svg += `<line x1="${x}" y1="${badgeTop + badgeH}" x2="${x}" y2="${topY}" stroke="${color}" stroke-width="3" opacity="0.6"/>`;
       });
 
       // 결과 표시 (하단) — 공개 전엔 ? 로 표시
