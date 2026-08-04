@@ -57,6 +57,23 @@
         </div>
       </div>
 
+      <!-- 건물 공용 비용 -->
+      <div class="bg-slate-800 rounded-2xl p-5 mb-6 border border-slate-700">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-bold text-white">🏢 건물 공용 비용 <span class="text-xs font-normal text-slate-400 ml-1">(공용전기, 하수도 등)</span></h3>
+          <div class="text-right">
+            <p class="text-xs text-slate-400">누적 공용 비용</p>
+            <p class="text-xl font-extrabold text-emerald-400" id="commonCostSum">0원</p>
+          </div>
+        </div>
+        <div class="grid md:grid-cols-3 gap-2 mb-3">
+          <input id="ccCostType" placeholder="비용항목 (예: 공용전기, 하수도)" class="col-span-1 bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400"/>
+          <input id="ccCost" type="number" min="0" step="0.01" placeholder="비용 (원)" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400"/>
+          <button id="ccAddBtn" class="btn bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl">+ 공용 비용 기록</button>
+        </div>
+        <div id="commonCostsList" class="space-y-2 max-h-56 overflow-y-auto"></div>
+      </div>
+
       <!-- 세입자 추가 폼 -->
       <div class="bg-slate-800 rounded-2xl p-5 mb-6 border border-slate-700">
         <h3 class="font-bold text-white mb-4">📝 세입자 등록 <span class="text-xs font-normal text-slate-400 ml-1">(최대 30명)</span></h3>
@@ -315,7 +332,9 @@
       document.getElementById('buildingDetail').classList.remove('hidden');
       document.getElementById('detailBuildingName').textContent = '🏢 ' + b.name;
       document.getElementById('detailBuildingCount').textContent = `세입자 ${b.tenants.length}/30명`;
+      if (!b.commonCosts) b.commonCosts = [];
       renderTenants();
+      renderCommonCosts();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -392,6 +411,62 @@
           else if (btn.dataset.act === 'del') deleteTenant(btn.dataset.tid);
         });
       });
+    }
+
+    // ============ 건물 공용 비용 ============
+    function renderCommonCosts() {
+      const b = buildings.find(x => x.id === currentBuildingId);
+      if (!b) return;
+      if (!b.commonCosts) b.commonCosts = [];
+      const list = document.getElementById('commonCostsList');
+      list.innerHTML = '';
+      const total = b.commonCosts.reduce((s, c) => s + (Number(c.cost) || 0), 0);
+      document.getElementById('commonCostSum').textContent = total ? total.toLocaleString('ko-KR') + '원' : '0원';
+      if (b.commonCosts.length === 0) {
+        list.innerHTML = '<p class="text-xs text-slate-500">아직 공용 비용 기록이 없습니다.</p>';
+        return;
+      }
+      b.commonCosts.forEach(c => {
+        const date = new Date(c.createdAt).toLocaleString('ko-KR', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+        list.innerHTML += `
+          <div class="bg-slate-900 rounded-xl px-3 py-2 border border-slate-700 flex items-center justify-between">
+            <div>
+              <span class="text-sm font-bold text-white">${escapeHtml(c.type || '비용')}</span>
+              <span class="text-xs text-slate-400 ml-2">${date}</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="text-sm font-bold text-emerald-400">${Number(c.cost).toLocaleString('ko-KR')}원</span>
+              <button data-ccid="${c.id}" class="text-rose-400 hover:text-rose-300 text-xs">삭제</button>
+            </div>
+          </div>`;
+      });
+      list.querySelectorAll('[data-ccid]').forEach(btn => {
+        btn.addEventListener('click', () => deleteCommonCost(btn.dataset.ccid));
+      });
+    }
+
+    function addCommonCost() {
+      const b = buildings.find(x => x.id === currentBuildingId);
+      if (!b) return;
+      const type = document.getElementById('ccCostType').value.trim();
+      const costVal = document.getElementById('ccCost').value;
+      const cost = costVal === '' ? null : Number(costVal);
+      if (cost === null || isNaN(cost)) { alert('공용 비용 금액을 입력하세요.'); return; }
+      if (!b.commonCosts) b.commonCosts = [];
+      b.commonCosts.unshift({ id: genId(), type: type || '기타', cost, createdAt: Date.now() });
+      saveBuildings();
+      renderCommonCosts();
+      document.getElementById('ccCostType').value = '';
+      document.getElementById('ccCost').value = '';
+    }
+
+    function deleteCommonCost(cid) {
+      const b = buildings.find(x => x.id === currentBuildingId);
+      if (!b) return;
+      if (!confirm('이 공용 비용 기록을 삭제하시겠습니까?')) return;
+      b.commonCosts = b.commonCosts.filter(c => c.id !== cid);
+      saveBuildings();
+      renderCommonCosts();
     }
 
     // 세입자 상태 판정 (현재 날짜 기준)
@@ -615,7 +690,7 @@
     function saveBuilding() {
       const name = document.getElementById('bName').value.trim();
       if (!name) { alert('건물 이름을 입력하세요.'); return; }
-      const b = { id: genId(), name, addr: document.getElementById('bAddr').value.trim(), tenants: [] };
+      const b = { id: genId(), name, addr: document.getElementById('bAddr').value.trim(), tenants: [], commonCosts: [] };
       buildings.push(b);
       saveBuildings();
       renderBuildings();
@@ -627,6 +702,7 @@
     document.getElementById('bCancel').addEventListener('click', hideBuildingModal);
     document.getElementById('bSave').addEventListener('click', saveBuilding);
     document.getElementById('addTenantBtn').addEventListener('click', addTenant);
+    document.getElementById('ccAddBtn').addEventListener('click', addCommonCost);
     document.getElementById('backBtn').addEventListener('click', backToList);
     document.getElementById('tmClose').addEventListener('click', closeTenant);
     document.getElementById('noteAdd').addEventListener('click', addNote);
