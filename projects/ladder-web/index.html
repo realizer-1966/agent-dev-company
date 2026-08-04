@@ -103,25 +103,27 @@
           }
         }
       }
-      // 위에서 아래로 따라가며 결과 계산
+      // 위에서 아래로 따라가며 결과 계산 (각 참가자의 실제 이동 경로도 저장)
       const results = [];
+      const paths = []; // 각 참가자가 탄 rungs (실제 경로 하이라이트용)
       for (let col = 0; col < n; col++) {
         let cur = col;
-        const path = [cur];
+        const used = [];
         for (let y = 1; y <= yCount; y++) {
           const rung = rungs.find(r => r.y === y && (r.a === cur || r.b === cur));
-          if (rung) { cur = rung.a === cur ? rung.b : rung.a; path.push(cur); }
+          if (rung) { used.push(rung); cur = rung.a === cur ? rung.b : rung.a; }
         }
         results.push(cur);
+        paths.push(used);
       }
-      return { rungs, results };
+      return { rungs, results, paths };
     }
 
     function drawLadder() {
-      const { names, options, rungs, results, revealed } = state;
+      const { names, options, rungs, results, paths, revealed } = state;
       const n = names.length;
-      const W = 720, H = 400;
-      const padX = 60, topPad = 78, botPad = 50;
+      const W = 720, H = 440;
+      const padX = 60, topPad = 78, botPad = 78;
       const usable = W - padX * 2;
       const colW = usable / (n - 1 || 1);
       const topY = topPad, botY = H - botPad;
@@ -164,22 +166,48 @@
       options.forEach((opt, j) => {
         const x = padX + j * colW;
         // 이 결과를 받는 참가자 인덱스
-        const winner = results.indexOf(j);
-        const isRevealed = revealed;
-        const color = isRevealed ? '#065f46' : '#94a3b8';
-        const text = isRevealed ? (winner >= 0 ? escapeHtml(opt) : '') : '?';
-        // 사다리 도착 위치에 결과 표시
-        svg += `<text x="${x}" y="${botY + 24}" text-anchor="middle" font-size="14" font-weight="700" fill="${color}">${text}</text>`;
+        const winner = revealed ? results.indexOf(j) : -1;
+        if (revealed && winner >= 0) {
+          const color = badgeColors[winner % badgeColors.length];
+          const badgeW = Math.min(120, colW * 0.9);
+          const badgeH = 30;
+          // 하단 결과 배지
+          svg += `<rect x="${x - badgeW/2}" y="${botY + 16}" width="${badgeW}" height="${badgeH}" rx="15" fill="${color}" opacity="0.95"/>`;
+          svg += `<text x="${x}" y="${botY + 37}" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">${escapeHtml(opt)}</text>`;
+          // 배지에서 세로줄로 이어지는 짧은 연결선
+          svg += `<line x1="${x}" y1="${botY}" x2="${x}" y2="${botY + 16}" stroke="${color}" stroke-width="3" opacity="0.6"/>`;
+        } else if (!revealed) {
+          svg += `<text x="${x}" y="${botY + 24}" text-anchor="middle" font-size="16" font-weight="700" fill="#cbd5e1">?</text>`;
+        }
       });
 
-      // 공개 시 매칭 강조 (참가자 -> 결과 화살표 느낌)
+      // 공개 시 각 참가자의 실제 이동 경로를 하이라이트
       if (revealed) {
+        // 경로 오버레이를 먼저 그려서 배지보다 아래에 오게 함
         names.forEach((name, i) => {
-          const target = results[i];
-          const x1 = padX + i * colW, y1 = botY;
-          const x2 = padX + target * colW, y2 = botY + 22;
-          svg += `<circle cx="${x1}" cy="${y1}" r="5" fill="#ec4899"/>`;
-          svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#ec4899" stroke-width="3" stroke-dasharray="4 3" opacity="0.6"/>`;
+          const color = badgeColors[i % badgeColors.length];
+          const used = paths[i]; // 이 참가자가 탄 가로선들
+          let cur = i;
+          let prevY = topY;
+          const colX = c => padX + c * colW;
+          const yAt = y => topY + (y / maxY) * (botY - topY);
+          const usedSet = new Set(used.map(r => r.y));
+          let pathSvg = '';
+          for (let y = 1; y <= maxY; y++) {
+            const yPos = yAt(y);
+            if (usedSet.has(y)) {
+              const rung = used.find(r => r.y === y);
+              const next = rung.a === cur ? rung.b : rung.a;
+              // 세로 구간 + 가로 구간
+              pathSvg += `<line x1="${colX(cur)}" y1="${prevY}" x2="${colX(cur)}" y2="${yPos}" stroke="${color}" stroke-width="6" stroke-linecap="round" opacity="0.9"/>`;
+              pathSvg += `<line x1="${colX(cur)}" y1="${yPos}" x2="${colX(next)}" y2="${yPos}" stroke="${color}" stroke-width="6" stroke-linecap="round" opacity="0.9"/>`;
+              cur = next;
+              prevY = yPos;
+            }
+          }
+          // 마지막 세로 구간
+          pathSvg += `<line x1="${colX(cur)}" y1="${prevY}" x2="${colX(cur)}" y2="${botY}" stroke="${color}" stroke-width="6" stroke-linecap="round" opacity="0.9"/>`;
+          svg += pathSvg;
         });
       }
 
@@ -200,8 +228,8 @@
       while (opts.length < names.length) opts.push('꽝 💀');
       while (opts.length > names.length) opts.pop();
       const density = parseInt(densityEl.value, 10);
-      const { rungs, results } = buildLadder(names, opts, density);
-      state = { names, options: opts, rungs, results, revealed: false };
+      const { rungs, results, paths } = buildLadder(names, opts, density);
+      state = { names, options: opts, rungs, results, paths, revealed: false };
       resultCard.classList.remove('hidden');
       drawLadder();
       resultCard.scrollIntoView({ behavior: 'smooth' });
