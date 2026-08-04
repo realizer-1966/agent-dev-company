@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>계산기</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); }
+    .btn { transition: all 0.15s ease; user-select: none; }
+    .btn:active { transform: scale(0.94); }
+    .fade-in { animation: fadeIn 0.2s ease; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+  <div class="w-full max-w-xs fade-in">
+    <div class="bg-slate-800 rounded-3xl shadow-2xl p-5 border border-slate-700">
+      <!-- 디스플레이 -->
+      <div class="bg-slate-900 rounded-2xl p-4 mb-4 text-right">
+        <div class="text-slate-400 text-sm h-6" id="expression">&nbsp;</div>
+        <div class="text-white text-5xl font-light truncate leading-tight" id="display">0</div>
+      </div>
+
+      <!-- 키패드 -->
+      <div class="grid grid-cols-4 gap-2">
+        <button data-action="clear" class="btn col-span-2 bg-slate-600 hover:bg-slate-500 text-white text-xl py-4 rounded-xl">AC</button>
+        <button data-action="back" class="btn bg-slate-600 hover:bg-slate-500 text-white text-xl py-4 rounded-xl">⌫</button>
+        <button data-op="/" class="btn bg-amber-500 hover:bg-amber-400 text-white text-2xl py-4 rounded-xl">÷</button>
+
+        <button data-num="7" class="btn bg-slate-700 hover:bg-slate-600 text-white text-xl py-4 rounded-xl">7</button>
+        <button data-num="8" class="btn bg-slate-700 hover:bg-slate-600 text-white text-xl py-4 rounded-xl">8</button>
+        <button data-num="9" class="btn bg-slate-700 hover:bg-slate-600 text-white text-xl py-4 rounded-xl">9</button>
+        <button data-op="*" class="btn bg-amber-500 hover:bg-amber-400 text-white text-2xl py-4 rounded-xl">×</button>
+
+        <button data-num="4" class="btn bg-slate-700 hover:bg-slate-600 text-white text-xl py-4 rounded-xl">4</button>
+        <button data-num="5" class="btn bg-slate-700 hover:bg-slate-600 text-white text-xl py-4 rounded-xl">5</button>
+        <button data-num="6" class="btn bg-slate-700 hover:bg-slate-600 text-white text-xl py-4 rounded-xl">6</button>
+        <button data-op="-" class="btn bg-amber-500 hover:bg-amber-400 text-white text-2xl py-4 rounded-xl">−</button>
+
+        <button data-num="1" class="btn bg-slate-700 hover:bg-slate-600 text-white text-xl py-4 rounded-xl">1</button>
+        <button data-num="2" class="btn bg-slate-700 hover:bg-slate-600 text-white text-xl py-4 rounded-xl">2</button>
+        <button data-num="3" class="btn bg-slate-700 hover:bg-slate-600 text-white text-xl py-4 rounded-xl">3</button>
+        <button data-op="+" class="btn bg-amber-500 hover:bg-amber-400 text-white text-2xl py-4 rounded-xl">+</button>
+
+        <button data-num="0" class="btn bg-slate-700 hover:bg-slate-600 text-white text-xl py-4 rounded-xl">0</button>
+        <button data-num="." class="btn bg-slate-700 hover:bg-slate-600 text-white text-xl py-4 rounded-xl">.</button>
+        <button data-op="%" class="btn bg-slate-600 hover:bg-slate-500 text-white text-xl py-4 rounded-xl">%</button>
+        <button data-op="=" class="btn bg-green-500 hover:bg-green-400 text-white text-2xl py-4 rounded-xl">=</button>
+      </div>
+    </div>
+    <p class="text-center text-slate-500 text-xs mt-4">계산기 · 버튼 클릭으로 사용하세요</p>
+  </div>
+
+  <script>
+    const display = document.getElementById('display');
+    const expression = document.getElementById('expression');
+    let current = '0';
+    let previous = null;
+    let operation = null;
+    let reset = false;
+
+    function update() {
+      display.textContent = current.length > 12 ? parseFloat(current).toExponential(4) : current;
+      expression.textContent = previous !== null
+        ? previous + ' ' + (operation === '*' ? '×' : operation === '/' ? '÷' : operation === '-' ? '−' : operation === '+' ? '+' : operation === '%' ? '%' : '') 
+        : '\u00a0';
+    }
+
+    function inputNum(n) {
+      if (reset) { current = n; reset = false; }
+      else if (current === '0' && n !== '.') current = n;
+      else if (n === '.' && current.includes('.')) return;
+      else current += n;
+      update();
+    }
+
+    function setOp(op) {
+      if (op === '=') {
+        if (operation && previous !== null) {
+          compute();
+          previous = null;
+          operation = null;
+        }
+        reset = true;
+      } else if (op === '%') {
+        current = String(parseFloat(current) / 100);
+        update();
+      } else {
+        if (operation && previous !== null) compute();
+        previous = current;
+        operation = op;
+        reset = true;
+      }
+      update();
+    }
+
+    function compute() {
+      const a = parseFloat(previous);
+      const b = parseFloat(current);
+      let result;
+      switch (operation) {
+        case '+': result = a + b; break;
+        case '-': result = a - b; break;
+        case '*': result = a * b; break;
+        case '/': result = b === 0 ? '오류' : a / b; break;
+        default: result = b;
+      }
+      if (result === '오류') { current = '0'; display.textContent = '오류'; expression.textContent = '0으로 나눌 수 없음'; return; }
+      current = String(Math.round((result + Number.EPSILON) * 1e10) / 1e10);
+    }
+
+    function clear() { current = '0'; previous = null; operation = null; reset = false; update(); }
+    function back() { current = current.length > 1 ? current.slice(0, -1) : '0'; update(); }
+
+    document.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.dataset.num) inputNum(btn.dataset.num);
+        else if (btn.dataset.op) setOp(btn.dataset.op);
+        else if (btn.dataset.action === 'clear') clear();
+        else if (btn.dataset.action === 'back') back();
+      });
+    });
+
+    // 키보드 지원
+    document.addEventListener('keydown', e => {
+      if (/[0-9.]/.test(e.key)) inputNum(e.key);
+      else if (['+','-','*','/'].includes(e.key)) setOp(e.key);
+      else if (e.key === 'Enter') setOp('=');
+      else if (e.key === 'Backspace') back();
+      else if (e.key === 'Escape') clear();
+    });
+
+    update();
+  </script>
+</body>
+</html>

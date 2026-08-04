@@ -1,0 +1,6 @@
+{
+  "title": "계산기",
+  "description": "세련된 다크 테마의 계산기 웹앱. 사칙연산, 소수점, 퍼센트를 지원하며 마우스와 키보드 모두 사용할 수 있습니다.",
+  "category": "Productivity",
+  "icon": "icon.svg"
+}
