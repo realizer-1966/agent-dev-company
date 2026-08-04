@@ -108,9 +108,19 @@
 
       <!-- 기록 작성 -->
       <h4 class="font-bold text-white text-sm mb-2">📝 기록 남기기</h4>
-      <textarea id="noteText" rows="3" placeholder="텍스트 기록 (예: 관리비 연체, 시설 점검 등)" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm mb-2 focus:ring-2 focus:ring-indigo-400"></textarea>
+      <div class="grid grid-cols-3 gap-2 mb-2">
+        <input id="noteCostType" placeholder="비용항목 (예: 수도, 전기)" class="col-span-2 bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400"/>
+        <input id="noteCost" type="number" min="0" step="0.01" placeholder="비용 (원)" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400"/>
+      </div>
+      <textarea id="noteText" rows="2" placeholder="텍스트 기록 (예: 관리비 연체, 시설 점검 등)" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm mb-2 focus:ring-2 focus:ring-indigo-400"></textarea>
       <input id="noteImg" type="file" accept="image/*" class="w-full text-sm text-slate-300 mb-3 file:mr-3 file:bg-indigo-600 file:text-white file:border-0 file:rounded-xl file:px-4 file:py-2 file:font-bold file:cursor-pointer"/>
       <button id="noteAdd" class="btn w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl mb-5">기록 추가</button>
+
+      <!-- 호수별 비용 합계 -->
+      <div class="bg-indigo-600/20 border border-indigo-500/40 rounded-xl p-3 mb-4 flex items-center justify-between">
+        <span class="text-sm font-bold text-white">💰 <span id="costRoomLabel">이 호수</span> 누적 비용</span>
+        <span class="text-lg font-extrabold text-emerald-400" id="costSum">0원</span>
+      </div>
 
       <!-- 기록 목록 -->
       <h4 class="font-bold text-white text-sm mb-2">📋 기록 목록</h4>
@@ -507,6 +517,9 @@
         <span class="text-slate-400">🚪 퇴거일</span><span class="text-white text-right">${fmtDate(t.moveOut)}</span>`;
       document.getElementById('tenantModal').classList.remove('hidden');
       document.getElementById('tenantModal').classList.add('flex');
+      // 호수 라벨 설정 (호실이 없으면 세입자 이름으로 표시)
+      const roomLabel = t.room ? `${t.room}호` : `${t.name} 님`;
+      document.getElementById('costRoomLabel').textContent = roomLabel;
       renderNotes();
     }
 
@@ -520,27 +533,30 @@
     function addNote() {
       if (!currentTenant) return;
       const text = document.getElementById('noteText').value.trim();
+      const costType = document.getElementById('noteCostType').value.trim();
+      const costVal = document.getElementById('noteCost').value;
+      const cost = costVal === '' || costVal === null ? null : Number(costVal);
       const imgInput = document.getElementById('noteImg');
       const imgFile = imgInput.files[0];
-      if (!text && !imgFile) { alert('텍스트 또는 이미지를 입력하세요.'); return; }
-      const note = { id: genId(), text, image: null, createdAt: Date.now() };
-      if (imgFile) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          note.image = reader.result; // base64 이미지
-          currentTenant.notes = currentTenant.notes || [];
-          currentTenant.notes.unshift(note);
-          saveBuildings();
-          renderNotes();
-        };
-        reader.readAsDataURL(imgFile);
-      } else {
+      if (!text && !imgFile && cost === null) { alert('비용, 텍스트 또는 이미지 중 하나를 입력하세요.'); return; }
+      if (cost !== null && isNaN(cost)) { alert('비용은 숫자로 입력하세요.'); return; }
+      const note = { id: genId(), text, costType, cost, image: null, createdAt: Date.now() };
+      const commit = () => {
         currentTenant.notes = currentTenant.notes || [];
         currentTenant.notes.unshift(note);
         saveBuildings();
         renderNotes();
+      };
+      if (imgFile) {
+        const reader = new FileReader();
+        reader.onload = () => { note.image = reader.result; commit(); };
+        reader.readAsDataURL(imgFile);
+      } else {
+        commit();
       }
       document.getElementById('noteText').value = '';
+      document.getElementById('noteCostType').value = '';
+      document.getElementById('noteCost').value = '';
       imgInput.value = '';
     }
 
@@ -556,18 +572,25 @@
       const list = document.getElementById('notesList');
       list.innerHTML = '';
       const notes = currentTenant.notes || [];
+      // 누적 비용 합계 갱신
+      const total = notes.reduce((s, n) => s + (Number(n.cost) || 0), 0);
+      document.getElementById('costSum').textContent = total ? total.toLocaleString('ko-KR') + '원' : '0원';
       if (notes.length === 0) {
         list.innerHTML = '<p class="text-center text-slate-500 text-sm py-6">아직 기록이 없습니다.</p>';
         return;
       }
       notes.forEach(n => {
         const date = new Date(n.createdAt).toLocaleString('ko-KR', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+        const costHtml = (n.cost !== null && n.cost !== undefined)
+          ? `<span class="text-sm font-bold text-emerald-400">${n.costType ? escapeHtml(n.costType) + ' ' : ''}${Number(n.cost).toLocaleString('ko-KR')}원</span>`
+          : '';
         list.innerHTML += `
           <div class="bg-slate-900 rounded-xl p-3 border border-slate-700">
             <div class="flex items-center justify-between mb-1">
               <span class="text-xs text-slate-400">${date}</span>
               <button data-nid="${n.id}" class="text-rose-400 hover:text-rose-300 text-xs">삭제</button>
             </div>
+            ${costHtml ? `<div class="mb-2">${costHtml}</div>` : ''}
             ${n.text ? `<p class="text-sm text-slate-200 whitespace-pre-wrap mb-2">${escapeHtml(n.text)}</p>` : ''}
             ${n.image ? `<img src="${n.image}" class="w-full max-h-64 object-cover rounded-lg mt-1 cursor-pointer" onclick="window.open(this.src)"/>` : ''}
           </div>`;
