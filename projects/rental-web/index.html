@@ -126,6 +126,22 @@
 
       <div class="bg-slate-900 rounded-xl p-4 mb-4 text-sm grid grid-cols-2 gap-2" id="tmInfo"></div>
 
+      <!-- 월세 입금 관리 -->
+      <div class="bg-slate-800 border border-slate-600/50 rounded-xl p-4 mb-4">
+        <div class="flex items-center justify-between mb-3">
+          <h4 class="font-bold text-white text-sm">💰 월세 입금 관리 <span class="text-xs text-slate-400 ml-1">(월세 <span id="rentMonthRate">0만원</span>/월)</span></h4>
+          <div class="text-right">
+            <p class="text-xs text-slate-400">입금 합계</p>
+            <p class="text-lg font-extrabold text-emerald-400" id="rentPaidSum">0원</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-2 mb-3">
+          <input id="rentMonth" type="month" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400"/>
+          <button id="rentAddBtn" class="btn bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold py-2 rounded-xl">+ 입금 기록</button>
+        </div>
+        <div id="rentList" class="space-y-2 max-h-56 overflow-y-auto"></div>
+      </div>
+
       <!-- 기록 작성 -->
       <h4 class="font-bold text-white text-sm mb-2">📝 기록 남기기</h4>
       <div class="grid grid-cols-3 gap-2 mb-2">
@@ -607,6 +623,10 @@
       // 호수 라벨 설정 (호실이 없으면 세입자 이름으로 표시)
       const roomLabel = t.room ? `${t.room}호` : `${t.name} 님`;
       document.getElementById('costRoomLabel').textContent = roomLabel;
+      // 월세 입금 관리 초기화
+      if (!t.rentPaid) t.rentPaid = [];
+      document.getElementById('rentMonthRate').textContent = fmtMoney(t.rent);
+      renderRent();
       renderNotes();
     }
 
@@ -653,6 +673,78 @@
       currentTenant.notes = currentTenant.notes.filter(n => n.id !== noteId);
       saveBuildings();
       renderNotes();
+    }
+
+    // ============ 월세 입금 관리 ============
+    function renderRent() {
+      if (!currentTenant) return;
+      const t = currentTenant;
+      if (!t.rentPaid) t.rentPaid = [];
+      const list = document.getElementById('rentList');
+      list.innerHTML = '';
+      const paidTotal = t.rentPaid.reduce((s, r) => s + (r.paid ? ((Number(t.rent)||0) * 10000) : 0), 0);
+      document.getElementById('rentPaidSum').textContent = paidTotal ? paidTotal.toLocaleString('ko-KR') + '원' : '0원';
+      if (t.rentPaid.length === 0) {
+        list.innerHTML = '<p class="text-xs text-slate-500">아직 입금 기록이 없습니다. 년월을 선택해 기록하세요.</p>';
+        return;
+      }
+      t.rentPaid.forEach(r => {
+        const monthLabel = formatMonth(r.month);
+        const paid = r.paid;
+        list.innerHTML += `
+          <div class="bg-slate-900 rounded-xl px-3 py-2 border border-slate-700 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <button data-rid="${r.id}" data-act="toggle" class="w-5 h-5 rounded border-2 ${paid ? 'bg-emerald-500 border-emerald-500' : 'border-slate-500'} flex items-center justify-center text-xs text-white">${paid ? '✓' : ''}</button>
+              <span class="text-sm font-bold ${paid ? 'text-slate-200' : 'text-rose-400'}">${monthLabel}</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="text-xs ${paid ? 'text-emerald-400' : 'text-rose-400 font-bold'}">${paid ? '입금 완료' : '미입금'}</span>
+              <button data-rid="${r.id}" data-act="del" class="text-rose-400 hover:text-rose-300 text-xs">삭제</button>
+            </div>
+          </div>`;
+      });
+      list.querySelectorAll('[data-rid]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (btn.dataset.act === 'toggle') toggleRentPaid(btn.dataset.rid);
+          else if (btn.dataset.act === 'del') deleteRent(btn.dataset.rid);
+        });
+      });
+    }
+
+    function formatMonth(m) {
+      if (!m) return '?';
+      const [y, mo] = m.split('-');
+      return `${y}년 ${mo}월`;
+    }
+
+    function addRent() {
+      if (!currentTenant) return;
+      const month = document.getElementById('rentMonth').value;
+      if (!month) { alert('입금할 년월을 선택하세요.'); return; }
+      const t = currentTenant;
+      if (!t.rentPaid) t.rentPaid = [];
+      if (t.rentPaid.some(r => r.month === month)) { alert('이미 해당 월의 입금 기록이 있습니다.'); return; }
+      t.rentPaid.unshift({ id: genId(), month, paid: true }); // 기본 입금 완료로 기록
+      saveBuildings();
+      renderRent();
+      document.getElementById('rentMonth').value = '';
+    }
+
+    function toggleRentPaid(rid) {
+      if (!currentTenant) return;
+      const r = currentTenant.rentPaid.find(x => x.id === rid);
+      if (!r) return;
+      r.paid = !r.paid;
+      saveBuildings();
+      renderRent();
+    }
+
+    function deleteRent(rid) {
+      if (!currentTenant) return;
+      if (!confirm('이 월 입금 기록을 삭제하시겠습니까?')) return;
+      currentTenant.rentPaid = currentTenant.rentPaid.filter(x => x.id !== rid);
+      saveBuildings();
+      renderRent();
     }
 
     function renderNotes() {
@@ -718,6 +810,7 @@
     document.getElementById('backBtn').addEventListener('click', backToList);
     document.getElementById('tmClose').addEventListener('click', closeTenant);
     document.getElementById('noteAdd').addEventListener('click', addNote);
+    document.getElementById('rentAddBtn').addEventListener('click', addRent);
     document.getElementById('emClose').addEventListener('click', closeEditModal);
     document.getElementById('emCancel').addEventListener('click', closeEditModal);
     document.getElementById('emSave').addEventListener('click', saveEditTenant);
