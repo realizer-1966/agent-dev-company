@@ -54,6 +54,7 @@ hermes kanban list    # 현재 업무 현황
 | [calculator-web](projects/calculator-web/) | ✅ 완료 | 계산기 웹앱 (OnDev 배포) |
 | [todo-web](projects/todo-web/) | ✅ 완료 | 할일 관리 웹앱 (FastAPI + UI) |
 | [ladder-web](projects/ladder-web/) | ✅ 완료 | 사다리 게임 웹앱 (OnDev 배포) |
+| [rental-web](projects/rental-web/) | ✅ 완료 | 임대관리 웹앱 (건물·세입자 관리, OnDev 배포) |
 
 ## 운영 자동화
 

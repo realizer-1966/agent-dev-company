@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>임대관리 앱</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%); }
+    .fade-in { animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    .btn { transition: all 0.15s ease; user-select: none; }
+    .btn:active { transform: scale(0.96); }
+    .card { transition: all 0.2s ease; }
+    .card:hover { transform: translateY(-3px); box-shadow: 0 12px 24px -8px rgba(0,0,0,0.4); }
+    input, select, textarea { color-scheme: dark; }
+    .badge { transition: all 0.2s ease; }
+    .badge:hover { transform: scale(1.05); }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+  </style>
+</head>
+<body class="min-h-screen text-slate-200">
+
+  <!-- 헤더 -->
+  <header class="bg-slate-900/80 backdrop-blur border-b border-slate-700 sticky top-0 z-40">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+      <h1 class="text-xl font-extrabold text-white tracking-tight">🏢 임대관리 앱</h1>
+      <div class="flex items-center gap-3">
+        <span class="hidden sm:inline text-xs text-slate-400" id="saveStatus">로컬 저장</span>
+        <button id="newBuildingBtn" class="btn bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold px-4 py-2 rounded-xl">+ 건물 추가</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-4 py-6">
+
+    <!-- 건물 목록 -->
+    <section id="buildingList" class="fade-in">
+      <div id="buildingsGrid" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+      <div id="emptyBuildings" class="text-center py-16 hidden">
+        <p class="text-5xl mb-4">🏢</p>
+        <p class="text-lg font-semibold text-slate-300">등록된 건물이 없습니다</p>
+        <p class="text-sm text-slate-500 mt-1">"+ 건물 추가" 버튼으로 첫 건물을 등록하세요</p>
+      </div>
+    </section>
+
+    <!-- 건물 상세 -->
+    <section id="buildingDetail" class="hidden fade-in">
+      <!-- 뒤로가기 + 건물 정보 -->
+      <div class="flex items-center justify-between mb-4">
+        <button id="backBtn" class="btn bg-slate-700 hover:bg-slate-600 text-sm font-bold px-3 py-2 rounded-xl">← 뒤로</button>
+        <div class="text-right">
+          <h2 class="text-xl font-bold text-white" id="detailBuildingName"></h2>
+          <p class="text-xs text-slate-400" id="detailBuildingCount"></p>
+        </div>
+      </div>
+
+      <!-- 세입자 추가 폼 -->
+      <div class="bg-slate-800 rounded-2xl p-5 mb-6 border border-slate-700">
+        <h3 class="font-bold text-white mb-4">📝 세입자 등록 <span class="text-xs font-normal text-slate-400 ml-1">(최대 30명)</span></h3>
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <input id="tName" placeholder="세입자 이름" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"/>
+          <input id="tPhone" placeholder="전화번호 (예: 010-1234-5678)" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"/>
+          <input id="tRoom" placeholder="호실 (예: 101)" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"/>
+          <input id="tDeposit" type="number" min="0" placeholder="보증금 (만원)" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"/>
+          <input id="tRent" type="number" min="0" placeholder="월세 (만원)" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"/>
+          <input id="tMgmt" type="number" min="0" placeholder="관리비 (만원)" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"/>
+          <input id="tMoveIn" type="date" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"/>
+          <input id="tMoveOut" type="date" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"/>
+          <button id="addTenantBtn" class="btn bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl">+ 세입자 등록</button>
+        </div>
+        <p class="text-xs text-slate-500 mt-2">※ 퇴거일을 비워두면 현재 입주 중인 세입자로 표시됩니다</p>
+      </div>
+
+      <!-- 세입자 목록 -->
+      <div id="tenantsGrid" class="grid gap-4"></div>
+    </section>
+
+  </main>
+
+  <!-- 건물 추가 모달 -->
+  <div id="buildingModal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4">
+    <div class="bg-slate-800 rounded-2xl p-6 w-full max-w-md border border-slate-700 fade-in">
+      <h3 class="font-bold text-white text-lg mb-4">🏢 건물 등록</h3>
+      <input id="bName" placeholder="건물 이름 (예: 미소빌딩)" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm mb-3 focus:ring-2 focus:ring-indigo-400"/>
+      <input id="bAddr" placeholder="주소 (선택)" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm mb-3 focus:ring-2 focus:ring-indigo-400"/>
+      <div class="flex gap-2 justify-end mt-2">
+        <button id="bCancel" class="btn bg-slate-700 hover:bg-slate-600 text-sm font-bold px-4 py-2 rounded-xl">취소</button>
+        <button id="bSave" class="btn bg-indigo-600 hover:bg-indigo-500 text-sm font-bold px-4 py-2 rounded-xl">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 세입자 상세/기록 모달 -->
+  <div id="tenantModal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4">
+    <div class="bg-slate-800 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto border border-slate-700 fade-in">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold text-white text-lg" id="tmTitle"></h3>
+        <button id="tmClose" class="text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
+      </div>
+
+      <div class="bg-slate-900 rounded-xl p-4 mb-4 text-sm grid grid-cols-2 gap-2" id="tmInfo"></div>
+
+      <!-- 기록 작성 -->
+      <h4 class="font-bold text-white text-sm mb-2">📝 기록 남기기</h4>
+      <textarea id="noteText" rows="3" placeholder="텍스트 기록 (예: 관리비 연체, 시설 점검 등)" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm mb-2 focus:ring-2 focus:ring-indigo-400"></textarea>
+      <input id="noteImg" type="file" accept="image/*" class="w-full text-sm text-slate-300 mb-3 file:mr-3 file:bg-indigo-600 file:text-white file:border-0 file:rounded-xl file:px-4 file:py-2 file:font-bold file:cursor-pointer"/>
+      <button id="noteAdd" class="btn w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl mb-5">기록 추가</button>
+
+      <!-- 기록 목록 -->
+      <h4 class="font-bold text-white text-sm mb-2">📋 기록 목록</h4>
+      <div id="notesList" class="space-y-3"></div>
+    </div>
+  </div>
+
+  <script>
+    // ============ 데이터 저장 (IndexedDB) ============
+    const DB_NAME = 'rental-mgmt';
+    const DB_VER = 1;
+    let db = null;
+    let buildings = [];      // { id, name, addr, tenants: [ ... ] }
+    let currentBuildingId = null;
+    let currentTenant = null;
+
+    // 건물당 세입자 최대 수
+    const MAX_TENANTS = 30;
+
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VER);
+        req.onupgradeneeded = (e) => {
+          const d = e.target.result;
+          if (!d.objectStoreNames.contains('buildings')) {
+            d.createObjectStore('buildings', { keyPath: 'id' });
+          }
+        };
+        req.onsuccess = () => { db = req.result; resolve(db); };
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function saveBuildings() {
+      if (!db) return;
+      const tx = db.transaction('buildings', 'readwrite');
+      const store = tx.objectStore('buildings');
+      store.clear();
+      buildings.forEach(b => store.put(b));
+      await new Promise((res) => { tx.oncomplete = res; });
+      flashSaved();
+    }
+
+    async function loadBuildings() {
+      if (!db) return;
+      const tx = db.transaction('buildings', 'readonly');
+      const store = tx.objectStore('buildings');
+      const req = store.getAll();
+      buildings = await new Promise((res, rej) => { req.onsuccess = () => res(req.result || []); req.onerror = () => rej(req.error); });
+    }
+
+    function flashSaved() {
+      const el = document.getElementById('saveStatus');
+      el.textContent = '저장됨 ✓';
+      el.classList.add('text-emerald-400');
+      setTimeout(() => { el.textContent = '로컬 저장'; el.classList.remove('text-emerald-400'); }, 1500);
+    }
+
+    function genId() {
+      return 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    }
+
+    // ============ 포맷팅 ============
+    function fmtMoney(v) {
+      if (v === null || v === undefined || v === '') return '-';
+      return Number(v).toLocaleString('ko-KR') + '만원';
+    }
+    function fmtDate(d) {
+      if (!d) return '입주 중';
+      return d;
+    }
+
+    // ============ UI: 건물 목록 ============
+    function renderBuildings() {
+      const grid = document.getElementById('buildingsGrid');
+      const empty = document.getElementById('emptyBuildings');
+      grid.innerHTML = '';
+      if (buildings.length === 0) {
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+      buildings.forEach((b, idx) => {
+        const totalRent = b.tenants.reduce((s, t) => s + (Number(t.rent)||0), 0);
+        const activeCount = b.tenants.filter(t => !t.moveOut).length;
+        const colors = ['from-indigo-600 to-purple-600','from-emerald-600 to-teal-600','from-rose-600 to-pink-600','from-amber-500 to-orange-600','from-sky-600 to-blue-600','from-fuchsia-600 to-purple-600'];
+        const grad = colors[idx % colors.length];
+        grid.innerHTML += `
+          <button data-bid="${b.id}" class="card badge text-left bg-slate-800 border border-slate-700 rounded-2xl p-4 overflow-hidden">
+            <div class="h-1.5 rounded-full bg-gradient-to-r ${grad} mb-3"></div>
+            <h3 class="font-bold text-white text-lg truncate">🏢 ${escapeHtml(b.name)}</h3>
+            ${b.addr ? `<p class="text-xs text-slate-400 truncate mt-0.5">${escapeHtml(b.addr)}</p>` : ''}
+            <div class="flex items-center justify-between mt-4">
+              <div>
+                <p class="text-2xl font-extrabold text-white">${activeCount}<span class="text-sm text-slate-400">/${b.tenants.length}명</span></p>
+                <p class="text-xs text-slate-500">입주 중</p>
+              </div>
+              <div class="text-right">
+                <p class="text-sm font-bold text-emerald-400">월 ${fmtMoney(totalRent)}</p>
+                <p class="text-xs text-slate-500">월세 합계</p>
+              </div>
+            </div>
+          </button>`;
+      });
+      // 클릭 이벤트 바인딩
+      grid.querySelectorAll('[data-bid]').forEach(btn => {
+        btn.addEventListener('click', () => openBuilding(btn.dataset.bid));
+      });
+    }
+
+    // ============ UI: 건물 상세 ============
+    function openBuilding(id) {
+      const b = buildings.find(x => x.id === id);
+      if (!b) return;
+      currentBuildingId = id;
+      document.getElementById('buildingList').classList.add('hidden');
+      document.getElementById('buildingDetail').classList.remove('hidden');
+      document.getElementById('detailBuildingName').textContent = '🏢 ' + b.name;
+      document.getElementById('detailBuildingCount').textContent = `세입자 ${b.tenants.length}/30명`;
+      renderTenants();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function backToList() {
+      currentBuildingId = null;
+      document.getElementById('buildingDetail').classList.add('hidden');
+      document.getElementById('buildingList').classList.remove('hidden');
+      renderBuildings();
+    }
+
+    function renderTenants() {
+      const b = buildings.find(x => x.id === currentBuildingId);
+      if (!b) return;
+      const grid = document.getElementById('tenantsGrid');
+      grid.innerHTML = '';
+      if (b.tenants.length === 0) {
+        grid.innerHTML = `<p class="text-center text-slate-500 py-8">등록된 세입자가 없습니다. 위에서 등록하세요.</p>`;
+        return;
+      }
+      b.tenants.forEach(t => {
+        const isActive = !t.moveOut;
+        const statusBadge = isActive
+          ? '<span class="bg-emerald-500/20 text-emerald-400 text-xs font-bold px-2 py-0.5 rounded-full">입주 중</span>'
+          : '<span class="bg-slate-500/20 text-slate-400 text-xs font-bold px-2 py-0.5 rounded-full">퇴거</span>';
+        grid.innerHTML += `
+          <div class="card bg-slate-800 border border-slate-700 rounded-2xl p-5">
+            <div class="flex items-start justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg shrink-0">
+                  ${escapeHtml((t.name||'?').charAt(0))}
+                </div>
+                <div>
+                  <h4 class="font-bold text-white">${escapeHtml(t.name)} <span class="text-slate-400 text-sm font-normal">${escapeHtml(t.room||'')}</span></h4>
+                  <p class="text-xs text-slate-400 mt-0.5">📞 ${escapeHtml(t.phone||'-')}</p>
+                </div>
+              </div>
+              ${statusBadge}
+            </div>
+            <div class="grid grid-cols-3 gap-2 mt-4 text-center">
+              <div class="bg-slate-900 rounded-xl py-2">
+                <p class="text-xs text-slate-400">보증금</p>
+                <p class="text-sm font-bold text-white mt-0.5">${fmtMoney(t.deposit)}</p>
+              </div>
+              <div class="bg-slate-900 rounded-xl py-2">
+                <p class="text-xs text-slate-400">월세</p>
+                <p class="text-sm font-bold text-white mt-0.5">${fmtMoney(t.rent)}</p>
+              </div>
+              <div class="bg-slate-900 rounded-xl py-2">
+                <p class="text-xs text-slate-400">관리비</p>
+                <p class="text-sm font-bold text-white mt-0.5">${fmtMoney(t.mgmt)}</p>
+              </div>
+            </div>
+            <div class="flex items-center justify-between mt-4 text-xs text-slate-400">
+              <span>📅 입주 ${fmtDate(t.moveIn)}</span>
+              <span>🚪 퇴거 ${fmtDate(t.moveOut)}</span>
+            </div>
+            <div class="flex gap-2 mt-4">
+              <button data-tid="${t.id}" data-act="detail" class="btn flex-1 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold py-2 rounded-xl">📋 기록 ${t.notes ? t.notes.length : 0}건</button>
+              <button data-tid="${t.id}" data-act="del" class="btn bg-rose-600/80 hover:bg-rose-500 text-white text-sm font-bold px-4 py-2 rounded-xl">삭제</button>
+            </div>
+          </div>`;
+      });
+      grid.querySelectorAll('[data-tid]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (btn.dataset.act === 'detail') openTenant(btn.dataset.tid);
+          else if (btn.dataset.act === 'del') deleteTenant(btn.dataset.tid);
+        });
+      });
+    }
+
+    // ============ 세입자 CRUD ============
+    function addTenant() {
+      const b = buildings.find(x => x.id === currentBuildingId);
+      if (!b) return;
+      if (b.tenants.length >= MAX_TENANTS) { alert('세입자는 건물당 최대 30명까지 등록할 수 있습니다.'); return; }
+      const name = document.getElementById('tName').value.trim();
+      if (!name) { alert('세입자 이름을 입력하세요.'); return; }
+      const tenant = {
+        id: genId(),
+        name,
+        phone: document.getElementById('tPhone').value.trim(),
+        room: document.getElementById('tRoom').value.trim(),
+        deposit: document.getElementById('tDeposit').value,
+        rent: document.getElementById('tRent').value,
+        mgmt: document.getElementById('tMgmt').value,
+        moveIn: document.getElementById('tMoveIn').value,
+        moveOut: document.getElementById('tMoveOut').value || '',
+        notes: [],
+        createdAt: Date.now()
+      };
+      b.tenants.push(tenant);
+      saveBuildings();
+      renderTenants();
+      // 폼 초기화
+      ['tName','tPhone','tRoom','tDeposit','tRent','tMgmt','tMoveIn','tMoveOut'].forEach(id => document.getElementById(id).value = '');
+    }
+
+    function deleteTenant(tid) {
+      if (!confirm('이 세입자를 삭제하시겠습니까? 기록도 함께 삭제됩니다.')) return;
+      const b = buildings.find(x => x.id === currentBuildingId);
+      if (!b) return;
+      b.tenants = b.tenants.filter(t => t.id !== tid);
+      saveBuildings();
+      renderTenants();
+    }
+
+    // ============ 세입자 상세/기록 ============
+    function openTenant(tid) {
+      const b = buildings.find(x => x.id === currentBuildingId);
+      if (!b) return;
+      const t = b.tenants.find(x => x.id === tid);
+      if (!t) return;
+      currentTenant = t;
+      document.getElementById('tmTitle').textContent = `${t.name} 님 기록`;
+      document.getElementById('tmInfo').innerHTML = `
+        <span class="text-slate-400">📞 전화번호</span><span class="text-white text-right">${escapeHtml(t.phone||'-')}</span>
+        <span class="text-slate-400">🏠 호실</span><span class="text-white text-right">${escapeHtml(t.room||'-')}</span>
+        <span class="text-slate-400">💰 보증금</span><span class="text-white text-right">${fmtMoney(t.deposit)}</span>
+        <span class="text-slate-400">📆 월세</span><span class="text-white text-right">${fmtMoney(t.rent)}</span>
+        <span class="text-slate-400">🧾 관리비</span><span class="text-white text-right">${fmtMoney(t.mgmt)}</span>
+        <span class="text-slate-400">📅 입주일</span><span class="text-white text-right">${fmtDate(t.moveIn)}</span>
+        <span class="text-slate-400">🚪 퇴거일</span><span class="text-white text-right">${fmtDate(t.moveOut)}</span>`;
+      document.getElementById('tenantModal').classList.remove('hidden');
+      document.getElementById('tenantModal').classList.add('flex');
+      renderNotes();
+    }
+
+    function closeTenant() {
+      currentTenant = null;
+      const m = document.getElementById('tenantModal');
+      m.classList.add('hidden');
+      m.classList.remove('flex');
+    }
+
+    function addNote() {
+      if (!currentTenant) return;
+      const text = document.getElementById('noteText').value.trim();
+      const imgInput = document.getElementById('noteImg');
+      const imgFile = imgInput.files[0];
+      if (!text && !imgFile) { alert('텍스트 또는 이미지를 입력하세요.'); return; }
+      const note = { id: genId(), text, image: null, createdAt: Date.now() };
+      if (imgFile) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          note.image = reader.result; // base64 이미지
+          currentTenant.notes = currentTenant.notes || [];
+          currentTenant.notes.unshift(note);
+          saveBuildings();
+          renderNotes();
+        };
+        reader.readAsDataURL(imgFile);
+      } else {
+        currentTenant.notes = currentTenant.notes || [];
+        currentTenant.notes.unshift(note);
+        saveBuildings();
+        renderNotes();
+      }
+      document.getElementById('noteText').value = '';
+      imgInput.value = '';
+    }
+
+    function deleteNote(noteId) {
+      if (!currentTenant) return;
+      if (!confirm('이 기록을 삭제하시겠습니까?')) return;
+      currentTenant.notes = currentTenant.notes.filter(n => n.id !== noteId);
+      saveBuildings();
+      renderNotes();
+    }
+
+    function renderNotes() {
+      const list = document.getElementById('notesList');
+      list.innerHTML = '';
+      const notes = currentTenant.notes || [];
+      if (notes.length === 0) {
+        list.innerHTML = '<p class="text-center text-slate-500 text-sm py-6">아직 기록이 없습니다.</p>';
+        return;
+      }
+      notes.forEach(n => {
+        const date = new Date(n.createdAt).toLocaleString('ko-KR', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+        list.innerHTML += `
+          <div class="bg-slate-900 rounded-xl p-3 border border-slate-700">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs text-slate-400">${date}</span>
+              <button data-nid="${n.id}" class="text-rose-400 hover:text-rose-300 text-xs">삭제</button>
+            </div>
+            ${n.text ? `<p class="text-sm text-slate-200 whitespace-pre-wrap mb-2">${escapeHtml(n.text)}</p>` : ''}
+            ${n.image ? `<img src="${n.image}" class="w-full max-h-64 object-cover rounded-lg mt-1 cursor-pointer" onclick="window.open(this.src)"/>` : ''}
+          </div>`;
+      });
+      list.querySelectorAll('[data-nid]').forEach(btn => {
+        btn.addEventListener('click', () => deleteNote(btn.dataset.nid));
+      });
+    }
+
+    // ============ 건물 CRUD ============
+    function showBuildingModal() {
+      document.getElementById('buildingModal').classList.remove('hidden');
+      document.getElementById('buildingModal').classList.add('flex');
+      document.getElementById('bName').focus();
+    }
+    function hideBuildingModal() {
+      document.getElementById('buildingModal').classList.add('hidden');
+      document.getElementById('buildingModal').classList.remove('flex');
+      document.getElementById('bName').value = '';
+      document.getElementById('bAddr').value = '';
+    }
+    function saveBuilding() {
+      const name = document.getElementById('bName').value.trim();
+      if (!name) { alert('건물 이름을 입력하세요.'); return; }
+      const b = { id: genId(), name, addr: document.getElementById('bAddr').value.trim(), tenants: [] };
+      buildings.push(b);
+      saveBuildings();
+      renderBuildings();
+      hideBuildingModal();
+    }
+
+    // ============ 이벤트 ============
+    document.getElementById('newBuildingBtn').addEventListener('click', showBuildingModal);
+    document.getElementById('bCancel').addEventListener('click', hideBuildingModal);
+    document.getElementById('bSave').addEventListener('click', saveBuilding);
+    document.getElementById('addTenantBtn').addEventListener('click', addTenant);
+    document.getElementById('backBtn').addEventListener('click', backToList);
+    document.getElementById('tmClose').addEventListener('click', closeTenant);
+    document.getElementById('noteAdd').addEventListener('click', addNote);
+    // 모달 밖 클릭 시 닫기
+    document.getElementById('buildingModal').addEventListener('click', (e) => { if (e.target === e.currentTarget) hideBuildingModal(); });
+    document.getElementById('tenantModal').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeTenant(); });
+
+    // ============ 초기화 ============
+    async function init() {
+      try {
+        await openDB();
+        await loadBuildings();
+      } catch (err) {
+        console.error('DB 열기 실패', err);
+      }
+      renderBuildings();
+    }
+    init();
+  </script>
+</body>
+</html>
