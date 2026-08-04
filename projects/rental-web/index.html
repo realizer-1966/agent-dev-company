@@ -90,7 +90,7 @@
         </div>
         <div class="flex items-center gap-4 mt-3 text-xs">
           <span class="text-slate-500">📅 입주일 · 📆 만기일</span>
-          <span class="text-slate-500">※ 입주일을 입력하면 만기일이 <span class="text-indigo-300 font-bold">입주일 + 2년</span>으로 자동 설정됩니다. 퇴거일은 추후 퇴거 시 수정에서 기록합니다.</span>
+          <span class="text-slate-500">※ 입주일을 입력하면 만기일이 <span class="text-indigo-300 font-bold">입주일 + 2년</span>으로 자동 설정됩니다. 퇴거일은 퇴거 시 수정에서 기록합니다.</span>
         </div>
       </div>
 
@@ -241,7 +241,7 @@
       return Number(v).toLocaleString('ko-KR') + '만원';
     }
     function fmtDate(d) {
-      if (!d) return '입주 중';
+      if (!d) return '-';
       return d;
     }
 
@@ -392,10 +392,19 @@
                 <p class="text-sm font-bold text-white mt-0.5">${fmtMoney(t.mgmt)}</p>
               </div>
             </div>
-            <div class="flex items-center justify-between mt-4 text-xs text-slate-400">
-              <span>📅 입주 ${fmtDate(t.moveIn)}</span>
-              ${t.contractEnd ? `<span class="text-indigo-300">📆 만기일 ${fmtDate(t.contractEnd)}</span>` : ''}
-              <span>🚪 퇴거 ${fmtDate(t.moveOut)}</span>
+            <div class="grid grid-cols-3 gap-2 mt-4 text-center text-xs">
+              <div class="bg-slate-900 rounded-lg py-1.5">
+                <p class="text-slate-500">📅 입주일</p>
+                <p class="text-slate-200 font-semibold mt-0.5">${fmtDate(t.moveIn)}</p>
+              </div>
+              <div class="bg-slate-900 rounded-lg py-1.5">
+                <p class="text-slate-500">📆 만기일</p>
+                <p class="text-indigo-300 font-semibold mt-0.5">${t.contractEnd ? fmtDate(t.contractEnd) : '-'}</p>
+              </div>
+              <div class="bg-slate-900 rounded-lg py-1.5">
+                <p class="text-slate-500">🚪 퇴거일</p>
+                <p class="text-slate-200 font-semibold mt-0.5">${fmtDate(t.moveOut)}</p>
+              </div>
             </div>
             <div class="flex gap-2 mt-4">
               <button data-tid="${t.id}" data-act="detail" class="btn flex-1 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold py-2 rounded-xl">📋 기록 ${t.notes ? t.notes.length : 0}건</button>
