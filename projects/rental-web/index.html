@@ -68,12 +68,12 @@
           <input id="tRent" type="number" min="0" placeholder="월세 (만원)" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"/>
           <input id="tMgmt" type="number" min="0" placeholder="관리비 (만원)" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"/>
           <input id="tMoveIn" type="date" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"/>
-          <input id="tMoveOut" type="date" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"/>
+          <input id="tContractEnd" type="date" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"/>
           <button id="addTenantBtn" class="btn bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl">+ 세입자 등록</button>
         </div>
         <div class="flex items-center gap-4 mt-3 text-xs">
-          <span class="text-slate-500">📅 입주일 · 🚪 퇴거일</span>
-          <span class="text-slate-500">※ 입주일을 입력하면 퇴거일이 <span class="text-indigo-300 font-bold">입주일 + 2년</span>으로 자동 설정됩니다. 중도 퇴거 시 퇴거일을 직접 바꾸면 됩니다.</span>
+          <span class="text-slate-500">📅 입주일 · 📆 계약만료일</span>
+          <span class="text-slate-500">※ 입주일을 입력하면 계약만료일이 <span class="text-indigo-300 font-bold">입주일 + 2년</span>으로 자동 설정됩니다. 퇴거일은 추후 퇴거 시 수정에서 기록합니다.</span>
         </div>
       </div>
 
@@ -134,11 +134,12 @@
           <input id="eRent" type="number" min="0" placeholder="월세" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400"/>
           <input id="eMgmt" type="number" min="0" placeholder="관리비" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400"/>
         </div>
-        <div class="grid grid-cols-2 gap-2 text-xs">
+        <div class="grid grid-cols-3 gap-2 text-xs">
           <div><label class="text-slate-400 block mb-1">📅 입주일</label><input id="eMoveIn" type="date" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-2 py-2 text-sm focus:ring-2 focus:ring-indigo-400"/></div>
+          <div><label class="text-slate-400 block mb-1">📆 계약만료</label><input id="eContractEnd" type="date" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-2 py-2 text-sm focus:ring-2 focus:ring-indigo-400"/></div>
           <div><label class="text-slate-400 block mb-1">🚪 퇴거일</label><input id="eMoveOut" type="date" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-2 py-2 text-sm focus:ring-2 focus:ring-indigo-400"/></div>
         </div>
-        <p class="text-xs text-slate-500">※ 입주일을 변경하면 퇴거일이 <span class="text-indigo-300 font-bold">입주일 + 2년</span>으로 자동 설정됩니다.</p>
+        <p class="text-xs text-slate-500">※ 입주일을 변경하면 계약만료일이 <span class="text-indigo-300 font-bold">입주일 + 2년</span>으로 자동 설정됩니다. 퇴거일은 비워두면 입주 중입니다.</p>
         <div class="flex gap-2 justify-end pt-2">
           <button id="emCancel" class="btn bg-slate-700 hover:bg-slate-600 text-sm font-bold px-4 py-2 rounded-xl">취소</button>
           <button id="emSave" class="btn bg-indigo-600 hover:bg-indigo-500 text-sm font-bold px-4 py-2 rounded-xl">저장</button>
@@ -229,12 +230,12 @@
       return `${yy}-${mm}-${dd}`;
     }
 
-    // 입주일이 바뀌면 퇴거일을 (입주일 + 2년)으로 자동 채움
-    function autoFillMoveOut(prefix) {
+    // 입주일이 바뀌면 계약만료일을 (입주일 + 2년)으로 자동 채움
+    function autoFillContractEnd(prefix) {
       const moveIn = document.getElementById(prefix + 'MoveIn').value;
       if (!moveIn) return;
       const end = calcContractEnd(moveIn);
-      document.getElementById(prefix + 'MoveOut').value = end;
+      document.getElementById(prefix + 'ContractEnd').value = end;
     }
 
     // ============ UI: 건물 목록 ============
@@ -412,6 +413,7 @@
       document.getElementById('eRent').value = t.rent || '';
       document.getElementById('eMgmt').value = t.mgmt || '';
       document.getElementById('eMoveIn').value = t.moveIn || '';
+      document.getElementById('eContractEnd').value = t.contractEnd || '';
       document.getElementById('eMoveOut').value = t.moveOut || '';
       document.getElementById('emTitle').textContent = `✏️ ${t.name} 님 수정`;
       document.getElementById('editModal').classList.remove('hidden');
@@ -439,7 +441,8 @@
       t.rent = document.getElementById('eRent').value;
       t.mgmt = document.getElementById('eMgmt').value;
       t.moveIn = document.getElementById('eMoveIn').value;
-      t.contractEnd = calcContractEnd(t.moveIn); // 입주일 + 2년 (자동 계산)
+      // 계약만료일: 입력값 우선, 비었으면 입주일 + 2년 자동 계산
+      t.contractEnd = document.getElementById('eContractEnd').value || calcContractEnd(t.moveIn);
       t.moveOut = document.getElementById('eMoveOut').value || '';
       saveBuildings();
       renderTenants();
@@ -454,6 +457,7 @@
       const name = document.getElementById('tName').value.trim();
       if (!name) { alert('세입자 이름을 입력하세요.'); return; }
       const moveIn = document.getElementById('tMoveIn').value;
+      const contractEnd = document.getElementById('tContractEnd').value || calcContractEnd(moveIn);
       const tenant = {
         id: genId(),
         name,
@@ -463,8 +467,8 @@
         rent: document.getElementById('tRent').value,
         mgmt: document.getElementById('tMgmt').value,
         moveIn,
-        contractEnd: calcContractEnd(moveIn), // 입주일 + 2년 (자동 계산)
-        moveOut: document.getElementById('tMoveOut').value || '',
+        contractEnd, // 계약만료일 (자동: 입주일 + 2년)
+        moveOut: '', // 등록 시 퇴거일 미기록, 퇴거 시 수정으로 기록
         notes: [],
         createdAt: Date.now()
       };
@@ -472,7 +476,7 @@
       saveBuildings();
       renderTenants();
       // 폼 초기화
-      ['tName','tPhone','tRoom','tDeposit','tRent','tMgmt','tMoveIn','tMoveOut'].forEach(id => document.getElementById(id).value = '');
+      ['tName','tPhone','tRoom','tDeposit','tRent','tMgmt','tMoveIn','tContractEnd'].forEach(id => document.getElementById(id).value = '');
     }
 
     function deleteTenant(tid) {
@@ -611,9 +615,9 @@
     document.getElementById('tenantModal').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeTenant(); });
     document.getElementById('editModal').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeEditModal(); });
 
-    // 입주일 변경 시 퇴거일 = 입주일 + 2년 자동 설정 (등록 폼 / 수정 모달)
-    document.getElementById('tMoveIn').addEventListener('change', () => autoFillMoveOut('t'));
-    document.getElementById('eMoveIn').addEventListener('change', () => autoFillMoveOut('e'));
+    // 입주일 변경 시 계약만료일 = 입주일 + 2년 자동 설정 (등록 폼 / 수정 모달)
+    document.getElementById('tMoveIn').addEventListener('change', () => autoFillContractEnd('t'));
+    document.getElementById('eMoveIn').addEventListener('change', () => autoFillContractEnd('e'));
 
     // ============ 초기화 ============
     async function init() {
