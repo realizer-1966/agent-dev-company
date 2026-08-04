@@ -841,7 +841,13 @@
       const roomMap = {};
       tenants.forEach(t => { if (t.room) (roomMap[t.room] = roomMap[t.room] || []).push(t); });
       const emptyRooms = Object.keys(roomMap).filter(r => !roomMap[r].some(t => getTenantStatus(t) === 'active')).length;
-      return { tenants, active, monthlyRent, activeRent, activeMgmt, paidRent, totalCost, rate, emptyRooms, rentMonths, paidMonths };
+      // 당해연도 퇴거 보증금 준비금: moveOut 연도가 올해인 세입자의 deposit 합계 (만원)
+      const thisYear = new Date().getFullYear();
+      const thisYearDeposit = tenants.reduce((s, t) => {
+        const y = t.moveOut ? Number(String(t.moveOut).slice(0, 4)) : NaN;
+        return y === thisYear ? s + (Number(t.deposit) || 0) : s;
+      }, 0);
+      return { tenants, active, monthlyRent, activeRent, activeMgmt, paidRent, totalCost, rate, emptyRooms, rentMonths, paidMonths, thisYearDeposit };
     }
 
     // 전체 통계 카드
@@ -849,7 +855,7 @@
       const el = document.getElementById('overallStats');
       const totalBuildings = buildings.length;
       let totalTenants = 0, totalActive = 0, totalRent = 0, totalMgmt = 0, totalPaid = 0;
-      let totalRentMonths = 0, totalPaidMonths = 0;
+      let totalRentMonths = 0, totalPaidMonths = 0, totalThisYearDeposit = 0;
       buildings.forEach(b => {
         const s = computeBuildingStats(b);
         totalTenants += s.tenants.length;
@@ -859,6 +865,7 @@
         totalPaid += s.paidRent;     // 누적 입금 (원)
         totalRentMonths += s.rentMonths;
         totalPaidMonths += s.paidMonths;
+        totalThisYearDeposit += s.thisYearDeposit; // 당해연도 퇴거 보증금 준비금 (만원)
       });
       const totalRate = totalRentMonths > 0 ? Math.round((totalPaidMonths / totalRentMonths) * 100) : null;
       const cards = [
@@ -868,6 +875,7 @@
         { icon: '💰', label: '월세 수입', value: fmtMoney(totalRent), sub: '입주중 월세 합계' },
         { icon: '🧾', label: '관리비', value: fmtMoney(totalMgmt), sub: '입주중 관리비 합계' },
         { icon: '💵', label: '누적 입금', value: totalPaid ? totalPaid.toLocaleString('ko-KR') + '원' : '0원', sub: '입금 완료 합계' },
+        { icon: '🪙', label: `당해연도 퇴거 보증금 준비금`, value: fmtMoney(totalThisYearDeposit), sub: `${new Date().getFullYear()}년 퇴거 예정/기준 보증금` },
       ];
       el.innerHTML = cards.map(c => `
         <div class="card bg-slate-800 border border-slate-700 rounded-2xl p-4">
@@ -947,6 +955,10 @@
             <div class="flex justify-between items-center bg-slate-900 rounded-lg px-3 py-2">
               <span class="text-xs text-slate-400">월세 입금률</span>
               <span class="font-bold ${s.rate === null ? 'text-slate-400' : (s.rate >= 90 ? 'text-emerald-400' : (s.rate >= 50 ? 'text-amber-400' : 'text-rose-400'))}">${s.rate === null ? '-' : s.rate + '%'}</span>
+            </div>
+            <div class="flex justify-between items-center bg-slate-900 rounded-lg px-3 py-2">
+              <span class="text-xs text-slate-400">🪙 당해연도 퇴거 보증금 준비금</span>
+              <span class="font-bold text-emerald-400">${fmtMoney(s.thisYearDeposit)}</span>
             </div>
           </div>
         </div>`;
