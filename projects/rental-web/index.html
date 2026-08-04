@@ -68,10 +68,14 @@
           <input id="tRent" type="number" min="0" placeholder="월세 (만원)" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"/>
           <input id="tMgmt" type="number" min="0" placeholder="관리비 (만원)" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"/>
           <input id="tMoveIn" type="date" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"/>
+          <input id="tContractEnd" type="date" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"/>
           <input id="tMoveOut" type="date" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"/>
           <button id="addTenantBtn" class="btn bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl">+ 세입자 등록</button>
         </div>
-        <p class="text-xs text-slate-500 mt-2">※ 퇴거일을 비워두면 현재 입주 중인 세입자로 표시됩니다</p>
+        <div class="flex items-center gap-4 mt-3 text-xs">
+          <span class="text-slate-500">📅 입주일 · <span class="text-indigo-300">계약만료일</span> · 🚪 퇴거일</span>
+          <span class="text-slate-500">※ 퇴거일이 계약만료일보다 빠르면 <span class="text-amber-400 font-bold">중도 퇴거</span>로 표시됩니다</span>
+        </div>
       </div>
 
       <!-- 세입자 목록 -->
@@ -112,6 +116,35 @@
       <!-- 기록 목록 -->
       <h4 class="font-bold text-white text-sm mb-2">📋 기록 목록</h4>
       <div id="notesList" class="space-y-3"></div>
+    </div>
+  </div>
+
+  <!-- 세입자 수정 모달 -->
+  <div id="editModal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4">
+    <div class="bg-slate-800 rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto border border-slate-700 fade-in">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold text-white text-lg" id="emTitle">✏️ 세입자 수정</h3>
+        <button id="emClose" class="text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
+      </div>
+      <div class="space-y-3">
+        <input id="eName" placeholder="세입자 이름" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400"/>
+        <input id="ePhone" placeholder="전화번호" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400"/>
+        <input id="eRoom" placeholder="호실" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400"/>
+        <div class="grid grid-cols-3 gap-2">
+          <input id="eDeposit" type="number" min="0" placeholder="보증금" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400"/>
+          <input id="eRent" type="number" min="0" placeholder="월세" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400"/>
+          <input id="eMgmt" type="number" min="0" placeholder="관리비" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400"/>
+        </div>
+        <div class="grid grid-cols-3 gap-2 text-xs">
+          <div><label class="text-slate-400 block mb-1">📅 입주일</label><input id="eMoveIn" type="date" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-2 py-2 text-sm focus:ring-2 focus:ring-indigo-400"/></div>
+          <div><label class="text-slate-400 block mb-1">📆 계약만료</label><input id="eContractEnd" type="date" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-2 py-2 text-sm focus:ring-2 focus:ring-indigo-400"/></div>
+          <div><label class="text-slate-400 block mb-1">🚪 퇴거일</label><input id="eMoveOut" type="date" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-2 py-2 text-sm focus:ring-2 focus:ring-indigo-400"/></div>
+        </div>
+        <div class="flex gap-2 justify-end pt-2">
+          <button id="emCancel" class="btn bg-slate-700 hover:bg-slate-600 text-sm font-bold px-4 py-2 rounded-xl">취소</button>
+          <button id="emSave" class="btn bg-indigo-600 hover:bg-indigo-500 text-sm font-bold px-4 py-2 rounded-xl">저장</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -274,9 +307,15 @@
       }
       b.tenants.forEach(t => {
         const isActive = !t.moveOut;
-        const statusBadge = isActive
-          ? '<span class="bg-emerald-500/20 text-emerald-400 text-xs font-bold px-2 py-0.5 rounded-full">입주 중</span>'
-          : '<span class="bg-slate-500/20 text-slate-400 text-xs font-bold px-2 py-0.5 rounded-full">퇴거</span>';
+        const isMidTerm = isMidTermMoveOut(t); // 중도 퇴거 판정
+        let statusBadge;
+        if (isActive) {
+          statusBadge = '<span class="bg-emerald-500/20 text-emerald-400 text-xs font-bold px-2 py-0.5 rounded-full">입주 중</span>';
+        } else if (isMidTerm) {
+          statusBadge = '<span class="bg-amber-500/20 text-amber-400 text-xs font-bold px-2 py-0.5 rounded-full">⚠ 중도 퇴거</span>';
+        } else {
+          statusBadge = '<span class="bg-slate-500/20 text-slate-400 text-xs font-bold px-2 py-0.5 rounded-full">계약만료 퇴거</span>';
+        }
         grid.innerHTML += `
           <div class="card bg-slate-800 border border-slate-700 rounded-2xl p-5">
             <div class="flex items-start justify-between">
@@ -307,10 +346,12 @@
             </div>
             <div class="flex items-center justify-between mt-4 text-xs text-slate-400">
               <span>📅 입주 ${fmtDate(t.moveIn)}</span>
+              ${t.contractEnd ? `<span class="text-indigo-300">📆 계약만료 ${fmtDate(t.contractEnd)}</span>` : ''}
               <span>🚪 퇴거 ${fmtDate(t.moveOut)}</span>
             </div>
             <div class="flex gap-2 mt-4">
               <button data-tid="${t.id}" data-act="detail" class="btn flex-1 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold py-2 rounded-xl">📋 기록 ${t.notes ? t.notes.length : 0}건</button>
+              <button data-tid="${t.id}" data-act="edit" class="btn bg-amber-500/80 hover:bg-amber-400 text-white text-sm font-bold px-3 py-2 rounded-xl">✏️ 수정</button>
               <button data-tid="${t.id}" data-act="del" class="btn bg-rose-600/80 hover:bg-rose-500 text-white text-sm font-bold px-4 py-2 rounded-xl">삭제</button>
             </div>
           </div>`;
@@ -318,9 +359,68 @@
       grid.querySelectorAll('[data-tid]').forEach(btn => {
         btn.addEventListener('click', () => {
           if (btn.dataset.act === 'detail') openTenant(btn.dataset.tid);
+          else if (btn.dataset.act === 'edit') openEditModal(btn.dataset.tid);
           else if (btn.dataset.act === 'del') deleteTenant(btn.dataset.tid);
         });
       });
+    }
+
+    // 중도 퇴거 판정: 퇴거일이 있고, 계약만료일이 있으면서 퇴거일 < 계약만료일인 경우
+    function isMidTermMoveOut(t) {
+      if (!t.moveOut) return false;
+      if (!t.contractEnd) return false;
+      return t.moveOut < t.contractEnd;
+    }
+
+    // ============ 세입자 수정 ============
+    let editTenantId = null;
+
+    function openEditModal(tid) {
+      const b = buildings.find(x => x.id === currentBuildingId);
+      if (!b) return;
+      const t = b.tenants.find(x => x.id === tid);
+      if (!t) return;
+      editTenantId = tid;
+      document.getElementById('eName').value = t.name || '';
+      document.getElementById('ePhone').value = t.phone || '';
+      document.getElementById('eRoom').value = t.room || '';
+      document.getElementById('eDeposit').value = t.deposit || '';
+      document.getElementById('eRent').value = t.rent || '';
+      document.getElementById('eMgmt').value = t.mgmt || '';
+      document.getElementById('eMoveIn').value = t.moveIn || '';
+      document.getElementById('eContractEnd').value = t.contractEnd || '';
+      document.getElementById('eMoveOut').value = t.moveOut || '';
+      document.getElementById('emTitle').textContent = `✏️ ${t.name} 님 수정`;
+      document.getElementById('editModal').classList.remove('hidden');
+      document.getElementById('editModal').classList.add('flex');
+    }
+
+    function closeEditModal() {
+      editTenantId = null;
+      document.getElementById('editModal').classList.add('hidden');
+      document.getElementById('editModal').classList.remove('flex');
+    }
+
+    function saveEditTenant() {
+      if (!editTenantId) return;
+      const b = buildings.find(x => x.id === currentBuildingId);
+      if (!b) return;
+      const t = b.tenants.find(x => x.id === editTenantId);
+      if (!t) return;
+      const name = document.getElementById('eName').value.trim();
+      if (!name) { alert('세입자 이름을 입력하세요.'); return; }
+      t.name = name;
+      t.phone = document.getElementById('ePhone').value.trim();
+      t.room = document.getElementById('eRoom').value.trim();
+      t.deposit = document.getElementById('eDeposit').value;
+      t.rent = document.getElementById('eRent').value;
+      t.mgmt = document.getElementById('eMgmt').value;
+      t.moveIn = document.getElementById('eMoveIn').value;
+      t.contractEnd = document.getElementById('eContractEnd').value || '';
+      t.moveOut = document.getElementById('eMoveOut').value || '';
+      saveBuildings();
+      renderTenants();
+      closeEditModal();
     }
 
     // ============ 세입자 CRUD ============
@@ -339,6 +439,7 @@
         rent: document.getElementById('tRent').value,
         mgmt: document.getElementById('tMgmt').value,
         moveIn: document.getElementById('tMoveIn').value,
+        contractEnd: document.getElementById('tContractEnd').value || '',
         moveOut: document.getElementById('tMoveOut').value || '',
         notes: [],
         createdAt: Date.now()
@@ -347,7 +448,7 @@
       saveBuildings();
       renderTenants();
       // 폼 초기화
-      ['tName','tPhone','tRoom','tDeposit','tRent','tMgmt','tMoveIn','tMoveOut'].forEach(id => document.getElementById(id).value = '');
+      ['tName','tPhone','tRoom','tDeposit','tRent','tMgmt','tMoveIn','tContractEnd','tMoveOut'].forEach(id => document.getElementById(id).value = '');
     }
 
     function deleteTenant(tid) {
@@ -374,6 +475,7 @@
         <span class="text-slate-400">📆 월세</span><span class="text-white text-right">${fmtMoney(t.rent)}</span>
         <span class="text-slate-400">🧾 관리비</span><span class="text-white text-right">${fmtMoney(t.mgmt)}</span>
         <span class="text-slate-400">📅 입주일</span><span class="text-white text-right">${fmtDate(t.moveIn)}</span>
+        <span class="text-slate-400">📆 계약만료</span><span class="text-white text-right">${fmtDate(t.contractEnd)}</span>
         <span class="text-slate-400">🚪 퇴거일</span><span class="text-white text-right">${fmtDate(t.moveOut)}</span>`;
       document.getElementById('tenantModal').classList.remove('hidden');
       document.getElementById('tenantModal').classList.add('flex');
@@ -477,9 +579,13 @@
     document.getElementById('backBtn').addEventListener('click', backToList);
     document.getElementById('tmClose').addEventListener('click', closeTenant);
     document.getElementById('noteAdd').addEventListener('click', addNote);
+    document.getElementById('emClose').addEventListener('click', closeEditModal);
+    document.getElementById('emCancel').addEventListener('click', closeEditModal);
+    document.getElementById('emSave').addEventListener('click', saveEditTenant);
     // 모달 밖 클릭 시 닫기
     document.getElementById('buildingModal').addEventListener('click', (e) => { if (e.target === e.currentTarget) hideBuildingModal(); });
     document.getElementById('tenantModal').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeTenant(); });
+    document.getElementById('editModal').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeEditModal(); });
 
     // ============ 초기화 ============
     async function init() {
