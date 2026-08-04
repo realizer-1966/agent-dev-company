@@ -120,8 +120,8 @@
     function drawLadder() {
       const { names, options, rungs, results, revealed } = state;
       const n = names.length;
-      const W = 720, H = 380;
-      const padX = 60, topPad = 50, botPad = 50;
+      const W = 720, H = 400;
+      const padX = 60, topPad = 78, botPad = 50;
       const usable = W - padX * 2;
       const colW = usable / (n - 1 || 1);
       const topY = topPad, botY = H - botPad;
@@ -147,10 +147,17 @@
         svg += `<line x1="${rp.x1}" y1="${rp.y}" x2="${rp.x2}" y2="${rp.y}" stroke="#6366f1" stroke-width="5" class="ladder-line"/>`;
       });
 
-      // 참가자 이름 (상단)
+      // 참가자 이름 (상단 배지)
+      const badgeColors = ['#ef4444','#f97316','#f59e0b','#10b981','#06b6d4','#3b82f6','#8b5cf6','#ec4899','#84cc16','#14b8a6','#6366f1','#f43f5e'];
       names.forEach((name, i) => {
         const x = padX + i * colW;
-        svg += `<text x="${x}" y="${topY - 14}" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">${escapeHtml(name)}</text>`;
+        const color = badgeColors[i % badgeColors.length];
+        const badgeW = Math.min(120, colW * 0.9);
+        const badgeH = 30;
+        svg += `<rect x="${x - badgeW/2}" y="${topY - 48}" width="${badgeW}" height="${badgeH}" rx="15" fill="${color}" opacity="0.95"/>`;
+        svg += `<text x="${x}" y="${topY - 27}" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">${escapeHtml(name)}</text>`;
+        // 배지에서 세로줄로 이어지는 짧은 연결선
+        svg += `<line x1="${x}" y1="${topY - 18}" x2="${x}" y2="${topY}" stroke="${color}" stroke-width="3" opacity="0.6"/>`;
       });
 
       // 결과 표시 (하단) — 공개 전엔 ? 로 표시
