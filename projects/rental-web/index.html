@@ -84,14 +84,17 @@
           <input id="tDeposit" type="number" min="0" placeholder="보증금 (만원)" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"/>
           <input id="tRent" type="number" min="0" placeholder="월세 (만원)" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"/>
           <input id="tMgmt" type="number" min="0" placeholder="관리비 (만원)" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"/>
-          <input id="tMoveIn" type="date" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"/>
-          <input id="tContractEnd" type="date" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"/>
+          <div class="flex flex-col">
+            <label class="text-xs text-slate-400 mb-1">📅 입주일</label>
+            <input id="tMoveIn" type="date" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"/>
+          </div>
+          <div class="flex flex-col">
+            <label class="text-xs text-slate-400 mb-1">📆 만기일</label>
+            <input id="tContractEnd" type="date" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"/>
+          </div>
           <button id="addTenantBtn" class="btn bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl">+ 세입자 등록</button>
         </div>
-        <div class="flex items-center gap-4 mt-3 text-xs">
-          <span class="text-slate-500">📅 입주일 · 📆 만기일</span>
-          <span class="text-slate-500">※ 입주일을 입력하면 만기일이 <span class="text-indigo-300 font-bold">입주일 + 2년</span>으로 자동 설정됩니다. 퇴거일은 퇴거 시 수정에서 기록합니다.</span>
-        </div>
+        <p class="text-xs text-slate-500 mt-3">※ 입주일을 입력하면 만기일이 <span class="text-indigo-300 font-bold">입주일 + 2년</span>으로 자동 설정됩니다. 퇴거일은 퇴거 시 수정에서 기록합니다.</p>
       </div>
 
       <!-- 세입자 목록 -->
