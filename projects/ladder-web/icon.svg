@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#7c3aed"/>
+  <!-- 사다리 세로줄 -->
+  <line x1="120" y1="70" x2="120" y2="442" stroke="#ffffff" stroke-width="26" stroke-linecap="round"/>
+  <line x1="392" y1="70" x2="392" y2="442" stroke="#ffffff" stroke-width="26" stroke-linecap="round"/>
+  <!-- 가로선 -->
+  <line x1="120" y1="150" x2="392" y2="150" stroke="#fbbf24" stroke-width="26" stroke-linecap="round"/>
+  <line x1="120" y1="290" x2="392" y2="290" stroke="#f472b6" stroke-width="26" stroke-linecap="round"/>
+  <!-- 사람 발자국 -->
+  <circle cx="392" cy="470" r="26" fill="#34d399"/>
+</svg>

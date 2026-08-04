@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>사다리 게임</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 45%, #db2777 100%); }
+    .fade-in { animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    .ladder-line { stroke-linecap: round; }
+    .btn:active { transform: scale(0.96); }
+    input:focus { outline: none; }
+  </style>
+</head>
+<body class="min-h-screen flex items-start justify-center p-4 pt-10">
+  <div class="w-full max-w-2xl fade-in">
+
+    <!-- 헤더 -->
+    <div class="text-center mb-6">
+      <h1 class="text-4xl font-extrabold text-white drop-shadow-md tracking-tight">🎋 사다리 게임</h1>
+      <p class="text-indigo-100 mt-2 text-sm">이름과 결과를 입력하고 사다리를 타보세요</p>
+    </div>
+
+    <!-- 설정 카드 -->
+    <div class="bg-white/95 backdrop-blur rounded-3xl shadow-2xl p-6 mb-6">
+      <div class="grid md:grid-cols-2 gap-5">
+        <!-- 참가자 -->
+        <div>
+          <label class="block text-sm font-bold text-slate-700 mb-2">👤 참가자 (한 줄에 한 명)</label>
+          <textarea id="names" rows="5" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-400 resize-none"
+            placeholder="철수&#10;영희&#10;민수">철수
+영희
+민수
+수진</textarea>
+        </div>
+        <!-- 결과 -->
+        <div>
+          <label class="block text-sm font-bold text-slate-700 mb-2">🎁 결과 (한 줄에 한 개)</label>
+          <textarea id="options" rows="5" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-400 resize-none"
+            placeholder="당첨!&#10;꽝&#10;커피 사기&#10;퇴근">당첨 🍀
+꽝 💀
+커피 사기 ☕
+퇴근 🎉</textarea>
+        </div>
+      </div>
+
+      <div class="mt-4 flex items-center gap-3">
+        <label class="text-sm font-bold text-slate-700 whitespace-nowrap">가로선 밀도</label>
+        <input id="density" type="range" min="3" max="12" value="7" class="flex-1 accent-indigo-600">
+        <span id="densityVal" class="text-sm font-bold text-indigo-600 w-8 text-right">7</span>
+      </div>
+
+      <button id="startBtn" class="btn mt-5 w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-3.5 rounded-2xl shadow-lg text-lg">
+        사다리 그리기 🎲
+      </button>
+    </div>
+
+    <!-- 결과 카드 -->
+    <div id="resultCard" class="bg-white/95 backdrop-blur rounded-3xl shadow-2xl p-6 hidden">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-bold text-slate-800">📋 결과</h2>
+        <div class="flex gap-2">
+          <button id="revealBtn" class="btn bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-bold px-4 py-2 rounded-xl">결과 공개 🎉</button>
+          <button id="resetBtn" class="btn bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-bold px-4 py-2 rounded-xl">다시 그리기</button>
+        </div>
+      </div>
+      <div id="ladderCanvas" class="w-full"></div>
+    </div>
+
+  </div>
+
+  <script>
+    const namesEl = document.getElementById('names');
+    const optionsEl = document.getElementById('options');
+    const densityEl = document.getElementById('density');
+    const densityVal = document.getElementById('densityVal');
+    const startBtn = document.getElementById('startBtn');
+    const resultCard = document.getElementById('resultCard');
+    const ladderCanvas = document.getElementById('ladderCanvas');
+    const revealBtn = document.getElementById('revealBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    densityEl.addEventListener('input', () => { densityVal.textContent = densityEl.value; });
+
+    let state = null; // { names, options, rungs, results, revealed }
+
+    // 사다리 타기 로직
+    function buildLadder(names, options, density) {
+      const n = names.length;
+      const rungs = []; // { a, b, y }  세로줄 a와 a+1을 y 높이에서 연결
+      const yCount = density; // 가로선 레벨 수
+      // 각 레벨에서 인접한 세로줄 사이에 랜덤으로 가로선 배치 (겹치지 않게)
+      const prevY = new Array(n).fill(0); // 각 세로줄의 마지막 가로선 y 위치 (중복 방지)
+      for (let y = 1; y <= yCount; y++) {
+        for (let a = 0; a < n - 1; a++) {
+          // 인접 선분들이 같은 레벨에서 연속되는 것을 방지 (a와 a+1 모두 이미 이 레벨에 선이 있으면 스킵)
+          const b = a + 1;
+          if (rungs.some(r => r.y === y && (r.a === a || r.a === b))) continue;
+          if (Math.random() < 0.45) {
+            rungs.push({ a, b, y });
+          }
+        }
+      }
+      // 위에서 아래로 따라가며 결과 계산
+      const results = [];
+      for (let col = 0; col < n; col++) {
+        let cur = col;
+        const path = [cur];
+        for (let y = 1; y <= yCount; y++) {
+          const rung = rungs.find(r => r.y === y && (r.a === cur || r.b === cur));
+          if (rung) { cur = rung.a === cur ? rung.b : rung.a; path.push(cur); }
+        }
+        results.push(cur);
+      }
+      return { rungs, results };
+    }
+
+    function drawLadder() {
+      const { names, options, rungs, results, revealed } = state;
+      const n = names.length;
+      const W = 720, H = 380;
+      const padX = 60, topPad = 50, botPad = 50;
+      const usable = W - padX * 2;
+      const colW = usable / (n - 1 || 1);
+      const topY = topPad, botY = H - botPad;
+      const maxY = densityEl.value;
+
+      let svg = `<svg viewBox="0 0 ${W} ${H}" class="w-full rounded-xl bg-slate-50" xmlns="http://www.w3.org/2000/svg">`;
+
+      // 가로선 (먼저 그려서 세로선 위에 안 보이게... 아니, 세로선이 더 위에 있어야 안 겹침. 가로선을 아래 레이어로)
+      const rungPaths = rungs.map(r => {
+        const x1 = padX + r.a * colW, x2 = padX + r.b * colW;
+        const y = topY + (r.y / maxY) * (botY - topY);
+        return { x1, x2, y };
+      });
+
+      // 세로선
+      for (let i = 0; i < n; i++) {
+        const x = padX + i * colW;
+        svg += `<line x1="${x}" y1="${topY}" x2="${x}" y2="${botY}" stroke="#94a3b8" stroke-width="4" class="ladder-line" stroke-dasharray="6 4"/>`;
+      }
+
+      // 가로선
+      rungPaths.forEach(rp => {
+        svg += `<line x1="${rp.x1}" y1="${rp.y}" x2="${rp.x2}" y2="${rp.y}" stroke="#6366f1" stroke-width="5" class="ladder-line"/>`;
+      });
+
+      // 참가자 이름 (상단)
+      names.forEach((name, i) => {
+        const x = padX + i * colW;
+        svg += `<text x="${x}" y="${topY - 14}" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">${escapeHtml(name)}</text>`;
+      });
+
+      // 결과 표시 (하단) — 공개 전엔 ? 로 표시
+      options.forEach((opt, j) => {
+        const x = padX + j * colW;
+        // 이 결과를 받는 참가자 인덱스
+        const winner = results.indexOf(j);
+        const isRevealed = revealed;
+        const color = isRevealed ? '#065f46' : '#94a3b8';
+        const text = isRevealed ? (winner >= 0 ? escapeHtml(opt) : '') : '?';
+        // 사다리 도착 위치에 결과 표시
+        svg += `<text x="${x}" y="${botY + 24}" text-anchor="middle" font-size="14" font-weight="700" fill="${color}">${text}</text>`;
+      });
+
+      // 공개 시 매칭 강조 (참가자 -> 결과 화살표 느낌)
+      if (revealed) {
+        names.forEach((name, i) => {
+          const target = results[i];
+          const x1 = padX + i * colW, y1 = botY;
+          const x2 = padX + target * colW, y2 = botY + 22;
+          svg += `<circle cx="${x1}" cy="${y1}" r="5" fill="#ec4899"/>`;
+          svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#ec4899" stroke-width="3" stroke-dasharray="4 3" opacity="0.6"/>`;
+        });
+      }
+
+      svg += `</svg>`;
+      ladderCanvas.innerHTML = svg;
+    }
+
+    function escapeHtml(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function start() {
+      const names = namesEl.value.split('\n').map(s => s.trim()).filter(Boolean);
+      const options = optionsEl.value.split('\n').map(s => s.trim()).filter(Boolean);
+      if (names.length < 2) { alert('참가자를 2명 이상 입력하세요.'); return; }
+      // 옵션 수가 부족하면 꽝으로 채움
+      const opts = [...options];
+      while (opts.length < names.length) opts.push('꽝 💀');
+      while (opts.length > names.length) opts.pop();
+      const density = parseInt(densityEl.value, 10);
+      const { rungs, results } = buildLadder(names, opts, density);
+      state = { names, options: opts, rungs, results, revealed: false };
+      resultCard.classList.remove('hidden');
+      drawLadder();
+      resultCard.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    revealBtn.addEventListener('click', () => {
+      if (!state) return;
+      state.revealed = true;
+      drawLadder();
+    });
+
+    resetBtn.addEventListener('click', start);
+
+    startBtn.addEventListener('click', start);
+
+    // 첫 로드 시 미리 그려두기
+    window.addEventListener('DOMContentLoaded', () => { });
+  </script>
+</body>
+</html>
