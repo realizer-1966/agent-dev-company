@@ -29,6 +29,7 @@
       <h1 class="text-xl font-extrabold text-white tracking-tight">🏢 임대관리 앱</h1>
       <div class="flex items-center gap-3">
         <span class="hidden sm:inline text-xs text-slate-400" id="saveStatus">로컬 저장</span>
+        <button id="statsBtn" class="btn bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold px-4 py-2 rounded-xl">📊 통계</button>
         <button id="newBuildingBtn" class="btn bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold px-4 py-2 rounded-xl">+ 건물 추가</button>
       </div>
     </div>
@@ -44,6 +45,28 @@
         <p class="text-lg font-semibold text-slate-300">등록된 건물이 없습니다</p>
         <p class="text-sm text-slate-500 mt-1">"+ 건물 추가" 버튼으로 첫 건물을 등록하세요</p>
       </div>
+    </section>
+
+    <!-- 통계 대시보드 -->
+    <section id="statsView" class="hidden fade-in">
+      <div class="flex items-center justify-between mb-4">
+        <button id="statsBackBtn" class="btn bg-slate-700 hover:bg-slate-600 text-sm font-bold px-3 py-2 rounded-xl">← 뒤로</button>
+        <h2 class="text-xl font-bold text-white">📊 리포트 · 통계</h2>
+        <span class="w-16"></span>
+      </div>
+
+      <!-- 전체 통계 카드 -->
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6" id="overallStats"></div>
+
+      <!-- 입금률 -->
+      <div class="bg-slate-800 rounded-2xl p-5 mb-6 border border-slate-700">
+        <h3 class="font-bold text-white mb-3">💰 월세 입금률</h3>
+        <div id="paymentRate" class="space-y-3"></div>
+      </div>
+
+      <!-- 건물별 통계 -->
+      <h3 class="font-bold text-white mb-3">🏢 건물별 통계</h3>
+      <div id="statsBuildings" class="grid md:grid-cols-2 gap-4"></div>
     </section>
 
     <!-- 건물 상세 -->
@@ -779,6 +802,178 @@
       });
     }
 
+    // ============ 리포트/통계 대시보드 ============
+    function openStats() {
+      document.getElementById('buildingList').classList.add('hidden');
+      document.getElementById('buildingDetail').classList.add('hidden');
+      document.getElementById('statsView').classList.remove('hidden');
+      renderStats();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function closeStats() {
+      document.getElementById('statsView').classList.add('hidden');
+      document.getElementById('buildingList').classList.remove('hidden');
+      renderBuildings();
+    }
+
+    // 건물별 통계 집계
+    function computeBuildingStats(b) {
+      const tenants = b.tenants || [];
+      const active = tenants.filter(t => getTenantStatus(t) === 'active');
+      const monthlyRent = tenants.reduce((s, t) => s + (Number(t.rent) || 0), 0);          // 만원
+      const activeRent = active.reduce((s, t) => s + (Number(t.rent) || 0), 0);            // 만원 (입주중)
+      const activeMgmt = active.reduce((s, t) => s + (Number(t.mgmt) || 0), 0);            // 만원 (입주중)
+      // 누적 입금 합계 (입금 완료된 월 × 월세)
+      const paidRent = tenants.reduce((s, t) =>
+        s + ((t.rentPaid || []).filter(r => r.paid).length * (Number(t.rent) || 0) * 10000), 0); // 원
+      // 누적 비용 합계 = 건물 공용비용 + 세입자 기록 비용
+      const commonCosts = (b.commonCosts || []).reduce((s, c) => s + (Number(c.cost) || 0), 0);
+      const tenantCosts = tenants.reduce((s, t) =>
+        s + (t.notes || []).reduce((ss, n) => ss + (Number(n.cost) || 0), 0), 0);
+      const totalCost = commonCosts + tenantCosts; // 원
+      // 입금률
+      const rentMonths = tenants.reduce((s, t) => s + (t.rentPaid || []).length, 0);
+      const paidMonths = tenants.reduce((s, t) =>
+        s + ((t.rentPaid || []).filter(r => r.paid).length), 0);
+      const rate = rentMonths > 0 ? Math.round((paidMonths / rentMonths) * 100) : null;
+      // 비어있는 방(호실): 한 번이라도 호실을 가진 방 중 현재 입주중인 세입자가 없는 방
+      const roomMap = {};
+      tenants.forEach(t => { if (t.room) (roomMap[t.room] = roomMap[t.room] || []).push(t); });
+      const emptyRooms = Object.keys(roomMap).filter(r => !roomMap[r].some(t => getTenantStatus(t) === 'active')).length;
+      return { tenants, active, monthlyRent, activeRent, activeMgmt, paidRent, totalCost, rate, emptyRooms, rentMonths, paidMonths };
+    }
+
+    // 전체 통계 카드
+    function renderOverallStats() {
+      const el = document.getElementById('overallStats');
+      const totalBuildings = buildings.length;
+      let totalTenants = 0, totalActive = 0, totalRent = 0, totalMgmt = 0, totalPaid = 0;
+      let totalRentMonths = 0, totalPaidMonths = 0;
+      buildings.forEach(b => {
+        const s = computeBuildingStats(b);
+        totalTenants += s.tenants.length;
+        totalActive += s.active.length;
+        totalRent += s.activeRent;   // 입주중 월세 합계 (만원)
+        totalMgmt += s.activeMgmt;   // 입주중 관리비 합계 (만원)
+        totalPaid += s.paidRent;     // 누적 입금 (원)
+        totalRentMonths += s.rentMonths;
+        totalPaidMonths += s.paidMonths;
+      });
+      const totalRate = totalRentMonths > 0 ? Math.round((totalPaidMonths / totalRentMonths) * 100) : null;
+      const cards = [
+        { icon: '🏢', label: '총 건물', value: `${totalBuildings}개`, sub: '건물 수' },
+        { icon: '👥', label: '총 세입자', value: `${totalTenants}명`, sub: '전체 세입자' },
+        { icon: '🏠', label: '입주 중', value: `${totalActive}명`, sub: '현재 입주' },
+        { icon: '💰', label: '월세 수입', value: fmtMoney(totalRent), sub: '입주중 월세 합계' },
+        { icon: '🧾', label: '관리비', value: fmtMoney(totalMgmt), sub: '입주중 관리비 합계' },
+        { icon: '💵', label: '누적 입금', value: totalPaid ? totalPaid.toLocaleString('ko-KR') + '원' : '0원', sub: '입금 완료 합계' },
+      ];
+      el.innerHTML = cards.map(c => `
+        <div class="card bg-slate-800 border border-slate-700 rounded-2xl p-4">
+          <p class="text-2xl mb-2">${c.icon}</p>
+          <p class="text-xs text-slate-400">${c.label}</p>
+          <p class="text-xl font-extrabold text-white mt-0.5 truncate" title="${escapeHtml(c.value)}">${c.value}</p>
+          <p class="text-[11px] text-slate-500 mt-0.5">${c.sub}</p>
+        </div>`).join('');
+    }
+
+    // 입금률 바
+    function renderRateBar(label, rate, months) {
+      if (rate === null) {
+        return `<div class="bg-slate-900 rounded-xl px-4 py-3 border border-slate-700">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-sm font-bold text-white">${label}</span>
+            <span class="text-xs text-slate-400">${months}개월 · 입금 기록 없음</span>
+          </div>
+          <div class="w-full h-2.5 bg-slate-700 rounded-full overflow-hidden"><div class="h-full w-0 bg-slate-500"></div></div>
+        </div>`;
+      }
+      const color = rate >= 90 ? 'bg-emerald-500' : (rate >= 50 ? 'bg-amber-500' : 'bg-rose-500');
+      return `<div class="bg-slate-900 rounded-xl px-4 py-3 border border-slate-700">
+        <div class="flex items-center justify-between mb-1.5">
+          <span class="text-sm font-bold text-white">${label}</span>
+          <span class="text-sm font-extrabold ${rate >= 90 ? 'text-emerald-400' : (rate >= 50 ? 'text-amber-400' : 'text-rose-400')}">${rate}%</span>
+        </div>
+        <div class="w-full h-2.5 bg-slate-700 rounded-full overflow-hidden">
+          <div class="h-full ${color} rounded-full" style="width:${Math.max(rate, 4)}%"></div>
+        </div>
+      </div>`;
+    }
+
+    // 건물별 통계 카드
+    function renderStatsBuildingCard(b, s, idx) {
+      const colors = ['from-indigo-600 to-purple-600','from-emerald-600 to-teal-600','from-rose-600 to-pink-600','from-amber-500 to-orange-600','from-sky-600 to-blue-600','from-fuchsia-600 to-purple-600'];
+      const grad = colors[idx % colors.length];
+      const occupancy = s.tenants.length > 0 ? Math.round((s.active.length / s.tenants.length) * 100) : 0;
+      return `
+        <div class="card bg-slate-800 border border-slate-700 rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <div class="h-10 w-10 rounded-xl bg-gradient-to-br ${grad} flex items-center justify-center text-xl shrink-0">🏢</div>
+              <div>
+                <h4 class="font-bold text-white">${escapeHtml(b.name)}</h4>
+                <p class="text-xs text-slate-500">${escapeHtml(b.addr || '주소 없음')}</p>
+              </div>
+            </div>
+            <span class="text-xs text-slate-400 whitespace-nowrap">빈 방 ${s.emptyRooms}개</span>
+          </div>
+          <div class="grid grid-cols-3 gap-2 text-center mb-4">
+            <div class="bg-slate-900 rounded-xl py-2.5">
+              <p class="text-xs text-slate-400">세입자</p>
+              <p class="text-lg font-extrabold text-white mt-0.5">${s.tenants.length}명</p>
+              <p class="text-[10px] text-slate-500">입주중 ${s.active.length}명</p>
+            </div>
+            <div class="bg-slate-900 rounded-xl py-2.5">
+              <p class="text-xs text-slate-400">월세 합계</p>
+              <p class="text-lg font-extrabold text-white mt-0.5">${fmtMoney(s.monthlyRent)}</p>
+              <p class="text-[10px] text-slate-500">입주중 ${fmtMoney(s.activeRent)}</p>
+            </div>
+            <div class="bg-slate-900 rounded-xl py-2.5">
+              <p class="text-xs text-slate-400">입주율</p>
+              <p class="text-lg font-extrabold ${occupancy >= 80 ? 'text-emerald-400' : (occupancy >= 40 ? 'text-amber-400' : 'text-rose-400')} mt-0.5">${occupancy}%</p>
+              <p class="text-[10px] text-slate-500">${s.active.length}/${s.tenants.length}명</p>
+            </div>
+          </div>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between items-center bg-slate-900 rounded-lg px-3 py-2">
+              <span class="text-xs text-slate-400">누적 비용 합계</span>
+              <span class="font-bold text-emerald-400">${s.totalCost ? s.totalCost.toLocaleString('ko-KR') + '원' : '0원'}</span>
+            </div>
+            <div class="flex justify-between items-center bg-slate-900 rounded-lg px-3 py-2">
+              <span class="text-xs text-slate-400">누적 입금 합계</span>
+              <span class="font-bold text-emerald-400">${s.paidRent ? s.paidRent.toLocaleString('ko-KR') + '원' : '0원'}</span>
+            </div>
+            <div class="flex justify-between items-center bg-slate-900 rounded-lg px-3 py-2">
+              <span class="text-xs text-slate-400">월세 입금률</span>
+              <span class="font-bold ${s.rate === null ? 'text-slate-400' : (s.rate >= 90 ? 'text-emerald-400' : (s.rate >= 50 ? 'text-amber-400' : 'text-rose-400'))}">${s.rate === null ? '-' : s.rate + '%'}</span>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    function renderStats() {
+      renderOverallStats();
+      // 입금률
+      const prEl = document.getElementById('paymentRate');
+      prEl.innerHTML = '';
+      let tRm = 0, tPm = 0;
+      buildings.forEach(b => {
+        const s = computeBuildingStats(b);
+        prEl.innerHTML += renderRateBar(escapeHtml(b.name), s.rate, s.rentMonths);
+        tRm += s.rentMonths; tPm += s.paidMonths;
+      });
+      const totalRate = tRm > 0 ? Math.round((tPm / tRm) * 100) : null;
+      prEl.innerHTML = renderRateBar('<span class="text-emerald-400">전체</span> 입금률', totalRate, tRm) + prEl.innerHTML;
+      // 건물별 통계
+      const sbEl = document.getElementById('statsBuildings');
+      if (buildings.length === 0) {
+        sbEl.innerHTML = '<p class="text-center text-slate-500 py-10 col-span-full">등록된 건물이 없어 통계를 표시할 수 없습니다.</p>';
+        return;
+      }
+      sbEl.innerHTML = buildings.map((b, i) => renderStatsBuildingCard(b, computeBuildingStats(b), i)).join('');
+    }
+
     // ============ 건물 CRUD ============
     function showBuildingModal() {
       document.getElementById('buildingModal').classList.remove('hidden');
@@ -803,6 +998,8 @@
 
     // ============ 이벤트 ============
     document.getElementById('newBuildingBtn').addEventListener('click', showBuildingModal);
+    document.getElementById('statsBtn').addEventListener('click', openStats);
+    document.getElementById('statsBackBtn').addEventListener('click', closeStats);
     document.getElementById('bCancel').addEventListener('click', hideBuildingModal);
     document.getElementById('bSave').addEventListener('click', saveBuilding);
     document.getElementById('addTenantBtn').addEventListener('click', addTenant);
