@@ -29,8 +29,11 @@
       <h1 class="text-xl font-extrabold text-white tracking-tight">🏢 임대관리 앱</h1>
       <div class="flex items-center gap-3">
         <span class="hidden sm:inline text-xs text-slate-400" id="saveStatus">로컬 저장</span>
+        <button id="backupBtn" class="btn bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold px-3 py-2 rounded-xl" title="데이터 백업(내보내기)">📤 백업</button>
+        <button id="restoreBtn" class="btn bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold px-3 py-2 rounded-xl" title="데이터 복원(가져오기)">📥 복원</button>
         <button id="statsBtn" class="btn bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold px-4 py-2 rounded-xl">📊 통계</button>
         <button id="newBuildingBtn" class="btn bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold px-4 py-2 rounded-xl">+ 건물 추가</button>
+        <input type="file" id="restoreFile" accept="application/json,.json" class="hidden" />
       </div>
     </div>
   </header>
@@ -269,6 +272,77 @@
       const store = tx.objectStore('buildings');
       const req = store.getAll();
       buildings = await new Promise((res, rej) => { req.onsuccess = () => res(req.result || []); req.onerror = () => rej(req.error); });
+    }
+
+    // ============ 백업(내보내기) / 복원(가져오기) ============
+    function validateBackupData(data) {
+      if (!data || typeof data !== 'object') return false;
+      const arr = Array.isArray(data) ? data : data.buildings;
+      if (!Array.isArray(arr)) return false;
+      // 각 건물이 tenants 배열을 보유해야 함
+      for (const b of arr) {
+        if (!b || typeof b !== 'object' || !Array.isArray(b.tenants)) return false;
+      }
+      return true;
+    }
+
+    function backupData() {
+      const data = { app: 'rental-mgmt', exportedAt: new Date().toISOString(), buildings: buildings };
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const d = new Date();
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      a.href = url;
+      a.download = `rental-backup-${yyyy}-${mm}-${dd}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      flashSaved();
+    }
+
+    async function restoreData(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsText(file);
+      });
+    }
+
+    async function applyRestore() {
+      const input = document.getElementById('restoreFile');
+      const file = input.files && input.files[0];
+      if (!file) return;
+      let parsed;
+      try {
+        const text = await restoreData(file);
+        parsed = JSON.parse(text);
+      } catch (e) {
+        alert('복원 실패: 올바른 JSON 백업 파일이 아닙니다.');
+        return;
+      }
+      if (!validateBackupData(parsed)) {
+        alert('복원 실패: 백업 파일 구조가 올바르지 않습니다. (건물 배열과 각 건물의 tenants 배열이 필요합니다)');
+        return;
+      }
+      const arr = Array.isArray(parsed) ? parsed : parsed.buildings;
+      const confirmed = confirm(`복원하시겠습니까? 현재 데이터 ${buildings.length}건이 백업 파일의 데이터 ${arr.length}건으로 덮어써집니다.`);
+      if (!confirmed) return;
+
+      const tx = db.transaction('buildings', 'readwrite');
+      const store = tx.objectStore('buildings');
+      store.clear();
+      arr.forEach(b => store.put(b));
+      await new Promise((res) => { tx.oncomplete = res; });
+
+      await loadBuildings();
+      renderBuildings();
+      alert('복원 완료 ✓');
     }
 
     function flashSaved() {
@@ -1079,6 +1153,9 @@
 
     // ============ 이벤트 ============
     document.getElementById('newBuildingBtn').addEventListener('click', showBuildingModal);
+    document.getElementById('backupBtn').addEventListener('click', backupData);
+    document.getElementById('restoreBtn').addEventListener('click', () => document.getElementById('restoreFile').click());
+    document.getElementById('restoreFile').addEventListener('change', applyRestore);
     document.getElementById('statsBtn').addEventListener('click', openStats);
     document.getElementById('statsBackBtn').addEventListener('click', closeStats);
     document.getElementById('bCancel').addEventListener('click', hideBuildingModal);
