@@ -40,6 +40,7 @@ curl -s -X POST https://ondev.store/api/deploy -H "Content-Type: application/jso
 - **IndexedDB** 기반 — 새로고침해도, 인터넷이 끊겨도 데이터가 유지됩니다.
 - 세입자별 기록(텍스트·이미지)은 base64로 인코딩되어 동일한 DB에 저장됩니다.
 - 같은 브라우저에서만 접근 가능하며, 다른 기기로는 자동 동기화되지 않습니다.
+- **백업/복원**: 헤더의 📤 백업 버튼으로 전체 데이터를 JSON 파일(`rental-backup-YYYY-MM-DD.json`)로 내보낼 수 있고, 📥 복원 버튼으로 해당 JSON 파일을 불러와 다른 기기·브라우저로 이관할 수 있습니다. 복원 시 기존 데이터를 덮어쓰기 전 확인 메시지가 표시됩니다.
 
 ## ⚠️ 참고
 
