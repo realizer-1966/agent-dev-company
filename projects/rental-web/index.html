@@ -134,6 +134,14 @@
       </div>
 
       <!-- 세입자 목록 -->
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-bold text-white">👥 세입자 목록</h3>
+        <div class="flex items-center gap-1 bg-slate-800 border border-slate-700 rounded-xl p-1">
+          <button data-sort="reg" class="sort-btn text-xs font-bold px-3 py-1.5 rounded-lg text-slate-300 hover:text-white">등록순</button>
+          <button data-sort="room" class="sort-btn text-xs font-bold px-3 py-1.5 rounded-lg text-slate-300 hover:text-white">호수순</button>
+          <button data-sort="name" class="sort-btn text-xs font-bold px-3 py-1.5 rounded-lg text-slate-300 hover:text-white">이름순</button>
+        </div>
+      </div>
       <div id="tenantsGrid" class="grid gap-4"></div>
     </section>
 
@@ -471,6 +479,38 @@
       renderBuildings();
     }
 
+    // 세입자 정렬 상태 (localStorage에 저장해 새로고침 후에도 유지)
+    let tenantSort = localStorage.getItem('rentalTenantSort') || 'reg';
+
+    function setTenantSort(mode) {
+      tenantSort = mode;
+      localStorage.setItem('rentalTenantSort', mode);
+      document.querySelectorAll('.sort-btn').forEach(btn => {
+        const active = btn.dataset.sort === mode;
+        btn.classList.toggle('bg-indigo-600', active);
+        btn.classList.toggle('text-white', active);
+        btn.classList.toggle('text-slate-300', !active);
+      });
+      renderTenants();
+    }
+
+    function sortTenants(list) {
+      const arr = list.slice(); // 원본 순서 보존을 위해 복사본 정렬
+      if (tenantSort === 'room') {
+        arr.sort((a, b) => {
+          const ra = parseInt(a.room, 10);
+          const rb = parseInt(b.room, 10);
+          const na = isNaN(ra) ? Infinity : ra; // 호실이 숫자가 아니면 맨 뒤
+          const nb = isNaN(rb) ? Infinity : rb;
+          return na - nb;
+        });
+      } else if (tenantSort === 'name') {
+        arr.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ko'));
+      }
+      // 'reg'는 등록 순서 그대로 유지
+      return arr;
+    }
+
     function renderTenants() {
       const b = buildings.find(x => x.id === currentBuildingId);
       if (!b) return;
@@ -480,7 +520,7 @@
         grid.innerHTML = `<p class="text-center text-slate-500 py-8">등록된 세입자가 없습니다. 위에서 등록하세요.</p>`;
         return;
       }
-      b.tenants.forEach(t => {
+      sortTenants(b.tenants).forEach(t => {
         const status = getTenantStatus(t); // 'active' | 'midterm' | 'full'
         let statusBadge;
         if (status === 'active') {
@@ -1169,6 +1209,12 @@
     document.getElementById('emClose').addEventListener('click', closeEditModal);
     document.getElementById('emCancel').addEventListener('click', closeEditModal);
     document.getElementById('emSave').addEventListener('click', saveEditTenant);
+    // 세입자 정렬 버튼
+    document.querySelectorAll('.sort-btn').forEach(btn => {
+      btn.addEventListener('click', () => setTenantSort(btn.dataset.sort));
+    });
+    // 저장된 정렬 상태 반영 (활성 버튼 표시)
+    setTenantSort(tenantSort);
     // 모달 밖 클릭 시 닫기
     document.getElementById('buildingModal').addEventListener('click', (e) => { if (e.target === e.currentTarget) hideBuildingModal(); });
     document.getElementById('tenantModal').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeTenant(); });
