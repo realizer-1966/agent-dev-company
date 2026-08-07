@@ -71,7 +71,7 @@ jobs:
         run: |
           python scripts/sync_issues.py sync --repo "$REPO"
           echo "--- dispatch ---"
-          hermes kanban dispatch --once
+          hermes kanban dispatch --max 1
           echo "--- status ---"
           hermes kanban list
 
