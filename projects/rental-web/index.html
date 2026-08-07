@@ -208,6 +208,18 @@
     </div>
   </div>
 
+  <!-- 호실 전체 이력 모달 -->
+  <div id="roomModal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4">
+    <div class="bg-slate-800 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto border border-slate-700 fade-in">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold text-white text-lg" id="rmTitle"></h3>
+        <button id="rmClose" class="text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
+      </div>
+      <p class="text-xs text-slate-400 mb-3">과거부터 현재까지 이 호실에 거주한 세입자 전체 이력 (입주일 순)</p>
+      <div id="roomHistoryList" class="space-y-3"></div>
+    </div>
+  </div>
+
   <!-- 세입자 수정 모달 -->
   <div id="editModal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4">
     <div class="bg-slate-800 rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto border border-slate-700 fade-in">
@@ -494,98 +506,192 @@
       renderTenants();
     }
 
-    function sortTenants(list) {
-      const arr = list.slice(); // 원본 순서 보존을 위해 복사본 정렬
-      if (tenantSort === 'room') {
-        arr.sort((a, b) => {
-          const ra = parseInt(a.room, 10);
-          const rb = parseInt(b.room, 10);
-          const na = isNaN(ra) ? Infinity : ra; // 호실이 숫자가 아니면 맨 뒤
-          const nb = isNaN(rb) ? Infinity : rb;
-          return na - nb;
-        });
-      } else if (tenantSort === 'name') {
-        arr.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ko'));
-      }
-      // 'reg'는 등록 순서 그대로 유지
-      return arr;
-    }
-
     function renderTenants() {
       const b = buildings.find(x => x.id === currentBuildingId);
       if (!b) return;
       const grid = document.getElementById('tenantsGrid');
       grid.innerHTML = '';
-      if (b.tenants.length === 0) {
-        grid.innerHTML = `<p class="text-center text-slate-500 py-8">등록된 세입자가 없습니다. 위에서 등록하세요.</p>`;
+      // 입주 중인 세입자만 (getTenantStatus === 'active')
+      const active = b.tenants.filter(t => getTenantStatus(t) === 'active');
+      if (active.length === 0) {
+        grid.innerHTML = `<p class="text-center text-slate-500 py-8">현재 입주 중인 세입자가 없습니다. 위에서 등록하세요.</p>`;
         return;
       }
-      sortTenants(b.tenants).forEach(t => {
-        const status = getTenantStatus(t); // 'active' | 'midterm' | 'full'
-        let statusBadge;
-        if (status === 'active') {
-          statusBadge = '<span class="bg-emerald-500/20 text-emerald-400 text-xs font-bold px-2 py-0.5 rounded-full">입주 중</span>';
-        } else if (status === 'midterm') {
-          statusBadge = '<span class="bg-amber-500/20 text-amber-400 text-xs font-bold px-2 py-0.5 rounded-full">⚠ 중도 퇴거</span>';
-        } else {
-          statusBadge = '<span class="bg-slate-500/20 text-slate-400 text-xs font-bold px-2 py-0.5 rounded-full">만기일 퇴거</span>';
-        }
-        grid.innerHTML += `
-          <div class="card bg-slate-800 border border-slate-700 rounded-2xl p-5">
-            <div class="flex items-start justify-between">
-              <div class="flex items-center gap-3">
-                <div class="w-11 h-11 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg shrink-0">
-                  ${escapeHtml((t.name||'?').charAt(0))}
-                </div>
-                <div>
-                  <h4 class="font-bold text-white">${escapeHtml(t.name)} <span class="text-slate-400 text-sm font-normal">${escapeHtml(t.room||'')}</span></h4>
-                  <p class="text-xs text-slate-400 mt-0.5">📞 ${escapeHtml(t.phone||'-')}</p>
-                </div>
-              </div>
-              ${statusBadge}
-            </div>
-            <div class="grid grid-cols-3 gap-2 mt-4 text-center">
-              <div class="bg-slate-900 rounded-xl py-2">
-                <p class="text-xs text-slate-400">보증금</p>
-                <p class="text-sm font-bold text-white mt-0.5">${fmtMoney(t.deposit)}</p>
-              </div>
-              <div class="bg-slate-900 rounded-xl py-2">
-                <p class="text-xs text-slate-400">월세</p>
-                <p class="text-sm font-bold text-white mt-0.5">${fmtMoney(t.rent)}</p>
-              </div>
-              <div class="bg-slate-900 rounded-xl py-2">
-                <p class="text-xs text-slate-400">관리비</p>
-                <p class="text-sm font-bold text-white mt-0.5">${fmtMoney(t.mgmt)}</p>
-              </div>
-            </div>
-            <div class="grid grid-cols-3 gap-2 mt-4 text-center text-xs">
-              <div class="bg-slate-900 rounded-lg py-1.5">
-                <p class="text-slate-500">📅 입주일</p>
-                <p class="text-slate-200 font-semibold mt-0.5">${fmtDate(t.moveIn)}</p>
-              </div>
-              <div class="bg-slate-900 rounded-lg py-1.5">
-                <p class="text-slate-500">📆 만기일</p>
-                <p class="text-indigo-300 font-semibold mt-0.5">${t.contractEnd ? fmtDate(t.contractEnd) : '-'}</p>
-              </div>
-              <div class="bg-slate-900 rounded-lg py-1.5">
-                <p class="text-slate-500">🚪 퇴거일</p>
-                <p class="text-slate-200 font-semibold mt-0.5">${fmtDate(t.moveOut)}</p>
-              </div>
-            </div>
-            <div class="flex gap-2 mt-4">
-              <button data-tid="${t.id}" data-act="detail" class="btn flex-1 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold py-2 rounded-xl">📋 기록 ${t.notes ? t.notes.length : 0}건</button>
-              <button data-tid="${t.id}" data-act="edit" class="btn bg-amber-500/80 hover:bg-amber-400 text-white text-sm font-bold px-3 py-2 rounded-xl">✏️ 수정</button>
-              <button data-tid="${t.id}" data-act="del" class="btn bg-rose-600/80 hover:bg-rose-500 text-white text-sm font-bold px-4 py-2 rounded-xl">삭제</button>
-            </div>
-          </div>`;
+      // 호실별 그룹핑 (호실 없는 입주중 세입자는 '' 그룹으로)
+      const rooms = {};
+      active.forEach(t => {
+        const room = (t.room || '').trim();
+        (rooms[room] = rooms[room] || []).push(t);
       });
+      const roomKeys = Object.keys(rooms);
+      const sortedKeys = sortRoomGroups(roomKeys, rooms);
+      sortedKeys.forEach(room => {
+        grid.innerHTML += renderRoomCard(room, rooms[room]);
+      });
+      // 호실 카드 클릭 → 해당 호실 전체 이력
+      grid.querySelectorAll('[data-act="history"]').forEach(btn => {
+        btn.addEventListener('click', () => openRoomHistory(btn.dataset.room));
+      });
+      // 세입자 액션 (기록/수정/삭제)
       grid.querySelectorAll('[data-tid]').forEach(btn => {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
           if (btn.dataset.act === 'detail') openTenant(btn.dataset.tid);
           else if (btn.dataset.act === 'edit') openEditModal(btn.dataset.tid);
           else if (btn.dataset.act === 'del') deleteTenant(btn.dataset.tid);
         });
       });
+    }
+
+    // 호실 그룹 정렬 (입주중 세입자 기준)
+    function sortRoomGroups(roomKeys, rooms) {
+      if (tenantSort === 'room') {
+        return roomKeys.slice().sort((a, b) => {
+          const na = parseInt(a, 10);
+          const nb = parseInt(b, 10);
+          const sa = isNaN(na) ? Infinity : na; // 비숫자·빈 호실 맨 뒤
+          const sb = isNaN(nb) ? Infinity : nb;
+          return sa - sb;
+        });
+      } else if (tenantSort === 'name') {
+        return roomKeys.slice().sort((a, b) => {
+          const keyA = a === '' ? '\uffff' : firstTenantName(rooms[a]); // 호실 없음 그룹은 맨 뒤
+          const keyB = b === '' ? '\uffff' : firstTenantName(rooms[b]);
+          return String(keyA).localeCompare(String(keyB), 'ko');
+        });
+      }
+      // 'reg': 삽입 순서(등록 순서) 유지
+      return roomKeys.slice();
+    }
+
+    // 그룹 내 세입자 이름 중 사전순 최소값 (그룹 대표 이름)
+    function firstTenantName(tenants) {
+      return tenants
+        .map(t => String(t.name || '?'))
+        .sort((x, y) => x.localeCompare(y, 'ko'))[0] || '?';
+    }
+
+    // 호실 카드 렌더링 (입주중 세입자 그룹)
+    function renderRoomCard(room, tenants) {
+      const roomLabel = room ? `${room}호` : '호실 없음';
+      const roomIcon = room ? escapeHtml(room) : '🚪';
+      const grad = room ? 'from-indigo-600 to-purple-600' : 'from-slate-600 to-slate-500';
+      return `
+        <div class="card bg-slate-800 border border-slate-700 rounded-2xl p-4">
+          <button data-room="${escapeHtml(room)}" data-act="history" class="btn w-full flex items-center justify-between rounded-xl px-2 py-2 -mx-2 text-left group">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-gradient-to-br ${grad} flex items-center justify-center text-white font-bold text-sm shrink-0">${roomIcon}</div>
+              <div>
+                <h4 class="font-bold text-white">${roomLabel}</h4>
+                <p class="text-xs text-slate-400">입주중 ${tenants.length}명 · <span class="text-indigo-300 group-hover:underline">📜 전체 이력</span></p>
+              </div>
+            </div>
+            <span class="text-slate-500 group-hover:text-indigo-300 text-xl">›</span>
+          </button>
+          <div class="mt-3 space-y-3">
+            ${tenants.map(t => renderTenantRow(t)).join('')}
+          </div>
+        </div>`;
+    }
+
+    // 호실 카드 안 입주중 세입자 행
+    function renderTenantRow(t) {
+      return `
+        <div class="bg-slate-900 rounded-xl p-4 border border-slate-700">
+          <div class="flex items-start justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold shrink-0">
+                ${escapeHtml((t.name||'?').charAt(0))}
+              </div>
+              <div>
+                <h5 class="font-bold text-white">${escapeHtml(t.name)}</h5>
+                <p class="text-xs text-slate-400 mt-0.5">📞 ${escapeHtml(t.phone||'-')}</p>
+              </div>
+            </div>
+            <span class="bg-emerald-500/20 text-emerald-400 text-xs font-bold px-2 py-0.5 rounded-full">입주 중</span>
+          </div>
+          <div class="grid grid-cols-3 gap-2 mt-3 text-center">
+            <div class="bg-slate-800 rounded-lg py-1.5">
+              <p class="text-[10px] text-slate-400">보증금</p>
+              <p class="text-xs font-bold text-white mt-0.5">${fmtMoney(t.deposit)}</p>
+            </div>
+            <div class="bg-slate-800 rounded-lg py-1.5">
+              <p class="text-[10px] text-slate-400">월세</p>
+              <p class="text-xs font-bold text-white mt-0.5">${fmtMoney(t.rent)}</p>
+            </div>
+            <div class="bg-slate-800 rounded-lg py-1.5">
+              <p class="text-[10px] text-slate-400">관리비</p>
+              <p class="text-xs font-bold text-white mt-0.5">${fmtMoney(t.mgmt)}</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2 mt-3 text-center text-xs">
+            <div class="bg-slate-800 rounded-lg py-1.5">
+              <p class="text-slate-500">📅 입주일</p>
+              <p class="text-slate-200 font-semibold mt-0.5">${fmtDate(t.moveIn)}</p>
+            </div>
+            <div class="bg-slate-800 rounded-lg py-1.5">
+              <p class="text-slate-500">📆 만기일</p>
+              <p class="text-indigo-300 font-semibold mt-0.5">${t.contractEnd ? fmtDate(t.contractEnd) : '-'}</p>
+            </div>
+          </div>
+          <div class="flex gap-2 mt-3">
+            <button data-tid="${t.id}" data-act="detail" class="btn flex-1 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold py-2 rounded-xl">📋 기록 ${t.notes ? t.notes.length : 0}건</button>
+            <button data-tid="${t.id}" data-act="edit" class="btn bg-amber-500/80 hover:bg-amber-400 text-white text-sm font-bold px-3 py-2 rounded-xl">✏️ 수정</button>
+            <button data-tid="${t.id}" data-act="del" class="btn bg-rose-600/80 hover:bg-rose-500 text-white text-sm font-bold px-4 py-2 rounded-xl">삭제</button>
+          </div>
+        </div>`;
+    }
+
+    // 호실 전체 이력 모달 열기 (과거~현재 모든 세입자, 입주일 오름차순)
+    function openRoomHistory(room) {
+      const b = buildings.find(x => x.id === currentBuildingId);
+      if (!b) return;
+      const roomStr = (room || '').trim();
+      const tenants = b.tenants
+        .filter(t => (t.room || '').trim() === roomStr)
+        .sort((a, c) => String(a.moveIn || '').localeCompare(String(c.moveIn || '')));
+      document.getElementById('rmTitle').textContent = roomStr ? `${roomStr}호 전체 이력` : '호실 없음 전체 이력';
+      const list = document.getElementById('roomHistoryList');
+      list.innerHTML = '';
+      if (tenants.length === 0) {
+        list.innerHTML = '<p class="text-center text-slate-500 py-6">이 호실의 거주 이력이 없습니다.</p>';
+        document.getElementById('roomModal').classList.remove('hidden');
+        document.getElementById('roomModal').classList.add('flex');
+        return;
+      }
+      tenants.forEach(t => {
+        const status = getTenantStatus(t);
+        let badge;
+        if (status === 'active') badge = '<span class="bg-emerald-500/20 text-emerald-400 text-xs font-bold px-2 py-0.5 rounded-full">입주 중</span>';
+        else if (status === 'midterm') badge = '<span class="bg-amber-500/20 text-amber-400 text-xs font-bold px-2 py-0.5 rounded-full">중도 퇴거</span>';
+        else badge = '<span class="bg-slate-500/20 text-slate-400 text-xs font-bold px-2 py-0.5 rounded-full">만기 퇴거</span>';
+        list.innerHTML += `
+          <div class="bg-slate-900 rounded-xl p-4 border border-slate-700">
+            <div class="flex items-start justify-between">
+              <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-slate-600 to-slate-500 flex items-center justify-center text-white font-bold text-xs shrink-0">${escapeHtml((t.name||'?').charAt(0))}</div>
+                <div>
+                  <h5 class="font-bold text-white text-sm">${escapeHtml(t.name)}</h5>
+                  <p class="text-[11px] text-slate-400">📞 ${escapeHtml(t.phone||'-')}</p>
+                </div>
+              </div>
+              ${badge}
+            </div>
+            <div class="grid grid-cols-3 gap-2 mt-3 text-center text-xs">
+              <div class="bg-slate-800 rounded-lg py-1.5"><p class="text-slate-500">📅 입주일</p><p class="text-slate-200 font-semibold mt-0.5">${fmtDate(t.moveIn)}</p></div>
+              <div class="bg-slate-800 rounded-lg py-1.5"><p class="text-slate-500">🚪 퇴거일</p><p class="text-slate-200 font-semibold mt-0.5">${fmtDate(t.moveOut)}</p></div>
+              <div class="bg-slate-800 rounded-lg py-1.5"><p class="text-slate-500">💰 보증금/월세</p><p class="text-emerald-300 font-semibold mt-0.5">${fmtMoney(t.deposit)} / ${fmtMoney(t.rent)}</p></div>
+            </div>
+          </div>`;
+      });
+      document.getElementById('roomModal').classList.remove('hidden');
+      document.getElementById('roomModal').classList.add('flex');
+    }
+
+    function closeRoomHistory() {
+      const m = document.getElementById('roomModal');
+      m.classList.add('hidden');
+      m.classList.remove('flex');
     }
 
     // ============ 건물 공용 비용 ============
@@ -1204,6 +1310,7 @@
     document.getElementById('ccAddBtn').addEventListener('click', addCommonCost);
     document.getElementById('backBtn').addEventListener('click', backToList);
     document.getElementById('tmClose').addEventListener('click', closeTenant);
+    document.getElementById('rmClose').addEventListener('click', closeRoomHistory);
     document.getElementById('noteAdd').addEventListener('click', addNote);
     document.getElementById('rentAddBtn').addEventListener('click', addRent);
     document.getElementById('emClose').addEventListener('click', closeEditModal);
@@ -1219,6 +1326,7 @@
     document.getElementById('buildingModal').addEventListener('click', (e) => { if (e.target === e.currentTarget) hideBuildingModal(); });
     document.getElementById('tenantModal').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeTenant(); });
     document.getElementById('editModal').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeEditModal(); });
+    document.getElementById('roomModal').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeRoomHistory(); });
 
     // 입주일 변경 시 계약만료일 = 입주일 + 2년 자동 설정 (등록 폼 / 수정 모달)
     document.getElementById('tMoveIn').addEventListener('change', () => autoFillContractEnd('t'));
