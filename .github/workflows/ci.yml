@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        project: ["hello-cli", "todo-list", "fastapi-backend", "glowscript-agent"]
+        project: ["hello-cli", "todo-list", "fastapi-backend", "glowscript-agent", "glowscript-llm"]
 
     steps:
     - uses: actions/checkout@v4

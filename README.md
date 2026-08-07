@@ -54,6 +54,7 @@ hermes kanban list    # 현재 업무 현황
 | [todo-web](projects/todo-web/) | ✅ 완료 | 할일 관리 웹앱 (FastAPI + UI) |
 | [rental-web](projects/rental-web/) | ✅ 완료 | 임대관리 웹앱 (건물·세입자 관리, OnDev 배포) |
 | [glowscript-agent](projects/glowscript-agent/) | ✅ 완료 | GlowScript/VPython 시뮬레이션 생성·검증 에이전트 (TDD, 56 tests) |
+| [glowscript-llm](projects/glowscript-llm/) | ✅ 완료 | GlowScript LLM 생성 백엔드 (FastAPI, 자연어→코드, TDD, 7 tests) |
 
 ## 운영 자동화
 
