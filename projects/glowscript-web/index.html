@@ -47,8 +47,18 @@
 <div class="max-w-5xl mx-auto p-3 md:p-4">
   <header class="text-center py-4 md:py-6">
     <h1 class="text-2xl md:text-3xl font-bold text-slate-800">⚛️ GlowScript 시뮬레이터</h1>
-    <p class="text-slate-500 mt-1 md:mt-2 text-sm md:text-base">물리 시뮬레이션을 브라우저에서 바로 실행</p>
+    <p class="text-slate-500 mt-1 md:mt-2 text-sm md:text-base">AI가 자연어 설명을 물리 시뮬레이션으로 생성</p>
   </header>
+
+  <!-- AI natural-language input -->
+  <div class="bg-white rounded-2xl shadow-lg p-3 md:p-4 mb-3 md:mb-4">
+    <label class="block text-sm font-semibold text-slate-700 mb-2">🤖 원하는 시뮬레이션을 설명하세요</label>
+    <div class="flex gap-2">
+      <input id="promptInput" type="text" placeholder="예: 공을 위로 던져 포물선으로 떨어지는 운동" class="flex-1 px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 text-slate-800 focus:outline-none focus:border-blue-500 text-sm">
+      <button id="promptBtn" class="touch-btn px-5 py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition whitespace-nowrap">생성 ▶</button>
+    </div>
+    <p id="promptHint" class="mt-2 text-xs text-slate-400">물리 운동을 한국어/영어로 설명하면 자동으로 시뮬레이션을 골라 실행합니다.</p>
+  </div>
 
   <div class="bg-white rounded-2xl shadow-lg p-3 md:p-4 mb-3 md:mb-4">
     <div id="simButtons" class="flex gap-2"></div>
@@ -425,10 +435,76 @@ const SIMS = {
   }
 };
 
+// ===== AI natural-language matching (keyword-based, mirrors glowscript-agent) =====
+// Each sim maps to a list of keywords (Korean + English) that describe it.
+const KEYWORDS = {
+  projectile: ['포물선', '던지', '발사', '공을 위로', '포물', 'projectile', 'throw', 'launch', '포물선운동'],
+  pendulum: ['진자', '흔들', 'pendulum', '스윙', 'swing', '시계추'],
+  spring: ['용수철', '진동', 'spring', 'oscillat', '탄성', '스프링'],
+  orbit: ['궤도', '행성이 별', '공전', 'orbit', '위성', '중력궤도'],
+  free_fall: ['자유낙하', '떨어', 'free fall', '낙하', 'drop', '떨어지는'],
+  collision: ['충돌', 'collision', '부딪', '탄성충돌', '두 공'],
+  electric_field: ['전기장', 'electric', '전하', 'field', '쿨롱', '전계'],
+  robot_arm: ['로봇', 'robot', '팔', 'arm', '관절', 'joint', '매니퓰레이터'],
+  wave: ['파동', 'wave', '횡파', '진동하는 줄', 'string', '줄의 진동'],
+  electromagnetic_wave: ['전자기파', 'electromagnetic', 'EM wave', '빛', '전자기', '전자기파'],
+  fluid: ['유체', 'fluid', '입자', '흐름', 'flow', '액체'],
+  interference: ['간섭', 'interference', '파동 간섭', '두 파원'],
+  double_pendulum: ['이중 진자', 'double pendulum', '카오스', 'chaos', '이중진자'],
+  solar_system: ['태양계', 'solar system', '행성들', '태양', '공전']
+};
+
+function matchTemplate(description) {
+  const d = description.toLowerCase();
+  let best = 'projectile';
+  let bestScore = 0;
+  Object.keys(KEYWORDS).forEach(name => {
+    const score = KEYWORDS[name].filter(kw => d.includes(kw.toLowerCase())).length;
+    if (score > bestScore) {
+      bestScore = score;
+      best = name;
+    }
+  });
+  return best;
+}
+
 // ===== Determine which sim + params from URL (?sim=key&v0=15&angle=30) =====
 const params = new URLSearchParams(window.location.search);
 let currentSim = params.get('sim') || 'projectile';
 if (!SIMS[currentSim]) currentSim = 'projectile';
+
+// ===== AI prompt input handling =====
+// If URL has ?prompt=..., match it to a simulation
+const urlPrompt = params.get('prompt');
+if (urlPrompt) {
+  const matched = matchTemplate(urlPrompt);
+  if (SIMS[matched]) currentSim = matched;
+}
+
+const promptInput = document.getElementById('promptInput');
+const promptBtn = document.getElementById('promptBtn');
+const promptHint = document.getElementById('promptHint');
+// Prefill input box if URL has a prompt
+if (urlPrompt) {
+  promptInput.value = urlPrompt;
+  promptHint.textContent = '→ ' + SIMS[currentSim].label + ' 시뮬레이션을 실행 중';
+}
+function handlePrompt() {
+  const text = promptInput.value.trim();
+  if (!text) { promptHint.textContent = '설명을 입력해주세요.'; promptHint.classList.add('text-red-500'); return; }
+  const matched = matchTemplate(text);
+  promptHint.textContent = '→ ' + SIMS[matched].label + ' 시뮬레이션을 실행합니다';
+  promptHint.classList.remove('text-red-500');
+  // Reload with ?prompt=<text> to run the matched sim (compiler runs once per load)
+  const url = new URL(window.location.href);
+  url.searchParams.set('prompt', text);
+  url.searchParams.delete('sim');
+  url.searchParams.delete('custom');
+  url.searchParams.delete('code');
+  window.location.href = url.toString();
+}
+promptBtn.addEventListener('click', handlePrompt);
+promptInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') handlePrompt(); });
 
 // ===== Parameter definitions per simulation =====
 const PARAMS = {
