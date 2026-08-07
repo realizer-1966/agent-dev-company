@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GlowScript 시뮬레이터</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  .sim-btn { transition: all .15s ease; }
+  .sim-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.15); }
+  .sim-btn.active { background: #2563eb; color: white; border-color: #2563eb; }
+  #glowscript { width: 100%; min-height: 480px; }
+  #glowscript canvas { border-radius: 12px; }
+</style>
+</head>
+<body class="bg-slate-100 min-h-screen">
+<div class="max-w-5xl mx-auto p-4">
+  <header class="text-center py-6">
+    <h1 class="text-3xl font-bold text-slate-800">⚛️ GlowScript 시뮬레이터</h1>
+    <p class="text-slate-500 mt-2">GlowScript/VPython 물리 시뮬레이션을 브라우저에서 바로 실행</p>
+  </header>
+
+  <div class="bg-white rounded-2xl shadow-lg p-4 mb-4">
+    <div class="flex flex-wrap gap-2 justify-center" id="simButtons"></div>
+  </div>
+
+  <div class="bg-white rounded-2xl shadow-lg p-4">
+    <div id="glowscript" class="glowscript"></div>
+    <div id="status" class="text-center text-sm text-slate-500 mt-3"></div>
+  </div>
+
+  <footer class="text-center text-xs text-slate-400 py-6">
+    GlowScript 시뮬레이터 · agent-dev-company · 8가지 물리 시뮬레이션
+  </footer>
+</div>
+
+<script src="https://www.glowscript.org/lib/jquery/2.1/jquery.min.js"></script>
+<script src="https://www.glowscript.org/lib/jquery/IDE/jquery-ui.custom.min.js"></script>
+<script src="https://www.glowscript.org/package/glow.3.2.min.js"></script>
+<script src="https://www.glowscript.org/package/RScompiler.3.2.min.js"></script>
+<script>
+// ===== Simulation code templates (from glowscript-agent knowledge base) =====
+const SIMS = {
+  projectile: {
+    label: '🎯 포물선',
+    code: [
+      "from vpython import *",
+      "scene = canvas()",
+      "ball = sphere(pos=vector(0,0,0), radius=0.5, color=color.red, make_trail=True)",
+      "floor = box(pos=vector(0,-1,0), size=vector(20,0.1,1), color=color.green)",
+      "ball.velocity = vector(5,10,0)",
+      "g = vector(0,-9.8,0)",
+      "dt = 0.01",
+      "while True:",
+      "    rate(100)",
+      "    ball.velocity += g*dt",
+      "    ball.pos += ball.velocity*dt",
+      "    if ball.pos.y < 0:",
+      "        ball.velocity.y = -ball.velocity.y*0.8"
+    ].join("\n")
+  },
+  pendulum: {
+    label: '🕰️ 진자',
+    code: [
+      "from vpython import *",
+      "scene = canvas()",
+      "pivot = vector(0,5,0)",
+      "rod = cylinder(pos=pivot, axis=vector(0,-3,0), radius=0.05, color=color.white)",
+      "bob = sphere(pos=pivot+vector(0,-3,0), radius=0.3, color=color.orange)",
+      "theta = 0.5",
+      "omega = 0",
+      "L = 3",
+      "g = 9.8",
+      "dt = 0.01",
+      "while True:",
+      "    rate(100)",
+      "    alpha = -(g/L)*sin(theta)",
+      "    omega += alpha*dt",
+      "    theta += omega*dt",
+      "    bob.pos = pivot + vector(L*sin(theta), -L*cos(theta), 0)",
+      "    rod.axis = bob.pos - pivot"
+    ].join("\n")
+  },
+  spring: {
+    label: '🌀 용수철',
+    code: [
+      "from vpython import *",
+      "scene = canvas()",
+      "ceiling = box(pos=vector(0,5,0), size=vector(4,0.2,1), color=color.white)",
+      "mass = sphere(pos=vector(0,2,0), radius=0.4, color=color.blue)",
+      "spring = helix(pos=ceiling.pos, axis=mass.pos-ceiling.pos, radius=0.2, color=color.white)",
+      "mass.velocity = vector(0,0,0)",
+      "k = 20",
+      "m = 1",
+      "g = 9.8",
+      "dt = 0.01",
+      "while True:",
+      "    rate(100)",
+      "    force = -k*(mass.pos.y-2)*vector(0,1,0) - m*g*vector(0,1,0)",
+      "    mass.velocity += (force/m)*dt",
+      "    mass.pos += mass.velocity*dt",
+      "    spring.axis = mass.pos - ceiling.pos"
+    ].join("\n")
+  },
+  orbit: {
+    label: '🪐 궤도',
+    code: [
+      "from vpython import *",
+      "scene = canvas()",
+      "star = sphere(pos=vector(0,0,0), radius=1, color=color.yellow)",
+      "planet = sphere(pos=vector(5,0,0), radius=0.3, color=color.blue, make_trail=True)",
+      "planet.velocity = vector(0,0,4.47)",
+      "G = 1",
+      "M = 100",
+      "dt = 0.01",
+      "while True:",
+      "    rate(100)",
+      "    r = planet.pos - star.pos",
+      "    force = -G*M*norm(r)/mag(r)**2",
+      "    planet.velocity += force*dt",
+      "    planet.pos += planet.velocity*dt"
+    ].join("\n")
+  },
+  free_fall: {
+    label: '⬇️ 자유낙하',
+    code: [
+      "from vpython import *",
+      "scene = canvas()",
+      "ball = sphere(pos=vector(0,10,0), radius=0.5, color=color.red, make_trail=True)",
+      "floor = box(pos=vector(0,-0.5,0), size=vector(10,0.1,1), color=color.green)",
+      "ball.velocity = vector(0,0,0)",
+      "g = vector(0,-9.8,0)",
+      "dt = 0.01",
+      "while True:",
+      "    rate(100)",
+      "    ball.velocity += g*dt",
+      "    ball.pos += ball.velocity*dt",
+      "    if ball.pos.y < 0:",
+      "        ball.pos.y = 0",
+      "        ball.velocity.y = 0"
+    ].join("\n")
+  },
+  collision: {
+    label: '💥 충돌',
+    code: [
+      "from vpython import *",
+      "scene = canvas()",
+      "ball1 = sphere(pos=vector(-3,0,0), radius=0.5, color=color.red, make_trail=True)",
+      "ball2 = sphere(pos=vector(3,0,0), radius=0.5, color=color.blue, make_trail=True)",
+      "ball1.velocity = vector(2,0,0)",
+      "ball2.velocity = vector(-1,0,0)",
+      "m1 = 1",
+      "m2 = 1",
+      "dt = 0.01",
+      "while True:",
+      "    rate(100)",
+      "    ball1.pos += ball1.velocity*dt",
+      "    ball2.pos += ball2.velocity*dt",
+      "    if mag(ball1.pos-ball2.pos) < 1.0:",
+      "        v1, v2 = ball1.velocity, ball2.velocity",
+      "        ball1.velocity = v2",
+      "        ball2.velocity = v1"
+    ].join("\n")
+  },
+  electric_field: {
+    label: '⚡ 전기장',
+    code: [
+      "from vpython import *",
+      "scene = canvas()",
+      "charge = sphere(pos=vector(0,0,0), radius=0.3, color=color.yellow)",
+      "k = 8.99e9",
+      "q = 1e-9",
+      "arrows = []",
+      "for x in range(-3,4):",
+      "    for y in range(-3,4):",
+      "        if x==0 and y==0:",
+      "            continue",
+      "        p = vector(x,y,0)",
+      "        r = mag(p)",
+      "        E = k*q/r**2*norm(p)",
+      "        arrows.append(arrow(pos=p, axis=E*0.1, color=color.cyan))",
+      "while True:",
+      "    rate(100)"
+    ].join("\n")
+  },
+  robot_arm: {
+    label: '🤖 로봇 팔',
+    code: [
+      "from vpython import *",
+      "scene = canvas()",
+      "base = vector(0,0,0)",
+      "L1 = 2",
+      "L2 = 1.5",
+      "theta1 = 0",
+      "theta2 = 0",
+      "omega = 0.5",
+      "dt = 0.01",
+      "while True:",
+      "    rate(100)",
+      "    theta1 += omega*dt",
+      "    theta2 += omega*0.5*dt",
+      "    joint = base + vector(L1*cos(theta1), L1*sin(theta1), 0)",
+      "    tip = joint + vector(L2*cos(theta1+theta2), L2*sin(theta1+theta2), 0)",
+      "    seg1 = cylinder(pos=base, axis=joint-base, radius=0.1, color=color.orange)",
+      "    seg2 = cylinder(pos=joint, axis=tip-joint, radius=0.1, color=color.cyan)"
+    ].join("\n")
+  }
+};
+
+// ===== Determine which sim to run from URL (?sim=key) =====
+const params = new URLSearchParams(window.location.search);
+let currentSim = params.get('sim') || 'projectile';
+if (!SIMS[currentSim]) currentSim = 'projectile';
+
+// ===== Build simulation buttons (links that reload the page) =====
+const btnContainer = document.getElementById('simButtons');
+Object.keys(SIMS).forEach(key => {
+  const a = document.createElement('a');
+  a.textContent = SIMS[key].label;
+  a.href = '?sim=' + key;
+  a.className = 'sim-btn px-4 py-2 rounded-xl border-2 border-slate-200 bg-white text-slate-700 font-medium no-underline inline-block';
+  if (key === currentSim) a.classList.add('active');
+  btnContainer.appendChild(a);
+});
+
+// ===== Run the selected simulation (single compile per page load) =====
+const status = document.getElementById('status');
+status.textContent = SIMS[currentSim].label + ' 시뮬레이션 실행 중...';
+try {
+  const embedScript = window.glowscript_compile(SIMS[currentSim].code, {
+    lang: 'vpython',
+    version: '3.2',
+    run: false,
+    nodictionary: false
+  });
+  const runScript = ';(function() {' + embedScript +
+    ';$(function(){ window.__context = { glowscript_container: $("#glowscript") };' +
+    ';__main__();});})();';
+  const scriptEl = document.createElement('script');
+  scriptEl.textContent = runScript;
+  document.body.appendChild(scriptEl);
+  status.textContent = SIMS[currentSim].label + ' 시뮬레이션 실행 중 ✅';
+} catch (e) {
+  status.textContent = '오류: ' + e.message;
+  console.error('GlowScript error:', e);
+}
+</script>
+</body>
+</html>

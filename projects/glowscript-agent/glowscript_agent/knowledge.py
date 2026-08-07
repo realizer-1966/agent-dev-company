@@ -128,7 +128,7 @@ TEMPLATES: dict = {
             "\n"
             "# Spring-mass oscillator\n"
             "scene = canvas()\n"
-            "ceiling = box(pos=vector(0, 5, 0), size=vector(4, 0.2, 1), color=color.gray)\n"
+            "ceiling = box(pos=vector(0, 5, 0), size=vector(4, 0.2, 1), color=color.white)\n"
             "mass = sphere(pos=vector(0, 2, 0), radius=0.4, color=color.blue)\n"
             "spring = helix(pos=ceiling.pos, axis=mass.pos - ceiling.pos, radius=0.2, color=color.white)\n"
             "mass.velocity = vector(0, 0, 0)\n"

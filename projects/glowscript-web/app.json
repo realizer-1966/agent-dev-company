@@ -1,0 +1,6 @@
+{
+  "title": "GlowScript 시뮬레이터",
+  "description": "GlowScript/VPython 물리 시뮬레이션을 브라우저에서 바로 실행하는 에이전트. 포물선, 진자, 용수철, 궤도, 충돌, 전기장, 로봇 팔 등 8가지 시뮬레이션을 선택하면 즉시 3D로 렌더링됩니다.",
+  "category": "Education",
+  "icon": "icon.png"
+}
