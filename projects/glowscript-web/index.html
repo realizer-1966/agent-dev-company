@@ -10,35 +10,68 @@
   .sim-btn { transition: all .15s ease; }
   .sim-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.15); }
   .sim-btn.active { background: #2563eb; color: white; border-color: #2563eb; }
-  #glowscript { width: 100%; min-height: 480px; }
-  #glowscript canvas { border-radius: 12px; }
+  #glowscript { width: 100%; min-height: 60vw; max-height: 70vh; }
+  #glowscript canvas { border-radius: 12px; width: 100% !important; height: auto !important; }
+
+  /* Mobile-friendly horizontal scroll for sim buttons */
+  #simButtons {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0.5rem;
+    scroll-snap-type: x proximity;
+  }
+  #simButtons a {
+    flex-shrink: 0;
+    scroll-snap-align: start;
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Mobile param panel: collapsible on small screens */
+  #paramPanel input[type=range] { height: 2rem; cursor: pointer; }
+
+  /* Touch-friendly buttons */
+  button { -webkit-tap-highlight-color: transparent; }
+  .touch-btn { min-height: 2.75rem; }
+
+  @media (min-width: 768px) {
+    #glowscript { min-height: 480px; }
+  }
 </style>
 </head>
 <body class="bg-slate-100 min-h-screen">
-<div class="max-w-5xl mx-auto p-4">
-  <header class="text-center py-6">
-    <h1 class="text-3xl font-bold text-slate-800">⚛️ GlowScript 시뮬레이터</h1>
-    <p class="text-slate-500 mt-2">GlowScript/VPython 물리 시뮬레이션을 브라우저에서 바로 실행</p>
+<div class="max-w-5xl mx-auto p-3 md:p-4">
+  <header class="text-center py-4 md:py-6">
+    <h1 class="text-2xl md:text-3xl font-bold text-slate-800">⚛️ GlowScript 시뮬레이터</h1>
+    <p class="text-slate-500 mt-1 md:mt-2 text-sm md:text-base">물리 시뮬레이션을 브라우저에서 바로 실행</p>
   </header>
 
-  <div class="bg-white rounded-2xl shadow-lg p-4 mb-4">
-    <div class="flex flex-wrap gap-2 justify-center" id="simButtons"></div>
+  <div class="bg-white rounded-2xl shadow-lg p-3 md:p-4 mb-3 md:mb-4">
+    <div id="simButtons" class="flex gap-2"></div>
   </div>
 
-  <div class="grid md:grid-cols-3 gap-4 mb-4">
-    <div class="bg-white rounded-2xl shadow-lg p-4 md:col-span-2">
-      <div id="glowscript" class="glowscript"></div>
-      <div id="status" class="text-center text-sm text-slate-500 mt-3"></div>
+  <!-- Mobile: stacked layout, canvas first -->
+  <div class="bg-white rounded-2xl shadow-lg p-2 md:p-4 mb-3 md:mb-4">
+    <div id="glowscript" class="glowscript"></div>
+    <div id="status" class="text-center text-sm text-slate-500 mt-2"></div>
+  </div>
+
+  <!-- Parameter panel: collapsible on mobile, always visible on desktop -->
+  <div class="bg-white rounded-2xl shadow-lg p-4 md:col-span-3 mb-3 md:mb-4">
+    <button id="paramToggle" class="w-full flex items-center justify-between font-bold text-slate-700 mb-1 md:mb-3 cursor-pointer md:cursor-default md:pointer-events-none">
+      <span>⚙️ 파라미터</span>
+      <span id="paramToggleIcon" class="md:hidden text-slate-400 transition-transform">▼</span>
+    </button>
+    <div id="paramPanel" class="space-y-3 text-sm text-slate-600">
+      <p class="text-slate-400">시뮬레이션을 선택하면 조절 가능한 파라미터가 표시됩니다.</p>
     </div>
-    <div class="bg-white rounded-2xl shadow-lg p-4">
-      <h2 class="font-bold text-slate-700 mb-3">⚙️ 파라미터</h2>
-      <div id="paramPanel" class="space-y-3 text-sm text-slate-600">
-        <p class="text-slate-400">시뮬레이션을 선택하면 조절 가능한 파라미터가 표시됩니다.</p>
-      </div>
-      <div class="mt-4 pt-4 border-t border-slate-100 space-y-2">
-        <button id="viewCodeBtn" class="w-full px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-medium hover:bg-slate-200 transition">📄 코드 보기</button>
-        <button id="shareLinkBtn" class="w-full px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-medium hover:bg-slate-200 transition">🔗 공유 링크 복사</button>
-      </div>
+    <div class="mt-4 pt-4 border-t border-slate-100 flex gap-2">
+      <button id="viewCodeBtn" class="touch-btn flex-1 px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-medium hover:bg-slate-200 transition">📄 코드</button>
+      <button id="shareLinkBtn" class="touch-btn flex-1 px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-medium hover:bg-slate-200 transition">🔗 공유</button>
     </div>
   </div>
 
@@ -48,15 +81,15 @@
 </div>
 
 <!-- Code viewer modal -->
-<div id="codeModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+<div id="codeModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-0 md:p-4">
+  <div class="bg-white rounded-t-2xl md:rounded-2xl shadow-xl max-w-2xl w-full max-h-[85vh] md:max-h-[80vh] flex flex-col">
     <div class="flex items-center justify-between p-4 border-b border-slate-100">
       <h3 class="font-bold text-slate-700">📄 GlowScript 코드</h3>
-      <button id="closeCodeBtn" class="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
+      <button id="closeCodeBtn" class="text-slate-400 hover:text-slate-600 text-2xl w-10 h-10 flex items-center justify-center">&times;</button>
     </div>
-    <pre id="codeView" class="flex-1 overflow-auto p-4 bg-slate-900 text-slate-100 text-xs font-mono rounded-b-2xl"></pre>
-    <div class="p-3 border-t border-slate-100 flex justify-end">
-      <button id="copyCodeBtn" class="px-4 py-2 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 transition">📋 복사</button>
+    <pre id="codeView" class="flex-1 overflow-auto p-4 bg-slate-900 text-slate-100 text-xs font-mono rounded-none md:rounded-b-2xl"></pre>
+    <div class="p-3 border-t border-slate-100 flex justify-end gap-2">
+      <button id="copyCodeBtn" class="touch-btn px-6 py-2 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 transition">📋 복사</button>
     </div>
   </div>
 </div>
@@ -469,6 +502,25 @@ function buildParams() {
   });
 }
 buildParams();
+
+// ===== Mobile param panel toggle (collapsed on mobile, open on desktop) =====
+const paramToggle = document.getElementById('paramToggle');
+const paramToggleIcon = document.getElementById('paramToggleIcon');
+const isMobile = () => window.innerWidth < 768;
+// Start collapsed on mobile, expanded on desktop
+paramPanel.style.display = isMobile() ? 'none' : '';
+paramToggle.addEventListener('click', () => {
+  if (!isMobile()) return;
+  const hidden = paramPanel.style.display === 'none';
+  paramPanel.style.display = hidden ? '' : 'none';
+  paramToggleIcon.style.transform = hidden ? 'rotate(0deg)' : 'rotate(180deg)';
+});
+window.addEventListener('resize', () => {
+  if (!isMobile()) {
+    paramPanel.style.display = '';
+    paramToggleIcon.style.transform = 'rotate(0deg)';
+  }
+});
 
 // ===== Apply parameters to the simulation code =====
 function applyParams(code) {
