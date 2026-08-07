@@ -71,6 +71,7 @@
     </div>
     <div class="mt-4 pt-4 border-t border-slate-100 flex gap-2">
       <button id="viewCodeBtn" class="touch-btn flex-1 px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-medium hover:bg-slate-200 transition">📄 코드</button>
+      <button id="customCodeBtn" class="touch-btn flex-1 px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-medium hover:bg-slate-200 transition">✏️ 직접 입력</button>
       <button id="shareLinkBtn" class="touch-btn flex-1 px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-medium hover:bg-slate-200 transition">🔗 공유</button>
     </div>
   </div>
@@ -90,6 +91,20 @@
     <pre id="codeView" class="flex-1 overflow-auto p-4 bg-slate-900 text-slate-100 text-xs font-mono rounded-none md:rounded-b-2xl"></pre>
     <div class="p-3 border-t border-slate-100 flex justify-end gap-2">
       <button id="copyCodeBtn" class="touch-btn px-6 py-2 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 transition">📋 복사</button>
+    </div>
+  </div>
+</div>
+
+<!-- Custom code modal -->
+<div id="customModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-0 md:p-4">
+  <div class="bg-white rounded-t-2xl md:rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] md:max-h-[85vh] flex flex-col">
+    <div class="flex items-center justify-between p-4 border-b border-slate-100">
+      <h3 class="font-bold text-slate-700">✏️ GlowScript 코드 직접 입력</h3>
+      <button id="closeCustomBtn" class="text-slate-400 hover:text-slate-600 text-2xl w-10 h-10 flex items-center justify-center">&times;</button>
+    </div>
+    <textarea id="customCode" spellcheck="false" class="flex-1 p-4 bg-slate-900 text-slate-100 text-xs font-mono border-0 outline-none resize-none" placeholder="# 여기에 GlowScript/VPython 코드를 작성하세요&#10;from vpython import *&#10;scene = canvas()&#10;ball = sphere(pos=vector(0,0,0), radius=0.5, color=color.red)&#10;while True:&#10;    rate(100)&#10;    ball.pos.x = 3*sin(3*clock())"></textarea>
+    <div class="p-3 border-t border-slate-100 flex justify-end gap-2">
+      <button id="runCustomBtn" class="touch-btn px-6 py-2 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 transition">▶️ 실행</button>
     </div>
   </div>
 </div>
@@ -592,12 +607,46 @@ document.getElementById('shareLinkBtn').addEventListener('click', async () => {
   }
 });
 
+// ===== Custom code editor =====
+const customModal = document.getElementById('customModal');
+const customCode = document.getElementById('customCode');
+document.getElementById('customCodeBtn').addEventListener('click', () => {
+  customCode.value = SIMS[currentSim].code;
+  customModal.classList.remove('hidden');
+});
+document.getElementById('closeCustomBtn').addEventListener('click', () => {
+  customModal.classList.add('hidden');
+});
+customModal.addEventListener('click', (e) => {
+  if (e.target === customModal) customModal.classList.add('hidden');
+});
+document.getElementById('runCustomBtn').addEventListener('click', () => {
+  const code = customCode.value;
+  if (!code.trim()) { alert('코드를 입력해주세요.'); return; }
+  const url = new URL(window.location.href);
+  url.searchParams.set('custom', '1');
+  url.searchParams.set('code', code);
+  url.searchParams.delete('sim');
+  window.location.href = url.toString();
+});
+
 // ===== Run the selected simulation (single compile per page load) =====
 const status = document.getElementById('status');
-status.textContent = SIMS[currentSim].label + ' 시뮬레이션 실행 중...';
+// Determine if we're in custom mode
+const isCustom = params.get('custom') === '1';
+const customProgram = params.get('code') || '';
+let sourceCode;
+let statusLabel;
+if (isCustom && customProgram) {
+  sourceCode = customProgram;
+  statusLabel = '✏️ 커스텀 코드';
+} else {
+  sourceCode = applyParams(SIMS[currentSim].code);
+  statusLabel = SIMS[currentSim].label;
+}
+status.textContent = statusLabel + ' 시뮬레이션 실행 중...';
 try {
-  const finalCode = applyParams(SIMS[currentSim].code);
-  const embedScript = window.glowscript_compile(finalCode, {
+  const embedScript = window.glowscript_compile(sourceCode, {
     lang: 'vpython',
     version: '3.2',
     run: false,
@@ -609,7 +658,7 @@ try {
   const scriptEl = document.createElement('script');
   scriptEl.textContent = runScript;
   document.body.appendChild(scriptEl);
-  status.textContent = SIMS[currentSim].label + ' 시뮬레이션 실행 중 ✅';
+  status.textContent = statusLabel + ' 시뮬레이션 실행 중 ✅';
 } catch (e) {
   status.textContent = '오류: ' + e.message;
   console.error('GlowScript error:', e);
