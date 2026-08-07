@@ -44,15 +44,33 @@ jobs:
           pip install -U hermes-agent==0.17.0
           hermes --version
 
-      # --- Hermes 설정: 모델 API 키 ---
+      # --- Hermes 설정: 모델 API 키 + 역할 프로필 생성 ---
       - name: Configure Hermes
         env:
           MODEL_API_KEY: ${{ secrets.OLLAMA_CLOUD_API_KEY }}
         run: |
           hermes config set model.provider ollama-cloud
+          hermes config set model.default deepseek-v4-flash:0731
           if [ -n "$MODEL_API_KEY" ]; then
             hermes config set model.api_key "$MODEL_API_KEY"
           fi
+          # Create role profiles (pm/dev/qa/reviewer) if missing
+          for p in pm dev qa reviewer; do
+            if [ ! -d "$HOME/.hermes/profiles/$p" ]; then
+              echo "Creating profile: $p"
+              hermes profile create "$p" --description "agent-dev-company $p role" || true
+            fi
+          done
+          # Ensure each profile has the model API key
+          for p in pm dev qa reviewer; do
+            if [ -d "$HOME/.hermes/profiles/$p" ]; then
+              hermes -p "$p" config set model.provider ollama-cloud 2>/dev/null || true
+              hermes -p "$p" config set model.default deepseek-v4-flash:0731 2>/dev/null || true
+              if [ -n "$MODEL_API_KEY" ]; then
+                hermes -p "$p" config set model.api_key "$MODEL_API_KEY" 2>/dev/null || true
+              fi
+            fi
+          done
           hermes profile list
 
       # --- kanban.db 상태 불러오기 ---
