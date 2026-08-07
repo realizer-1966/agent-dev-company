@@ -41,7 +41,7 @@ jobs:
 
       - name: Install Hermes
         run: |
-          pip install -U hermes-agent
+          pip install -U hermes-agent==0.17.0
           hermes --version
 
       # --- Hermes 설정: 모델 API 키 ---
