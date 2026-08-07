@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "glowscript-agent"
+version = "0.1.0"
+description = "An LLM-trained agent that generates GlowScript/VPython physics simulations from natural-language descriptions"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+glowscript-agent = "glowscript_agent.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=7.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
