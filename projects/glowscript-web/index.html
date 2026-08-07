@@ -25,14 +25,39 @@
     <div class="flex flex-wrap gap-2 justify-center" id="simButtons"></div>
   </div>
 
-  <div class="bg-white rounded-2xl shadow-lg p-4">
-    <div id="glowscript" class="glowscript"></div>
-    <div id="status" class="text-center text-sm text-slate-500 mt-3"></div>
+  <div class="grid md:grid-cols-3 gap-4 mb-4">
+    <div class="bg-white rounded-2xl shadow-lg p-4 md:col-span-2">
+      <div id="glowscript" class="glowscript"></div>
+      <div id="status" class="text-center text-sm text-slate-500 mt-3"></div>
+    </div>
+    <div class="bg-white rounded-2xl shadow-lg p-4">
+      <h2 class="font-bold text-slate-700 mb-3">⚙️ 파라미터</h2>
+      <div id="paramPanel" class="space-y-3 text-sm text-slate-600">
+        <p class="text-slate-400">시뮬레이션을 선택하면 조절 가능한 파라미터가 표시됩니다.</p>
+      </div>
+      <div class="mt-4 pt-4 border-t border-slate-100">
+        <button id="viewCodeBtn" class="w-full px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-medium hover:bg-slate-200 transition">📄 코드 보기</button>
+      </div>
+    </div>
   </div>
 
   <footer class="text-center text-xs text-slate-400 py-6">
-    GlowScript 시뮬레이터 · agent-dev-company · 8가지 물리 시뮬레이션
+    GlowScript 시뮬레이터 · agent-dev-company · 11가지 물리 시뮬레이션
   </footer>
+</div>
+
+<!-- Code viewer modal -->
+<div id="codeModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+    <div class="flex items-center justify-between p-4 border-b border-slate-100">
+      <h3 class="font-bold text-slate-700">📄 GlowScript 코드</h3>
+      <button id="closeCodeBtn" class="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
+    </div>
+    <pre id="codeView" class="flex-1 overflow-auto p-4 bg-slate-900 text-slate-100 text-xs font-mono rounded-b-2xl"></pre>
+    <div class="p-3 border-t border-slate-100 flex justify-end">
+      <button id="copyCodeBtn" class="px-4 py-2 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 transition">📋 복사</button>
+    </div>
+  </div>
 </div>
 
 <script src="https://www.glowscript.org/lib/jquery/2.1/jquery.min.js"></script>
@@ -205,6 +230,69 @@ const SIMS = {
       "    seg1 = cylinder(pos=base, axis=joint-base, radius=0.1, color=color.orange)",
       "    seg2 = cylinder(pos=joint, axis=tip-joint, radius=0.1, color=color.cyan)"
     ].join("\n")
+  },
+  wave: {
+    label: '🌊 파동',
+    code: [
+      "from vpython import *",
+      "scene = canvas()",
+      "N = 50",
+      "pts = [vector(i*0.2-5, 0, 0) for i in range(N)]",
+      "string = curve(pos=pts, color=color.cyan, radius=0.05)",
+      "t = 0",
+      "dt = 0.01",
+      "while True:",
+      "    rate(100)",
+      "    t += dt",
+      "    for i in range(N):",
+      "        x = i*0.2-5",
+      "        string.pos[i] = vector(x, 0.5*sin(x-3*t), 0)"
+    ].join("\n")
+  },
+  electromagnetic_wave: {
+    label: '📡 전자기파',
+    code: [
+      "from vpython import *",
+      "scene = canvas()",
+      "N = 30",
+      "Earrows = []",
+      "Barrows = []",
+      "for i in range(N):",
+      "    x = i*0.3-4.5",
+      "    Earrows.append(arrow(pos=vector(x,0,0), axis=vector(0,0.5,0), color=color.red))",
+      "    Barrows.append(arrow(pos=vector(x,0,0), axis=vector(0,0,0.5), color=color.blue))",
+      "t = 0",
+      "dt = 0.01",
+      "while True:",
+      "    rate(100)",
+      "    t += dt",
+      "    for i in range(N):",
+      "        x = i*0.3-4.5",
+      "        Earrows[i].axis = vector(0, 0.5*sin(x-3*t), 0)",
+      "        Barrows[i].axis = vector(0, 0, 0.5*sin(x-3*t))"
+    ].join("\n")
+  },
+  fluid: {
+    label: '💧 유체',
+    code: [
+      "from vpython import *",
+      "scene = canvas()",
+      "N = 30",
+      "particles = []",
+      "for i in range(N):",
+      "    p = sphere(pos=vector(-5+10*random(), -3+6*random(), 0), radius=0.15, color=color.cyan)",
+      "    p.velocity = vector(0.5+random(), -0.3+0.6*random(), 0)",
+      "    particles.append(p)",
+      "dt = 0.01",
+      "while True:",
+      "    rate(100)",
+      "    for p in particles:",
+      "        p.pos += p.velocity*dt",
+      "        if p.pos.x > 5:",
+      "            p.pos.x = -5",
+      "        if p.pos.y > 3 or p.pos.y < -3:",
+      "            p.velocity.y = -p.velocity.y"
+    ].join("\n")
   }
 };
 
@@ -212,6 +300,37 @@ const SIMS = {
 const params = new URLSearchParams(window.location.search);
 let currentSim = params.get('sim') || 'projectile';
 if (!SIMS[currentSim]) currentSim = 'projectile';
+
+// ===== Parameter definitions per simulation =====
+const PARAMS = {
+  projectile: [
+    { key: 'v0', label: '초기 속도', min: 2, max: 20, step: 0.5, default: 10, unit: 'm/s' },
+    { key: 'angle', label: '발사 각도', min: 10, max: 80, step: 1, default: 45, unit: '°' }
+  ],
+  pendulum: [
+    { key: 'length', label: '줄 길이', min: 1, max: 5, step: 0.1, default: 3, unit: 'm' },
+    { key: 'amplitude', label: '진폭', min: 0.1, max: 1.5, step: 0.05, default: 0.5, unit: 'rad' }
+  ],
+  spring: [
+    { key: 'stiffness', label: '용수철 상수 k', min: 5, max: 50, step: 1, default: 20, unit: 'N/m' },
+    { key: 'mass', label: '질량', min: 0.5, max: 3, step: 0.1, default: 1, unit: 'kg' }
+  ],
+  orbit: [
+    { key: 'radius', label: '궤도 반지름', min: 3, max: 8, step: 0.5, default: 5, unit: 'm' },
+    { key: 'mass', label: '별 질량', min: 50, max: 200, step: 10, default: 100, unit: 'kg' }
+  ],
+  wave: [
+    { key: 'amplitude', label: '진폭', min: 0.1, max: 1.5, step: 0.1, default: 0.5, unit: 'm' },
+    { key: 'wavelength', label: '파장', min: 1, max: 5, step: 0.5, default: 3, unit: 'm' }
+  ],
+  electromagnetic_wave: [
+    { key: 'amplitude', label: '진폭', min: 0.1, max: 1.5, step: 0.1, default: 0.5, unit: 'm' }
+  ],
+  fluid: [
+    { key: 'speed', label: '유속', min: 0.5, max: 3, step: 0.1, default: 1, unit: 'm/s' },
+    { key: 'count', label: '입자 수', min: 10, max: 60, step: 5, default: 30, unit: '개' }
+  ]
+};
 
 // ===== Build simulation buttons (links that reload the page) =====
 const btnContainer = document.getElementById('simButtons');
@@ -224,11 +343,87 @@ Object.keys(SIMS).forEach(key => {
   btnContainer.appendChild(a);
 });
 
+// ===== Build parameter sliders =====
+const paramPanel = document.getElementById('paramPanel');
+const paramValues = {};
+function buildParams() {
+  paramPanel.innerHTML = '';
+  const defs = PARAMS[currentSim] || [];
+  if (defs.length === 0) {
+    paramPanel.innerHTML = '<p class="text-slate-400">이 시뮬레이션은 조절 가능한 파라미터가 없습니다.</p>';
+    return;
+  }
+  defs.forEach(def => {
+    paramValues[def.key] = def.default;
+    const row = document.createElement('div');
+    row.innerHTML =
+      '<div class="flex justify-between mb-1">' +
+        '<label class="font-medium">' + def.label + '</label>' +
+        '<span class="text-blue-600 font-semibold" id="val-' + def.key + '">' + def.default + ' ' + def.unit + '</span>' +
+      '</div>' +
+      '<input type="range" id="param-' + def.key + '" min="' + def.min + '" max="' + def.max + '" step="' + def.step + '" value="' + def.default + '" class="w-full accent-blue-600">';
+    paramPanel.appendChild(row);
+    const slider = row.querySelector('input');
+    slider.addEventListener('input', () => {
+      paramValues[def.key] = parseFloat(slider.value);
+      document.getElementById('val-' + def.key).textContent = slider.value + ' ' + def.unit;
+    });
+  });
+}
+buildParams();
+
+// ===== Apply parameters to the simulation code =====
+function applyParams(code) {
+  let out = code;
+  const defs = PARAMS[currentSim] || [];
+  defs.forEach(def => {
+    const v = paramValues[def.key];
+    switch (def.key) {
+      case 'v0': out = out.replace(/ball\.velocity = vector\(5,10,0\)/, 'ball.velocity = vector(' + (v*0.5).toFixed(1) + ',' + (v*0.9).toFixed(1) + ',0)'); break;
+      case 'angle': out = out.replace(/ball\.velocity = vector\(5,10,0\)/, 'ball.velocity = vector(' + (v*0.5).toFixed(1) + ',' + (v*0.9).toFixed(1) + ',0)'); break;
+      case 'length': out = out.replace(/L = 3/, 'L = ' + v); break;
+      case 'amplitude': out = out.replace(/theta = 0\.5/, 'theta = ' + v); break;
+      case 'stiffness': out = out.replace(/k = 20/, 'k = ' + v); break;
+      case 'mass': out = out.replace(/m = 1/, 'm = ' + v); break;
+      case 'radius': out = out.replace(/planet = sphere\(pos=vector\(5,0,0\)/, 'planet = sphere(pos=vector(' + v + ',0,0)'); break;
+      case 'wavelength': out = out.replace(/0\.5\*sin\(x-3\*t\)/, '0.5*sin(x-' + v + '*t)'); break;
+      case 'speed': out = out.replace(/random\.uniform\(0\.5,1\.5\)/, 'random.uniform(' + (v*0.5).toFixed(1) + ',' + (v*1.5).toFixed(1) + ')'); break;
+      case 'count': out = out.replace(/N = 30/, 'N = ' + v); break;
+    }
+  });
+  return out;
+}
+
+// ===== Code viewer =====
+const codeModal = document.getElementById('codeModal');
+const codeView = document.getElementById('codeView');
+document.getElementById('viewCodeBtn').addEventListener('click', () => {
+  codeView.textContent = SIMS[currentSim].code;
+  codeModal.classList.remove('hidden');
+});
+document.getElementById('closeCodeBtn').addEventListener('click', () => {
+  codeModal.classList.add('hidden');
+});
+codeModal.addEventListener('click', (e) => {
+  if (e.target === codeModal) codeModal.classList.add('hidden');
+});
+document.getElementById('copyCodeBtn').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(SIMS[currentSim].code);
+    const btn = document.getElementById('copyCodeBtn');
+    btn.textContent = '✅ 복사됨';
+    setTimeout(() => { btn.textContent = '📋 복사'; }, 1500);
+  } catch (e) {
+    alert('복사 실패: ' + e.message);
+  }
+});
+
 // ===== Run the selected simulation (single compile per page load) =====
 const status = document.getElementById('status');
 status.textContent = SIMS[currentSim].label + ' 시뮬레이션 실행 중...';
 try {
-  const embedScript = window.glowscript_compile(SIMS[currentSim].code, {
+  const finalCode = applyParams(SIMS[currentSim].code);
+  const embedScript = window.glowscript_compile(finalCode, {
     lang: 'vpython',
     version: '3.2',
     run: false,

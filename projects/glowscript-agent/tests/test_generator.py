@@ -40,6 +40,18 @@ def test_match_template_robot_arm():
     assert match_template("로봇 팔이 회전하는 운동") == "robot_arm"
 
 
+def test_match_template_wave():
+    assert match_template("줄을 따라 전파되는 파동") == "wave"
+
+
+def test_match_template_electromagnetic_wave():
+    assert match_template("전자기파가 전파되는 모습") == "electromagnetic_wave"
+
+
+def test_match_template_fluid():
+    assert match_template("유체 속 입자들이 흐르는 모습") == "fluid"
+
+
 def test_match_template_defaults_to_projectile():
     assert match_template("아무거나") == "projectile"
 

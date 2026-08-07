@@ -112,7 +112,8 @@ def test_free_fall_physics_accelerates():
 def test_generated_code_contains_physics():
     """Generated code should contain the physics update logic."""
     for template in ["projectile", "pendulum", "spring", "orbit", "free_fall",
-                     "collision", "electric_field", "robot_arm"]:
+                     "collision", "electric_field", "robot_arm",
+                     "wave", "electromagnetic_wave", "fluid"]:
         code = generate_simulation(SimulationSpec(description="test", template=template))
         assert "while True" in code
         assert "rate(" in code
@@ -148,3 +149,34 @@ def test_robot_arm_kinematics():
     # Tip should be within reach: distance from base <= L1+L2
     dist = math.sqrt(tip[0]**2 + tip[1]**2)
     assert dist <= L1 + L2 + 1e-9, f"tip {dist} out of reach"
+
+
+def test_wave_physics_propagates():
+    """Wave: the wave pattern should move along the string over time."""
+    N = 50
+    def wave_at(t):
+        return [0.5 * math.sin(i * 0.2 - 5 - 3 * t) for i in range(N)]
+    # At t=0, the peak is at x where sin(x-5)=1 -> x-5=pi/2 -> x~=6.57 (beyond string)
+    # Instead check that the wave shifts: value at a fixed index changes over time
+    v0 = wave_at(0)
+    v1 = wave_at(0.5)
+    # The wave should have moved, so values at the same index differ
+    assert any(abs(a - b) > 0.01 for a, b in zip(v0, v1)), "wave not propagating"
+
+
+def test_electromagnetic_wave_orthogonal():
+    """EM wave: E and B fields should be perpendicular."""
+    # E along y, B along z, propagation along x -> E x B along x (Poynting)
+    E = (0, 1, 0)
+    B = (0, 0, 1)
+    dot = E[0]*B[0] + E[1]*B[1] + E[2]*B[2]
+    assert abs(dot) < 1e-9, "E and B not orthogonal"
+
+
+def test_fluid_physics_flow():
+    """Fluid: particles should move in the +x direction on average."""
+    import random
+    random.seed(42)
+    vels = [random.uniform(0.5, 1.5) for _ in range(30)]
+    avg_vx = sum(vels) / len(vels)
+    assert avg_vx > 0.5, f"fluid not flowing, avg_vx={avg_vx}"

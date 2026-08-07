@@ -264,6 +264,79 @@ TEMPLATES: dict = {
             "    seg2 = cylinder(pos=joint, axis=tip - joint, radius=0.1, color=color.cyan)\n"
         ),
     },
+    "wave": {
+        "description": "A traveling wave on a string (transverse wave).",
+        "keywords": ["파동", "wave", "횡파", "진동하는 줄", "string"],
+        "code": (
+            "from vpython import *\n"
+            "\n"
+            "# Traveling wave on a string\n"
+            "scene = canvas()\n"
+            "N = 50\n"
+            "pts = [vector(i * 0.2 - 5, 0, 0) for i in range(N)]\n"
+            "string = curve(pos=pts, color=color.cyan, radius=0.05)\n"
+            "t = 0\n"
+            "dt = 0.01\n"
+            "while True:\n"
+            "    rate(100)\n"
+            "    t += dt\n"
+            "    for i in range(N):\n"
+            "        x = i * 0.2 - 5\n"
+            "        string.pos[i] = vector(x, 0.5 * sin(x - 3 * t), 0)\n"
+        ),
+    },
+    "electromagnetic_wave": {
+        "description": "An electromagnetic wave with oscillating E and B fields.",
+        "keywords": ["전자기파", "electromagnetic", "EM wave", "빛", "전자기"],
+        "code": (
+            "from vpython import *\n"
+            "\n"
+            "# Electromagnetic wave (E and B fields oscillating)\n"
+            "scene = canvas()\n"
+            "N = 30\n"
+            "Earrows = []\n"
+            "Barrows = []\n"
+            "for i in range(N):\n"
+            "    x = i * 0.3 - 4.5\n"
+            "    Earrows.append(arrow(pos=vector(x, 0, 0), axis=vector(0, 0.5, 0), color=color.red))\n"
+            "    Barrows.append(arrow(pos=vector(x, 0, 0), axis=vector(0, 0, 0.5), color=color.blue))\n"
+            "t = 0\n"
+            "dt = 0.01\n"
+            "while True:\n"
+            "    rate(100)\n"
+            "    t += dt\n"
+            "    for i in range(N):\n"
+            "        x = i * 0.3 - 4.5\n"
+            "        Earrows[i].axis = vector(0, 0.5 * sin(x - 3 * t), 0)\n"
+            "        Barrows[i].axis = vector(0, 0, 0.5 * sin(x - 3 * t))\n"
+        ),
+    },
+    "fluid": {
+        "description": "Particles flowing in a fluid (random motion).",
+        "keywords": ["유체", "fluid", "입자", "흐름", "flow"],
+        "code": (
+            "from vpython import *\n"
+            "\n"
+            "# Fluid particle flow\n"
+            "scene = canvas()\n"
+            "N = 30\n"
+            "particles = []\n"
+            "for i in range(N):\n"
+            "    p = sphere(pos=vector(-5 + 10 * random(), -3 + 6 * random(), 0),\n"
+            "               radius=0.15, color=color.cyan)\n"
+            "    p.velocity = vector(0.5 + random(), -0.3 + 0.6 * random(), 0)\n"
+            "    particles.append(p)\n"
+            "dt = 0.01\n"
+            "while True:\n"
+            "    rate(100)\n"
+            "    for p in particles:\n"
+            "        p.pos += p.velocity * dt\n"
+            "        if p.pos.x > 5:\n"
+            "            p.pos.x = -5\n"
+            "        if p.pos.y > 3 or p.pos.y < -3:\n"
+            "            p.velocity.y = -p.velocity.y\n"
+        ),
+    },
 }
 
 

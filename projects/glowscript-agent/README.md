@@ -50,3 +50,6 @@ python -m pytest -q
 | `collision` | 두 공의 탄성 충돌 (운동량 보존) |
 | `electric_field` | 점전하 주위의 전기장 (역제곱 법칙) |
 | `robot_arm` | 2-링크 로봇 팔 (전방 기구학) |
+| `wave` | 줄을 따라 전파되는 횡파 |
+| `electromagnetic_wave` | 전자기파 (E·B장 진동) |
+| `fluid` | 유체 입자 흐름 |
