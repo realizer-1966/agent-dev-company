@@ -337,6 +337,96 @@ TEMPLATES: dict = {
             "            p.velocity.y = -p.velocity.y\n"
         ),
     },
+    "interference": {
+        "description": "Two-source wave interference pattern.",
+        "keywords": ["간섭", "interference", "파동 간섭", "두 파원"],
+        "code": (
+            "from vpython import *\n"
+            "\n"
+            "# Two-source wave interference\n"
+            "scene = canvas()\n"
+            "N = 60\n"
+            "pts = [vector(i * 0.2 - 6, 0, 0) for i in range(N)]\n"
+            "wave = curve(pos=pts, color=color.cyan, radius=0.05)\n"
+            "src1 = sphere(pos=vector(-3, 0, 0), radius=0.2, color=color.yellow)\n"
+            "src2 = sphere(pos=vector(3, 0, 0), radius=0.2, color=color.yellow)\n"
+            "t = 0\n"
+            "dt = 0.01\n"
+            "while True:\n"
+            "    rate(100)\n"
+            "    t += dt\n"
+            "    for i in range(N):\n"
+            "        x = i * 0.2 - 6\n"
+            "        d1 = abs(x + 3)\n"
+            "        d2 = abs(x - 3)\n"
+            "        wave.pos[i] = vector(x, 0.3 * (sin(d1 - 3 * t) + sin(d2 - 3 * t)), 0)\n"
+        ),
+    },
+    "double_pendulum": {
+        "description": "A double pendulum showing chaotic motion.",
+        "keywords": ["이중 진자", "double pendulum", "카오스", "chaos"],
+        "code": (
+            "from vpython import *\n"
+            "\n"
+            "# Double pendulum (chaotic)\n"
+            "scene = canvas()\n"
+            "pivot = vector(0, 5, 0)\n"
+            "L1 = 2\n"
+            "L2 = 1.5\n"
+            "m1 = 1\n"
+            "m2 = 1\n"
+            "g = 9.8\n"
+            "t1 = 1.0\n"
+            "t2 = 0.5\n"
+            "w1 = 0\n"
+            "w2 = 0\n"
+            "dt = 0.005\n"
+            "bob1 = sphere(pos=pivot + vector(0, -L1, 0), radius=0.2, color=color.red, make_trail=True)\n"
+            "bob2 = sphere(pos=pivot + vector(0, -(L1 + L2), 0), radius=0.15, color=color.blue, make_trail=True)\n"
+            "rod1 = cylinder(pos=pivot, axis=vector(0, -L1, 0), radius=0.05)\n"
+            "rod2 = cylinder(pos=bob1.pos, axis=vector(0, -L2, 0), radius=0.05)\n"
+            "while True:\n"
+            "    rate(100)\n"
+            "    a1 = -(g * (2 * m1 + m2) * sin(t1) + m2 * g * sin(t1 - 2 * t2) + 2 * sin(t1 - t2) * m2 * (w2 * w2 * L2 + w1 * w1 * L1 * cos(t1 - t2))) / (L1 * (2 * m1 + m2 - m2 * cos(2 * t1 - 2 * t2)))\n"
+            "    a2 = (2 * sin(t1 - t2) * (w1 * w1 * L1 * (m1 + m2) + g * (m1 + m2) * cos(t1) + w2 * w2 * L2 * m2 * cos(t1 - t2))) / (L2 * (2 * m1 + m2 - m2 * cos(2 * t1 - 2 * t2)))\n"
+            "    w1 += a1 * dt\n"
+            "    w2 += a2 * dt\n"
+            "    t1 += w1 * dt\n"
+            "    t2 += w2 * dt\n"
+            "    bob1.pos = pivot + vector(L1 * sin(t1), -L1 * cos(t1), 0)\n"
+            "    bob2.pos = bob1.pos + vector(L2 * sin(t2), -L2 * cos(t2), 0)\n"
+            "    rod1.axis = bob1.pos - pivot\n"
+            "    rod2.pos = bob1.pos\n"
+            "    rod2.axis = bob2.pos - bob1.pos\n"
+        ),
+    },
+    "solar_system": {
+        "description": "A solar system with planets orbiting the sun.",
+        "keywords": ["태양계", "solar system", "행성들", "태양"],
+        "code": (
+            "from vpython import *\n"
+            "\n"
+            "# Solar system\n"
+            "scene = canvas()\n"
+            "sun = sphere(pos=vector(0, 0, 0), radius=1.5, color=color.yellow)\n"
+            "planets = []\n"
+            "G = 1\n"
+            "M = 500\n"
+            "dt = 0.01\n"
+            "# Circular orbit speed: v = sqrt(G*M/r)\n"
+            "for r, radius, color_, v in [(4, 0.2, color.red, 11.18), (6, 0.3, color.green, 9.13), (8, 0.4, color.blue, 7.91)]:\n"
+            "    p = sphere(pos=vector(r, 0, 0), radius=radius, color=color_, make_trail=True)\n"
+            "    p.velocity = vector(0, 0, v)\n"
+            "    planets.append(p)\n"
+            "while True:\n"
+            "    rate(100)\n"
+            "    for p in planets:\n"
+            "        r = p.pos - sun.pos\n"
+            "        force = -G * M * norm(r) / mag(r) ** 2\n"
+            "        p.velocity += force * dt\n"
+            "        p.pos += p.velocity * dt\n"
+        ),
+    },
 }
 
 

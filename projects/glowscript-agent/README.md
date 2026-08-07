@@ -53,3 +53,6 @@ python -m pytest -q
 | `wave` | 줄을 따라 전파되는 횡파 |
 | `electromagnetic_wave` | 전자기파 (E·B장 진동) |
 | `fluid` | 유체 입자 흐름 |
+| `interference` | 두 파원의 파동 간섭 |
+| `double_pendulum` | 이중 진자 (카오스) |
+| `solar_system` | 태양계 (행성 궤도) |

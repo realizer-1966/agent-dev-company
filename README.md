@@ -53,7 +53,7 @@ hermes kanban list    # 현재 업무 현황
 | [fastapi-backend](projects/fastapi-backend/) | ✅ 완료 | FastAPI 웹 백엔드 (RESTful API, TDD, 5 tests) |
 | [todo-web](projects/todo-web/) | ✅ 완료 | 할일 관리 웹앱 (FastAPI + UI) |
 | [rental-web](projects/rental-web/) | ✅ 완료 | 임대관리 웹앱 (건물·세입자 관리, OnDev 배포) |
-| [glowscript-agent](projects/glowscript-agent/) | ✅ 완료 | GlowScript/VPython 시뮬레이션 생성·검증 에이전트 (TDD, 50 tests) |
+| [glowscript-agent](projects/glowscript-agent/) | ✅ 완료 | GlowScript/VPython 시뮬레이션 생성·검증 에이전트 (TDD, 56 tests) |
 
 ## 운영 자동화
 

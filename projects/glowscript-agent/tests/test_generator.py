@@ -52,6 +52,18 @@ def test_match_template_fluid():
     assert match_template("유체 속 입자들이 흐르는 모습") == "fluid"
 
 
+def test_match_template_interference():
+    assert match_template("두 파원의 파동 간섭") == "interference"
+
+
+def test_match_template_double_pendulum():
+    assert match_template("이중 진자의 카오스 운동") == "double_pendulum"
+
+
+def test_match_template_solar_system():
+    assert match_template("태양계 행성들의 공전") == "solar_system"
+
+
 def test_match_template_defaults_to_projectile():
     assert match_template("아무거나") == "projectile"
 

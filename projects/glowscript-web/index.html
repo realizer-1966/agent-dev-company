@@ -35,14 +35,15 @@
       <div id="paramPanel" class="space-y-3 text-sm text-slate-600">
         <p class="text-slate-400">시뮬레이션을 선택하면 조절 가능한 파라미터가 표시됩니다.</p>
       </div>
-      <div class="mt-4 pt-4 border-t border-slate-100">
+      <div class="mt-4 pt-4 border-t border-slate-100 space-y-2">
         <button id="viewCodeBtn" class="w-full px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-medium hover:bg-slate-200 transition">📄 코드 보기</button>
+        <button id="shareLinkBtn" class="w-full px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-medium hover:bg-slate-200 transition">🔗 공유 링크 복사</button>
       </div>
     </div>
   </div>
 
   <footer class="text-center text-xs text-slate-400 py-6">
-    GlowScript 시뮬레이터 · agent-dev-company · 11가지 물리 시뮬레이션
+    GlowScript 시뮬레이터 · agent-dev-company · 14가지 물리 시뮬레이션
   </footer>
 </div>
 
@@ -293,10 +294,90 @@ const SIMS = {
       "        if p.pos.y > 3 or p.pos.y < -3:",
       "            p.velocity.y = -p.velocity.y"
     ].join("\n")
+  },
+  interference: {
+    label: '🌊 간섭',
+    code: [
+      "from vpython import *",
+      "scene = canvas()",
+      "N = 60",
+      "pts = [vector(i*0.2-6, 0, 0) for i in range(N)]",
+      "wave = curve(pos=pts, color=color.cyan, radius=0.05)",
+      "src1 = sphere(pos=vector(-3,0,0), radius=0.2, color=color.yellow)",
+      "src2 = sphere(pos=vector(3,0,0), radius=0.2, color=color.yellow)",
+      "t = 0",
+      "dt = 0.01",
+      "while True:",
+      "    rate(100)",
+      "    t += dt",
+      "    for i in range(N):",
+      "        x = i*0.2-6",
+      "        d1 = abs(x+3)",
+      "        d2 = abs(x-3)",
+      "        wave.pos[i] = vector(x, 0.3*(sin(d1-3*t)+sin(d2-3*t)), 0)"
+    ].join("\n")
+  },
+  double_pendulum: {
+    label: '🔀 이중 진자',
+    code: [
+      "from vpython import *",
+      "scene = canvas()",
+      "pivot = vector(0,5,0)",
+      "L1 = 2",
+      "L2 = 1.5",
+      "m1 = 1",
+      "m2 = 1",
+      "g = 9.8",
+      "t1 = 1.0",
+      "t2 = 0.5",
+      "w1 = 0",
+      "w2 = 0",
+      "dt = 0.005",
+      "bob1 = sphere(pos=pivot+vector(0,-L1,0), radius=0.2, color=color.red, make_trail=True)",
+      "bob2 = sphere(pos=pivot+vector(0,-(L1+L2),0), radius=0.15, color=color.blue, make_trail=True)",
+      "rod1 = cylinder(pos=pivot, axis=vector(0,-L1,0), radius=0.05)",
+      "rod2 = cylinder(pos=bob1.pos, axis=vector(0,-L2,0), radius=0.05)",
+      "while True:",
+      "    rate(100)",
+      "    a1 = -(g*(2*m1+m2)*sin(t1)+m2*g*sin(t1-2*t2)+2*sin(t1-t2)*m2*(w2*w2*L2+w1*w1*L1*cos(t1-t2)))/(L1*(2*m1+m2-m2*cos(2*t1-2*t2)))",
+      "    a2 = (2*sin(t1-t2)*(w1*w1*L1*(m1+m2)+g*(m1+m2)*cos(t1)+w2*w2*L2*m2*cos(t1-t2)))/(L2*(2*m1+m2-m2*cos(2*t1-2*t2)))",
+      "    w1 += a1*dt",
+      "    w2 += a2*dt",
+      "    t1 += w1*dt",
+      "    t2 += w2*dt",
+      "    bob1.pos = pivot + vector(L1*sin(t1), -L1*cos(t1), 0)",
+      "    bob2.pos = bob1.pos + vector(L2*sin(t2), -L2*cos(t2), 0)",
+      "    rod1.axis = bob1.pos - pivot",
+      "    rod2.pos = bob1.pos",
+      "    rod2.axis = bob2.pos - bob1.pos"
+    ].join("\n")
+  },
+  solar_system: {
+    label: '🌌 태양계',
+    code: [
+      "from vpython import *",
+      "scene = canvas()",
+      "sun = sphere(pos=vector(0,0,0), radius=1.5, color=color.yellow)",
+      "planets = []",
+      "G = 1",
+      "M = 500",
+      "dt = 0.01",
+      "for r, radius, color_, v in [(4,0.2,color.red,11.18), (6,0.3,color.green,9.13), (8,0.4,color.blue,7.91)]:",
+      "    p = sphere(pos=vector(r,0,0), radius=radius, color=color_, make_trail=True)",
+      "    p.velocity = vector(0,0,v)",
+      "    planets.append(p)",
+      "while True:",
+      "    rate(100)",
+      "    for p in planets:",
+      "        r = p.pos - sun.pos",
+      "        force = -G*M*norm(r)/mag(r)**2",
+      "        p.velocity += force*dt",
+      "        p.pos += p.velocity*dt"
+    ].join("\n")
   }
 };
 
-// ===== Determine which sim to run from URL (?sim=key) =====
+// ===== Determine which sim + params from URL (?sim=key&v0=15&angle=30) =====
 const params = new URLSearchParams(window.location.search);
 let currentSim = params.get('sim') || 'projectile';
 if (!SIMS[currentSim]) currentSim = 'projectile';
@@ -329,6 +410,13 @@ const PARAMS = {
   fluid: [
     { key: 'speed', label: '유속', min: 0.5, max: 3, step: 0.1, default: 1, unit: 'm/s' },
     { key: 'count', label: '입자 수', min: 10, max: 60, step: 5, default: 30, unit: '개' }
+  ],
+  double_pendulum: [
+    { key: 'length1', label: '첫 막대 길이', min: 1, max: 4, step: 0.1, default: 2, unit: 'm' },
+    { key: 'length2', label: '둘째 막대 길이', min: 1, max: 4, step: 0.1, default: 1.5, unit: 'm' }
+  ],
+  solar_system: [
+    { key: 'planets', label: '행성 수', min: 1, max: 5, step: 1, default: 3, unit: '개' }
   ]
 };
 
@@ -354,19 +442,29 @@ function buildParams() {
     return;
   }
   defs.forEach(def => {
-    paramValues[def.key] = def.default;
+    // Read initial value from URL if present, else use default
+    const urlVal = params.get(def.key);
+    let initVal = urlVal !== null ? parseFloat(urlVal) : def.default;
+    if (isNaN(initVal) || initVal < def.min || initVal > def.max) initVal = def.default;
+    paramValues[def.key] = initVal;
     const row = document.createElement('div');
     row.innerHTML =
       '<div class="flex justify-between mb-1">' +
         '<label class="font-medium">' + def.label + '</label>' +
-        '<span class="text-blue-600 font-semibold" id="val-' + def.key + '">' + def.default + ' ' + def.unit + '</span>' +
+        '<span class="text-blue-600 font-semibold" id="val-' + def.key + '">' + initVal + ' ' + def.unit + '</span>' +
       '</div>' +
-      '<input type="range" id="param-' + def.key + '" min="' + def.min + '" max="' + def.max + '" step="' + def.step + '" value="' + def.default + '" class="w-full accent-blue-600">';
+      '<input type="range" id="param-' + def.key + '" min="' + def.min + '" max="' + def.max + '" step="' + def.step + '" value="' + initVal + '" class="w-full accent-blue-600">';
     paramPanel.appendChild(row);
     const slider = row.querySelector('input');
+    // Live update the displayed value while dragging
     slider.addEventListener('input', () => {
-      paramValues[def.key] = parseFloat(slider.value);
       document.getElementById('val-' + def.key).textContent = slider.value + ' ' + def.unit;
+    });
+    // On release, update URL and reload to apply the new parameter
+    slider.addEventListener('change', () => {
+      params.set('sim', currentSim);
+      params.set(def.key, slider.value);
+      window.location.search = params.toString();
     });
   });
 }
@@ -389,6 +487,9 @@ function applyParams(code) {
       case 'wavelength': out = out.replace(/0\.5\*sin\(x-3\*t\)/, '0.5*sin(x-' + v + '*t)'); break;
       case 'speed': out = out.replace(/random\.uniform\(0\.5,1\.5\)/, 'random.uniform(' + (v*0.5).toFixed(1) + ',' + (v*1.5).toFixed(1) + ')'); break;
       case 'count': out = out.replace(/N = 30/, 'N = ' + v); break;
+      case 'length1': out = out.replace(/L1 = 2/, 'L1 = ' + v); break;
+      case 'length2': out = out.replace(/L2 = 1\.5/, 'L2 = ' + v); break;
+      case 'planets': out = out.replace(/\[\(4,0\.2,color\.red,11\.18\), \(6,0\.3,color\.green,9\.13\), \(8,0\.4,color\.blue,7\.91\)\]/, '[' + (() => { let s = []; const speeds = [11.18, 9.13, 7.91, 6.8, 6.0]; const radii = [4, 6, 8, 10, 12]; const cols = ['color.red','color.green','color.blue','color.orange','color.cyan']; for (let i = 0; i < v; i++) s.push('(' + radii[i] + ',0.2,color.green,' + speeds[i] + ')'); return s.join(', '); })() + ']'); break;
     }
   });
   return out;
@@ -413,6 +514,27 @@ document.getElementById('copyCodeBtn').addEventListener('click', async () => {
     const btn = document.getElementById('copyCodeBtn');
     btn.textContent = '✅ 복사됨';
     setTimeout(() => { btn.textContent = '📋 복사'; }, 1500);
+  } catch (e) {
+    alert('복사 실패: ' + e.message);
+  }
+});
+
+// ===== Share link (copies URL with sim + params) =====
+document.getElementById('shareLinkBtn').addEventListener('click', async () => {
+  const shareParams = new URLSearchParams();
+  shareParams.set('sim', currentSim);
+  const defs = PARAMS[currentSim] || [];
+  defs.forEach(def => {
+    if (paramValues[def.key] !== undefined) {
+      shareParams.set(def.key, paramValues[def.key]);
+    }
+  });
+  const shareUrl = window.location.origin + window.location.pathname + '?' + shareParams.toString();
+  try {
+    await navigator.clipboard.writeText(shareUrl);
+    const btn = document.getElementById('shareLinkBtn');
+    btn.textContent = '✅ 링크 복사됨';
+    setTimeout(() => { btn.textContent = '🔗 공유 링크 복사'; }, 1500);
   } catch (e) {
     alert('복사 실패: ' + e.message);
   }

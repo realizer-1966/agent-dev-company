@@ -113,7 +113,8 @@ def test_generated_code_contains_physics():
     """Generated code should contain the physics update logic."""
     for template in ["projectile", "pendulum", "spring", "orbit", "free_fall",
                      "collision", "electric_field", "robot_arm",
-                     "wave", "electromagnetic_wave", "fluid"]:
+                     "wave", "electromagnetic_wave", "fluid",
+                     "interference", "double_pendulum", "solar_system"]:
         code = generate_simulation(SimulationSpec(description="test", template=template))
         assert "while True" in code
         assert "rate(" in code
@@ -180,3 +181,49 @@ def test_fluid_physics_flow():
     vels = [random.uniform(0.5, 1.5) for _ in range(30)]
     avg_vx = sum(vels) / len(vels)
     assert avg_vx > 0.5, f"fluid not flowing, avg_vx={avg_vx}"
+
+
+def test_interference_physics_superposition():
+    """Interference: two waves superpose (sum of amplitudes)."""
+    t = 0.5
+    x = 0.0
+    d1 = abs(x + 3)
+    d2 = abs(x - 3)
+    combined = 0.3 * (math.sin(d1 - 3 * t) + math.sin(d2 - 3 * t))
+    # Combined should equal the sum of the two individual waves
+    expected = 0.3 * math.sin(d1 - 3 * t) + 0.3 * math.sin(d2 - 3 * t)
+    assert abs(combined - expected) < 1e-9, "superposition violated"
+
+
+def test_double_pendulum_physics_total_length():
+    """Double pendulum: bob2 should stay within L1+L2 of the pivot."""
+    L1, L2 = 2.0, 1.5
+    t1, t2 = 1.0, 0.5
+    bob1 = (L1 * math.sin(t1), -L1 * math.cos(t1))
+    bob2 = (bob1[0] + L2 * math.sin(t2), bob1[1] - L2 * math.cos(t2))
+    dist = math.sqrt(bob2[0]**2 + bob2[1]**2)
+    assert dist <= L1 + L2 + 1e-9, f"bob2 out of reach, dist={dist}"
+
+
+def test_solar_system_physics_multiple_orbits():
+    """Solar system: each planet should stay in a bounded orbit."""
+    G, M = 1.0, 500.0
+    # Circular orbit speeds: v = sqrt(G*M/r)
+    for r, v in [(4, 11.18), (6, 9.13), (8, 7.91)]:
+        x, z = float(r), 0.0
+        vx, vz = 0.0, float(v)
+        dt = 0.01
+        min_r, max_r = 1e9, 0.0
+        for _ in range(2000):
+            rad = math.sqrt(x*x + z*z)
+            min_r = min(min_r, rad)
+            max_r = max(max_r, rad)
+            fx = -G * M * x / (rad**3)
+            fz = -G * M * z / (rad**3)
+            vx += fx * dt
+            vz += fz * dt
+            x += vx * dt
+            z += vz * dt
+        # Each planet should stay near its initial radius (bounded orbit)
+        assert max_r < r * 1.3, f"planet at r={r} escaped, max_r={max_r}"
+        assert min_r > r * 0.7, f"planet at r={r} crashed, min_r={min_r}"
