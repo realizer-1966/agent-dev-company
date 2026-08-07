@@ -403,6 +403,18 @@
       return `${yy}-${mm}-${dd}`;
     }
 
+    // 주어진 날짜(YYYY-MM-DD)의 하루 전 날짜를 YYYY-MM-DD 문자열로 반환 (연/월 경계 처리)
+    function dayBefore(dateStr) {
+      if (!dateStr) return '';
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const date = new Date(y, m - 1, d);
+      date.setDate(date.getDate() - 1);
+      const yy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const dd = String(date.getDate()).padStart(2, '0');
+      return `${yy}-${mm}-${dd}`;
+    }
+
     // 현재 월 (현지 기준, YYYY-MM)
     function todayMonth() {
       const d = new Date();
@@ -923,6 +935,16 @@
         createdAt: Date.now()
       };
       b.tenants.push(tenant);
+      // 같은 호실에 입주 중(active)이면서 퇴거일이 비어 있는 이전 세입자들의 퇴거일을
+      // 새 세입자의 입주일 하루 전으로 자동 설정한다.
+      if (moveIn) {
+        const prevMoveOut = dayBefore(moveIn);
+        b.tenants.forEach(t => {
+          if (t.id !== tenant.id && t.room === tenant.room && getTenantStatus(t) === 'active' && t.moveOut === '') {
+            t.moveOut = prevMoveOut;
+          }
+        });
+      }
       saveBuildings();
       renderTenants();
       // 폼 초기화
