@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from app.llm import GlowScriptGenerator, LLMClient
@@ -32,6 +33,16 @@ def _load_api_key() -> str:
 def create_app() -> FastAPI:
     """Build the FastAPI app with a real or mock LLM client."""
     app = FastAPI(title="GlowScript LLM Generator")
+
+    # CORS: allow the OnDev-hosted web app and local dev origins.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "*",  # OnDev apps use per-deploy subdomains; tighten for production
+        ],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     # Read API key from env or Hermes config; if absent, fall back to templates.
     api_key = _load_api_key()

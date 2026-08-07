@@ -484,6 +484,8 @@ if (urlPrompt) {
 const promptInput = document.getElementById('promptInput');
 const promptBtn = document.getElementById('promptBtn');
 const promptHint = document.getElementById('promptHint');
+// LLM backend URL (configurable). Set to the FastAPI glowscript-llm backend when available.
+const LLM_BACKEND_URL = 'http://127.0.0.1:8010'; // replace with deployed backend URL
 // Prefill input box if URL has a prompt
 if (urlPrompt) {
   promptInput.value = urlPrompt;
@@ -492,16 +494,35 @@ if (urlPrompt) {
 function handlePrompt() {
   const text = promptInput.value.trim();
   if (!text) { promptHint.textContent = '설명을 입력해주세요.'; promptHint.classList.add('text-red-500'); return; }
-  const matched = matchTemplate(text);
-  promptHint.textContent = '→ ' + SIMS[matched].label + ' 시뮬레이션을 실행합니다';
   promptHint.classList.remove('text-red-500');
-  // Reload with ?prompt=<text> to run the matched sim (compiler runs once per load)
-  const url = new URL(window.location.href);
-  url.searchParams.set('prompt', text);
-  url.searchParams.delete('sim');
-  url.searchParams.delete('custom');
-  url.searchParams.delete('code');
-  window.location.href = url.toString();
+  promptHint.textContent = '🤖 AI가 시뮬레이션을 생성 중...';
+  // Try the LLM backend first for a truly generative response.
+  fetch(LLM_BACKEND_URL + '/api/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ description: text })
+  })
+  .then(r => { if (!r.ok) throw new Error('backend error'); return r.json(); })
+  .then(data => {
+    // Run the LLM-generated code via ?custom=1
+    const url = new URL(window.location.href);
+    url.searchParams.set('custom', '1');
+    url.searchParams.set('code', data.code);
+    url.searchParams.delete('sim');
+    url.searchParams.delete('prompt');
+    window.location.href = url.toString();
+  })
+  .catch(() => {
+    // Fall back to keyword matching when backend unavailable.
+    const matched = matchTemplate(text);
+    promptHint.textContent = '→ ' + SIMS[matched].label + ' 시뮬레이션을 실행합니다 (LLM 백엔드 연결 안됨)';
+    const url = new URL(window.location.href);
+    url.searchParams.set('prompt', text);
+    url.searchParams.delete('sim');
+    url.searchParams.delete('custom');
+    url.searchParams.delete('code');
+    window.location.href = url.toString();
+  });
 }
 promptBtn.addEventListener('click', handlePrompt);
 promptInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') handlePrompt(); });
