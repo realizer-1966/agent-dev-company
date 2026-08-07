@@ -465,17 +465,20 @@
         const activeCount = b.tenants.filter(t => getTenantStatus(t) === 'active').length;
         const colors = ['from-indigo-600 to-purple-600','from-emerald-600 to-teal-600','from-rose-600 to-pink-600','from-amber-500 to-orange-600','from-sky-600 to-blue-600','from-fuchsia-600 to-purple-600'];
         const grad = colors[idx % colors.length];
-        // 오늘 입주기념일 세입자
+        // 오늘 입주기념일 세입자 (전체), 그중 현재 월 미입금만 나열
         const todayTenants = getTodayMoveInTenants(b);
+        const unpaidTenants = todayTenants.filter(t => !isRentPaidFor(t, cardMonth));
         let todayHtml;
         if (todayTenants.length === 0) {
           todayHtml = `<p class="text-[11px] text-slate-500 mt-3 pt-2 border-t border-slate-700/70">오늘 입주 기념일 없음</p>`;
+        } else if (unpaidTenants.length === 0) {
+          todayHtml = `<p class="text-[11px] text-slate-500 mt-3 pt-2 border-t border-slate-700/70">🎂 오늘 입주 기념일 · 이번 달 미입금 없음</p>`;
         } else {
           todayHtml = `
             <div class="mt-3 pt-2 border-t border-slate-700/70">
-              <p class="text-[11px] font-bold text-indigo-300 mb-1.5">🎂 오늘 입주 기념일</p>
+              <p class="text-[11px] font-bold text-indigo-300 mb-1.5">🎂 오늘 입주 기념일 · 이번 달 미입금</p>
               <div class="space-y-1">
-                ${todayTenants.map(t => {
+                ${unpaidTenants.map(t => {
                   const paid = isRentPaidFor(t, cardMonth);
                   return `
                     <div class="flex items-center justify-between bg-slate-900/70 rounded-lg px-2.5 py-1.5">
