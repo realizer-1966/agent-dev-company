@@ -58,9 +58,9 @@ jobs:
       # --- kanban.db 상태 불러오기 ---
       - name: Load kanban state
         run: |
-          mkdir -p /root/.hermes
+          mkdir -p "$HOME/.hermes"
           if [ -f state/kanban.db ]; then
-            cp state/kanban.db /root/.hermes/kanban.db
+            cp state/kanban.db "$HOME/.hermes/kanban.db"
             echo "Loaded existing kanban.db"
           else
             echo "No existing kanban.db, starting fresh"
@@ -79,8 +79,8 @@ jobs:
       - name: Commit kanban state
         run: |
           mkdir -p state
-          if [ -f /root/.hermes/kanban.db ]; then
-            cp /root/.hermes/kanban.db state/kanban.db
+          if [ -f "$HOME/.hermes/kanban.db" ]; then
+            cp "$HOME/.hermes/kanban.db" state/kanban.db
           fi
           git config user.name "Agent Dev Company"
           git config user.email "office@agent-company.local"
