@@ -189,6 +189,81 @@ TEMPLATES: dict = {
             "        ball.velocity.y = 0\n"
         ),
     },
+    "collision": {
+        "description": "Two balls colliding elastically (momentum conservation).",
+        "keywords": ["충돌", "collision", "부딪", "탄성", "공이 부딪"],
+        "code": (
+            "from vpython import *\n"
+            "\n"
+            "# Elastic collision of two balls\n"
+            "scene = canvas()\n"
+            "ball1 = sphere(pos=vector(-3, 0, 0), radius=0.5, color=color.red, make_trail=True)\n"
+            "ball2 = sphere(pos=vector(3, 0, 0), radius=0.5, color=color.blue, make_trail=True)\n"
+            "ball1.velocity = vector(2, 0, 0)\n"
+            "ball2.velocity = vector(-1, 0, 0)\n"
+            "m1 = 1\n"
+            "m2 = 1\n"
+            "dt = 0.01\n"
+            "while True:\n"
+            "    rate(100)\n"
+            "    ball1.pos += ball1.velocity * dt\n"
+            "    ball2.pos += ball2.velocity * dt\n"
+            "    if mag(ball1.pos - ball2.pos) < 1.0:\n"
+            "        # Elastic collision: swap velocities for equal masses\n"
+            "        v1, v2 = ball1.velocity, ball2.velocity\n"
+            "        ball1.velocity = v2\n"
+            "        ball2.velocity = v1\n"
+        ),
+    },
+    "electric_field": {
+        "description": "Electric field lines around a point charge.",
+        "keywords": ["전기장", "electric", "전하", "field", "쿨롱"],
+        "code": (
+            "from vpython import *\n"
+            "\n"
+            "# Electric field of a point charge\n"
+            "scene = canvas()\n"
+            "charge = sphere(pos=vector(0, 0, 0), radius=0.3, color=color.yellow)\n"
+            "k = 8.99e9\n"
+            "q = 1e-9\n"
+            "arrows = []\n"
+            "for x in range(-3, 4):\n"
+            "    for y in range(-3, 4):\n"
+            "        if x == 0 and y == 0:\n"
+            "            continue\n"
+            "        p = vector(x, y, 0)\n"
+            "        r = mag(p)\n"
+            "        E = k * q / r**2 * norm(p)\n"
+            "        arrows.append(arrow(pos=p, axis=E * 0.1, color=color.cyan))\n"
+            "while True:\n"
+            "    rate(100)\n"
+        ),
+    },
+    "robot_arm": {
+        "description": "A two-segment robot arm rotating (kinematics).",
+        "keywords": ["로봇", "robot", "팔", "arm", "관절", "joint"],
+        "code": (
+            "from vpython import *\n"
+            "\n"
+            "# Two-segment robot arm\n"
+            "scene = canvas()\n"
+            "base = vector(0, 0, 0)\n"
+            "L1 = 2\n"
+            "L2 = 1.5\n"
+            "theta1 = 0\n"
+            "theta2 = 0\n"
+            "omega = 0.5\n"
+            "dt = 0.01\n"
+            "while True:\n"
+            "    rate(100)\n"
+            "    theta1 += omega * dt\n"
+            "    theta2 += omega * 0.5 * dt\n"
+            "    joint = base + vector(L1 * cos(theta1), L1 * sin(theta1), 0)\n"
+            "    tip = joint + vector(L2 * cos(theta1 + theta2), L2 * sin(theta1 + theta2), 0)\n"
+            "    seg1 = cylinder(pos=base, axis=joint - base, radius=0.1, color=color.orange)\n"
+            "    seg2 = cylinder(pos=joint, axis=tip - joint, radius=0.1, color=color.cyan)\n"
+        ),
+    },
 }
 
 

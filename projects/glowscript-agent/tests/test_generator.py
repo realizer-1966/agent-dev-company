@@ -28,6 +28,18 @@ def test_match_template_free_fall():
     assert match_template("물체가 자유낙하") == "free_fall"
 
 
+def test_match_template_collision():
+    assert match_template("두 공이 부딪히는 충돌") == "collision"
+
+
+def test_match_template_electric_field():
+    assert match_template("점전하 주위의 전기장") == "electric_field"
+
+
+def test_match_template_robot_arm():
+    assert match_template("로봇 팔이 회전하는 운동") == "robot_arm"
+
+
 def test_match_template_defaults_to_projectile():
     assert match_template("아무거나") == "projectile"
 

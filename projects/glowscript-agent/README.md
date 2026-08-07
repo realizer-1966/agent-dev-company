@@ -47,3 +47,6 @@ python -m pytest -q
 | `spring` | 용수철 진동 (SHM) |
 | `orbit` | 중력 궤도 운동 |
 | `free_fall` | 자유낙하 |
+| `collision` | 두 공의 탄성 충돌 (운동량 보존) |
+| `electric_field` | 점전하 주위의 전기장 (역제곱 법칙) |
+| `robot_arm` | 2-링크 로봇 팔 (전방 기구학) |

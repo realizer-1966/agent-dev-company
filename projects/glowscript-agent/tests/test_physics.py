@@ -111,7 +111,40 @@ def test_free_fall_physics_accelerates():
 
 def test_generated_code_contains_physics():
     """Generated code should contain the physics update logic."""
-    for template in ["projectile", "pendulum", "spring", "orbit", "free_fall"]:
+    for template in ["projectile", "pendulum", "spring", "orbit", "free_fall",
+                     "collision", "electric_field", "robot_arm"]:
         code = generate_simulation(SimulationSpec(description="test", template=template))
         assert "while True" in code
         assert "rate(" in code
+
+
+def test_collision_physics_momentum_conservation():
+    """Collision: total momentum should be conserved."""
+    m1, m2 = 1.0, 1.0
+    v1, v2 = 2.0, -1.0
+    p_before = m1 * v1 + m2 * v2
+    # Elastic collision of equal masses: swap velocities
+    v1, v2 = v2, v1
+    p_after = m1 * v1 + m2 * v2
+    assert abs(p_before - p_after) < 1e-9, "momentum not conserved"
+
+
+def test_electric_field_inverse_square():
+    """Electric field: magnitude should follow inverse-square law."""
+    k, q = 8.99e9, 1e-9
+    # E at r=1 should be 4x E at r=2
+    E1 = k * q / 1.0**2
+    E2 = k * q / 2.0**2
+    assert abs(E1 / E2 - 4.0) < 1e-9, "inverse-square law violated"
+
+
+def test_robot_arm_kinematics():
+    """Robot arm: tip position should follow forward kinematics."""
+    L1, L2 = 2.0, 1.5
+    theta1, theta2 = 0.5, 0.3
+    joint = (L1 * math.cos(theta1), L1 * math.sin(theta1))
+    tip = (joint[0] + L2 * math.cos(theta1 + theta2),
+           joint[1] + L2 * math.sin(theta1 + theta2))
+    # Tip should be within reach: distance from base <= L1+L2
+    dist = math.sqrt(tip[0]**2 + tip[1]**2)
+    assert dist <= L1 + L2 + 1e-9, f"tip {dist} out of reach"
