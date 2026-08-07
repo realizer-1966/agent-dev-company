@@ -403,6 +403,18 @@
       return `${yy}-${mm}-${dd}`;
     }
 
+    // 현재 월 (현지 기준, YYYY-MM)
+    function todayMonth() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    // 특정 세입자의 특정 월 입금 여부 (rentPaid에서 조회)
+    function isRentPaidFor(t, month) {
+      const rec = (t.rentPaid || []).find(r => r.month === month);
+      return !!(rec && rec.paid);
+    }
+
     // 입주일이 바뀌면 계약만료일을 (입주일 + 2년)으로 자동 채움
     function autoFillContractEnd(prefix) {
       const moveIn = document.getElementById(prefix + 'MoveIn').value;
@@ -412,6 +424,32 @@
     }
 
     // ============ UI: 건물 목록 ============
+    // 오늘 입주기념일(월/일 일치, 연도 무관) 세입자 목록. 입주 중(active) 우선.
+    function getTodayMoveInTenants(b) {
+      const now = new Date();
+      const todayMD = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      return (b.tenants || []).filter(t => {
+        if (!t.moveIn || typeof t.moveIn !== 'string') return false;
+        const md = t.moveIn.slice(5, 10); // YYYY-MM-DD → MM-DD
+        return md === todayMD;
+      }).sort((a, c) => {
+        const sa = getTenantStatus(a) === 'active' ? 0 : 1;
+        const sc = getTenantStatus(c) === 'active' ? 0 : 1;
+        return sa - sc;
+      });
+    }
+
+    // 카드에서 현재 월 입금 여부 토글 → rentPaid upsert
+    function toggleCardRent(t, checked) {
+      if (!t.rentPaid) t.rentPaid = [];
+      const month = todayMonth();
+      const rec = t.rentPaid.find(r => r.month === month);
+      if (rec) rec.paid = !!checked;
+      else t.rentPaid.push({ id: genId(), month, paid: !!checked });
+      saveBuildings();
+      renderBuildings();
+    }
+
     function renderBuildings() {
       const grid = document.getElementById('buildingsGrid');
       const empty = document.getElementById('emptyBuildings');
@@ -421,11 +459,39 @@
         return;
       }
       empty.classList.add('hidden');
+      const cardMonth = todayMonth();
       buildings.forEach((b, idx) => {
         const totalRent = b.tenants.reduce((s, t) => s + (Number(t.rent)||0), 0);
         const activeCount = b.tenants.filter(t => getTenantStatus(t) === 'active').length;
         const colors = ['from-indigo-600 to-purple-600','from-emerald-600 to-teal-600','from-rose-600 to-pink-600','from-amber-500 to-orange-600','from-sky-600 to-blue-600','from-fuchsia-600 to-purple-600'];
         const grad = colors[idx % colors.length];
+        // 오늘 입주기념일 세입자
+        const todayTenants = getTodayMoveInTenants(b);
+        let todayHtml;
+        if (todayTenants.length === 0) {
+          todayHtml = `<p class="text-[11px] text-slate-500 mt-3 pt-2 border-t border-slate-700/70">오늘 입주 기념일 없음</p>`;
+        } else {
+          todayHtml = `
+            <div class="mt-3 pt-2 border-t border-slate-700/70">
+              <p class="text-[11px] font-bold text-indigo-300 mb-1.5">🎂 오늘 입주 기념일</p>
+              <div class="space-y-1">
+                ${todayTenants.map(t => {
+                  const paid = isRentPaidFor(t, cardMonth);
+                  return `
+                    <div class="flex items-center justify-between bg-slate-900/70 rounded-lg px-2.5 py-1.5">
+                      <span class="text-xs text-slate-200 truncate">
+                        <span class="text-slate-400">${escapeHtml(t.room || '-')}호</span> ${escapeHtml(t.name)}
+                        ${getTenantStatus(t) === 'active' ? '' : '<span class="text-slate-500">(퇴거)</span>'}
+                      </span>
+                      <label class="flex items-center gap-1.5 cursor-pointer select-none shrink-0" title="현재 월 월세 입금 여부">
+                        <span class="text-[10px] ${paid ? 'text-emerald-400' : 'text-rose-400 font-bold'}">${paid ? '입금' : '미입금'}</span>
+                        <input type="checkbox" data-todayrent="${t.id}" ${paid ? 'checked' : ''} class="w-4 h-4 accent-emerald-500 cursor-pointer" />
+                      </label>
+                    </div>`;
+                }).join('')}
+              </div>
+            </div>`;
+        }
         grid.innerHTML += `
           <div data-bid="${b.id}" class="card badge cursor-pointer text-left bg-slate-800 border border-slate-700 rounded-2xl p-4 overflow-hidden">
             <div class="flex items-start justify-between">
@@ -444,6 +510,7 @@
                 <p class="text-xs text-slate-500">월세 합계</p>
               </div>
             </div>
+            ${todayHtml}
           </div>`;
       });
       // 카드 클릭 → 건물 상세
@@ -455,6 +522,20 @@
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           deleteBuilding(btn.dataset.bid);
+        });
+      });
+      // 오늘 입주기념일 세입자의 현재 월 입금 토글 (카드 클릭과 충돌 방지)
+      grid.querySelectorAll('[data-todayrent]').forEach(cb => {
+        cb.addEventListener('click', (e) => {
+          e.stopPropagation();
+        });
+        cb.addEventListener('change', (e) => {
+          e.stopPropagation();
+          const b = buildings.find(x => x.id === cb.closest('[data-bid]').dataset.bid);
+          if (!b) return;
+          const t = b.tenants.find(x => x.id === cb.dataset.todayrent);
+          if (!t) return;
+          toggleCardRent(t, cb.checked);
         });
       });
     }
