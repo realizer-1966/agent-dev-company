@@ -626,32 +626,73 @@
       const active = b.tenants.filter(t => getTenantStatus(t) === 'active');
       if (active.length === 0) {
         grid.innerHTML = `<p class="text-center text-slate-500 py-8">현재 입주 중인 세입자가 없습니다. 위에서 등록하세요.</p>`;
-        return;
-      }
-      // 호실별 그룹핑 (호실 없는 입주중 세입자는 '' 그룹으로)
-      const rooms = {};
-      active.forEach(t => {
-        const room = (t.room || '').trim();
-        (rooms[room] = rooms[room] || []).push(t);
-      });
-      const roomKeys = Object.keys(rooms);
-      const sortedKeys = sortRoomGroups(roomKeys, rooms);
-      sortedKeys.forEach(room => {
-        grid.innerHTML += renderRoomCard(room, rooms[room]);
-      });
-      // 호실 카드 클릭 → 해당 호실 전체 이력
-      grid.querySelectorAll('[data-act="history"]').forEach(btn => {
-        btn.addEventListener('click', () => openRoomHistory(btn.dataset.room));
-      });
-      // 세입자 액션 (기록/수정/삭제)
-      grid.querySelectorAll('[data-tid]').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          if (btn.dataset.act === 'detail') openTenant(btn.dataset.tid);
-          else if (btn.dataset.act === 'edit') openEditModal(btn.dataset.tid);
-          else if (btn.dataset.act === 'del') deleteTenant(btn.dataset.tid);
+      } else {
+        // 호실별 그룹핑 (호실 없는 입주중 세입자는 '' 그룹으로)
+        const rooms = {};
+        active.forEach(t => {
+          const room = (t.room || '').trim();
+          (rooms[room] = rooms[room] || []).push(t);
         });
-      });
+        const roomKeys = Object.keys(rooms);
+        const sortedKeys = sortRoomGroups(roomKeys, rooms);
+        sortedKeys.forEach(room => {
+          grid.innerHTML += renderRoomCard(room, rooms[room]);
+        });
+        // 호실 카드 클릭 → 해당 호실 전체 이력
+        grid.querySelectorAll('[data-act="history"]').forEach(btn => {
+          btn.addEventListener('click', () => openRoomHistory(btn.dataset.room));
+        });
+        // 세입자 액션 (기록/수정/삭제)
+        grid.querySelectorAll('[data-tid]').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (btn.dataset.act === 'detail') openTenant(btn.dataset.tid);
+            else if (btn.dataset.act === 'edit') openEditModal(btn.dataset.tid);
+            else if (btn.dataset.act === 'del') deleteTenant(btn.dataset.tid);
+          });
+        });
+      }
+      // 입주 예정 세입자 (getTenantStatus === 'upcoming') 별도 섹션
+      const upcoming = b.tenants.filter(t => getTenantStatus(t) === 'upcoming');
+      if (upcoming.length > 0) {
+        grid.innerHTML += `
+          <div class="mt-2">
+            <div class="flex items-center gap-2 mb-3">
+              <h4 class="font-bold text-white">📅 입주 예정</h4>
+              <span class="bg-sky-500/20 text-sky-400 text-xs font-bold px-2 py-0.5 rounded-full">${upcoming.length}명</span>
+            </div>
+            ${upcoming.sort((a, c) => String(a.moveIn || '').localeCompare(String(c.moveIn || ''))).map(t => renderUpcomingRow(t)).join('')}
+          </div>`;
+      }
+    }
+
+    // 입주 예정 세입자 행 (이름·호수·입주일)
+    function renderUpcomingRow(t) {
+      return `
+        <div class="bg-slate-900 rounded-xl p-4 border border-slate-700/80 mb-3">
+          <div class="flex items-start justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-full bg-gradient-to-br from-sky-500 to-cyan-500 flex items-center justify-center text-white font-bold shrink-0">
+                ${escapeHtml((t.name||'?').charAt(0))}
+              </div>
+              <div>
+                <h5 class="font-bold text-white">${escapeHtml(t.name)}</h5>
+                <p class="text-xs text-slate-400 mt-0.5">🚪 ${escapeHtml(t.room||'-')}호 · 📞 ${escapeHtml(t.phone||'-')}</p>
+              </div>
+            </div>
+            <span class="bg-sky-500/20 text-sky-400 text-xs font-bold px-2 py-0.5 rounded-full">입주 예정</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2 mt-3 text-center text-xs">
+            <div class="bg-slate-800 rounded-lg py-1.5">
+              <p class="text-slate-500">📅 입주일</p>
+              <p class="text-sky-300 font-semibold mt-0.5">${fmtDate(t.moveIn)}</p>
+            </div>
+            <div class="bg-slate-800 rounded-lg py-1.5">
+              <p class="text-slate-500">📆 만기일</p>
+              <p class="text-indigo-300 font-semibold mt-0.5">${t.contractEnd ? fmtDate(t.contractEnd) : '-'}</p>
+            </div>
+          </div>
+        </div>`;
     }
 
     // 호실 그룹 정렬 (입주중 세입자 기준)
@@ -773,7 +814,8 @@
       tenants.forEach(t => {
         const status = getTenantStatus(t);
         let badge;
-        if (status === 'active') badge = '<span class="bg-emerald-500/20 text-emerald-400 text-xs font-bold px-2 py-0.5 rounded-full">입주 중</span>';
+        if (status === 'upcoming') badge = '<span class="bg-sky-500/20 text-sky-400 text-xs font-bold px-2 py-0.5 rounded-full">입주 예정</span>';
+        else if (status === 'active') badge = '<span class="bg-emerald-500/20 text-emerald-400 text-xs font-bold px-2 py-0.5 rounded-full">입주 중</span>';
         else if (status === 'midterm') badge = '<span class="bg-amber-500/20 text-amber-400 text-xs font-bold px-2 py-0.5 rounded-full">중도 퇴거</span>';
         else badge = '<span class="bg-slate-500/20 text-slate-400 text-xs font-bold px-2 py-0.5 rounded-full">만기 퇴거</span>';
         list.innerHTML += `
@@ -891,11 +933,14 @@
     }
 
     // 세입자 상태 판정 (현재 날짜 기준)
-    // - active  : 퇴거일이 비었거나, 퇴거일이 오늘보다 이후 (입주 중)
-    // - midterm : 퇴거일 < 계약만료일 (중도 퇴거)
-    // - full    : 계약만료일에 맞춰 퇴거 (계약만료 퇴거)
+    // - upcoming : 입주일(moveIn)이 오늘보다 미래 (아직 입주 전, 입주 예정)
+    // - active   : 퇴거일이 비었거나, 퇴거일이 오늘보다 이후 (입주 중)
+    // - midterm  : 퇴거일 < 계약만료일 (중도 퇴거)
+    // - full     : 계약만료일에 맞춰 퇴거 (계약만료 퇴거)
     function getTenantStatus(t) {
       const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      // 입주 예정: 입주일이 미래면 최우선 판정 (아직 입주 전)
+      if (t.moveIn && t.moveIn > today) return 'upcoming';
       if (!t.moveOut) return 'active';               // 퇴거일 미정 → 입주 중
       if (t.moveOut >= today) return 'active';       // 아직 퇴거일 안 지남 → 입주 중
       // 과거에 퇴거함 → 중도/만료 판정
