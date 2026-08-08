@@ -625,11 +625,16 @@
       const active = b.tenants.filter(t => getTenantStatus(t) === 'active');
       // 입주 예정 세입자 (getTenantStatus === 'upcoming') 별도 섹션
       const upcoming = b.tenants.filter(t => getTenantStatus(t) === 'upcoming');
+      // 퇴거 세입자 (중도/만기) — 입주중 세입자가 없는 호실 카드를 '퇴거' 상태로 유지
+      const movedOut = b.tenants.filter(t => {
+        const s = getTenantStatus(t);
+        return s === 'midterm' || s === 'full';
+      });
 
-      // 전체 HTML(입주중 카드 + 입주예정 섹션)을 한 번에 문자열로 조립한 뒤
+      // 전체 HTML(입주중 카드 + 퇴거 카드 + 입주예정 섹션)을 한 번에 문자열로 조립한 뒤
       // grid.innerHTML에 단 한 번만 할당한다. (innerHTML += 재파싱으로 인한 이벤트 소멸 방지)
       let html = '';
-      if (active.length === 0) {
+      if (active.length === 0 && movedOut.length === 0) {
         html = `<p class="text-center text-slate-500 py-8">현재 입주 중인 세입자가 없습니다. 위에서 등록하세요.</p>`;
       } else {
         // 호실별 그룹핑 (호실 없는 입주중 세입자는 '' 그룹으로)
@@ -642,6 +647,20 @@
         const sortedKeys = sortRoomGroups(roomKeys, rooms);
         sortedKeys.forEach(room => {
           html += renderRoomCard(room, rooms[room]);
+        });
+
+        // 입주중 세입자가 없는 호실 중 퇴거 세입자만 있는 호실 → '퇴거' 상태 카드로 유지
+        const movedRooms = {};
+        movedOut.forEach(t => {
+          const room = (t.room || '').trim();
+          if (!(room in rooms)) {
+            (movedRooms[room] = movedRooms[room] || []).push(t);
+          }
+        });
+        const movedKeys = Object.keys(movedRooms);
+        const sortedMoved = sortRoomGroups(movedKeys, movedRooms);
+        sortedMoved.forEach(room => {
+          html += renderMovedOutRoomCard(room, movedRooms[room]);
         });
       }
       if (upcoming.length > 0) {
@@ -794,6 +813,67 @@
           </div>
           <div class="flex gap-2 mt-3">
             <button data-tid="${t.id}" data-act="detail" class="btn flex-1 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold py-2 rounded-xl">📋 기록 ${t.notes ? t.notes.length : 0}건</button>
+            <button data-tid="${t.id}" data-act="edit" class="btn bg-amber-500/80 hover:bg-amber-400 text-white text-sm font-bold px-3 py-2 rounded-xl">✏️ 수정</button>
+            <button data-tid="${t.id}" data-act="del" class="btn bg-rose-600/80 hover:bg-rose-500 text-white text-sm font-bold px-4 py-2 rounded-xl">삭제</button>
+          </div>
+        </div>`;
+    }
+
+    // 퇴거 세입자만 있는 호실 카드 (입주중 세입자 없음 → '퇴거' 상태로 유지)
+    function renderMovedOutRoomCard(room, tenants) {
+      const roomLabel = room ? `${room}호` : '호실 없음';
+      const roomIcon = room ? escapeHtml(room) : '🚪';
+      const grad = room ? 'from-slate-600 to-slate-500' : 'from-slate-600 to-slate-500';
+      return `
+        <div class="card bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 opacity-90">
+          <button data-room="${escapeHtml(room)}" data-act="history" class="btn w-full flex items-center justify-between rounded-xl px-2 py-2 -mx-2 text-left group">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-gradient-to-br ${grad} flex items-center justify-center text-white font-bold text-sm shrink-0">${roomIcon}</div>
+              <div>
+                <h4 class="font-bold text-white">${roomLabel}</h4>
+                <p class="text-xs text-slate-400">🚪 퇴거 ${tenants.length}명 · <span class="text-slate-300 group-hover:underline">📜 전체 이력</span></p>
+              </div>
+            </div>
+            <span class="text-slate-500 group-hover:text-slate-300 text-xl">›</span>
+          </button>
+          <div class="mt-3 space-y-3">
+            ${tenants.map(t => renderMovedOutTenantRow(t)).join('')}
+          </div>
+        </div>`;
+    }
+
+    // 퇴거 호실 카드 안 세입자 행 (회색/슬레이트 톤, '퇴거' 배지)
+    function renderMovedOutTenantRow(t) {
+      const status = getTenantStatus(t);
+      const badge = status === 'midterm'
+        ? '<span class="bg-amber-500/20 text-amber-400 text-xs font-bold px-2 py-0.5 rounded-full">중도 퇴거</span>'
+        : '<span class="bg-slate-500/20 text-slate-400 text-xs font-bold px-2 py-0.5 rounded-full">만기 퇴거</span>';
+      return `
+        <div class="bg-slate-900/70 rounded-xl p-4 border border-slate-700/60">
+          <div class="flex items-start justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-full bg-gradient-to-br from-slate-600 to-slate-500 flex items-center justify-center text-white font-bold shrink-0">
+                ${escapeHtml((t.name||'?').charAt(0))}
+              </div>
+              <div>
+                <h5 class="font-bold text-white">${escapeHtml(t.name)}</h5>
+                <p class="text-xs text-slate-400 mt-0.5">📞 ${escapeHtml(t.phone||'-')}</p>
+              </div>
+            </div>
+            ${badge}
+          </div>
+          <div class="grid grid-cols-2 gap-2 mt-3 text-center text-xs">
+            <div class="bg-slate-800 rounded-lg py-1.5">
+              <p class="text-slate-500">📅 입주일</p>
+              <p class="text-slate-200 font-semibold mt-0.5">${fmtDate(t.moveIn)}</p>
+            </div>
+            <div class="bg-slate-800 rounded-lg py-1.5">
+              <p class="text-slate-500">🚪 퇴거일</p>
+              <p class="text-slate-200 font-semibold mt-0.5">${fmtDate(t.moveOut)}</p>
+            </div>
+          </div>
+          <div class="flex gap-2 mt-3">
+            <button data-tid="${t.id}" data-act="detail" class="btn flex-1 bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold py-2 rounded-xl">📋 기록 ${t.notes ? t.notes.length : 0}건</button>
             <button data-tid="${t.id}" data-act="edit" class="btn bg-amber-500/80 hover:bg-amber-400 text-white text-sm font-bold px-3 py-2 rounded-xl">✏️ 수정</button>
             <button data-tid="${t.id}" data-act="del" class="btn bg-rose-600/80 hover:bg-rose-500 text-white text-sm font-bold px-4 py-2 rounded-xl">삭제</button>
           </div>
