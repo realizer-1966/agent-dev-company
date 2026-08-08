@@ -90,6 +90,10 @@
         <div class="text-right">
           <h2 class="text-xl font-bold text-white" id="detailBuildingName"></h2>
           <p class="text-xs text-slate-400" id="detailBuildingCount"></p>
+          <div class="flex items-center justify-end gap-1 mt-0.5">
+            <p class="text-xs text-slate-400" id="detailBuildingAddr"></p>
+            <button id="detailEditAddr" class="btn text-slate-500 hover:text-indigo-300 hover:bg-indigo-500/10 rounded-lg px-1.5 py-0.5 text-xs" title="주소 수정">✏️</button>
+          </div>
         </div>
       </div>
 
@@ -451,17 +455,20 @@
     }
 
     // ============ UI: 건물 목록 ============
-    // 입주기념일(매달 반복, 연도·월 무관) 세입자 목록. 입주 중(active) 우선.
-    // 기준: 입주일(moveIn)의 일(day-of-month)이 1일~오늘의 일 사이인 세입자.
-    // 예) 오늘이 8월 8일이면, 입주일의 일이 1~8일인 세입자 (어느 달/해든 무관).
-    function getTodayMoveInTenants(b) {
+    // 최근 한 달 이내(오늘-30일 ~ 오늘) 입주한 세입자 목록. 입주 중(active) 우선.
+    // 기준: moveIn(입주일)이 (오늘 - 30일) 이상이고 오늘 이하인 세입자. moveIn 없으면 제외.
+    function getRecentMoveInTenants(b) {
       const now = new Date();
-      const todayDay = now.getDate();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const cutoff = new Date(today);
+      cutoff.setDate(cutoff.getDate() - 30);
       return (b.tenants || []).filter(t => {
         if (!t.moveIn || typeof t.moveIn !== 'string') return false;
-        const day = Number(t.moveIn.slice(8, 10)); // YYYY-MM-DD → DD
-        if (!Number.isInteger(day)) return false;
-        return day >= 1 && day <= todayDay;
+        const [y, m, d] = t.moveIn.split('-').map(Number);
+        if (!y || !m || !d) return false;
+        const moveDate = new Date(y, m - 1, d);
+        if (isNaN(moveDate.getTime())) return false;
+        return moveDate >= cutoff && moveDate <= today;
       }).sort((a, c) => {
         const sa = getTenantStatus(a) === 'active' ? 0 : 1;
         const sc = getTenantStatus(c) === 'active' ? 0 : 1;
@@ -497,18 +504,18 @@
         const tenantCount = b.tenants.filter(t => getTenantStatus(t) !== 'upcoming').length;
         const colors = ['from-indigo-600 to-purple-600','from-emerald-600 to-teal-600','from-rose-600 to-pink-600','from-amber-500 to-orange-600','from-sky-600 to-blue-600','from-fuchsia-600 to-purple-600'];
         const grad = colors[idx % colors.length];
-        // 오늘 입주기념일 세입자 (전체), 그중 현재 월 미입금만 나열
-        const todayTenants = getTodayMoveInTenants(b);
-        const unpaidTenants = todayTenants.filter(t => !isRentPaidFor(t, cardMonth));
+        // 최근 한 달 이내 입주한 세입자 (전체), 그중 현재 월 미입금만 나열
+        const recentTenants = getRecentMoveInTenants(b);
+        const unpaidTenants = recentTenants.filter(t => !isRentPaidFor(t, cardMonth));
         let todayHtml;
-        if (todayTenants.length === 0) {
-          todayHtml = `<p class="text-[11px] text-slate-500 mt-3 pt-2 border-t border-slate-700/70">입주 기념일(이번 달 미입금) 없음</p>`;
+        if (recentTenants.length === 0) {
+          todayHtml = `<p class="text-[11px] text-slate-500 mt-3 pt-2 border-t border-slate-700/70">이번 달 미입금 내역 없음</p>`;
         } else if (unpaidTenants.length === 0) {
-          todayHtml = `<p class="text-[11px] text-slate-500 mt-3 pt-2 border-t border-slate-700/70">🎂 입주 기념일 · 이번 달 미입금 없음</p>`;
+          todayHtml = `<p class="text-[11px] text-slate-500 mt-3 pt-2 border-t border-slate-700/70">🎂 이번 달 미입금 내역 없음</p>`;
         } else {
           todayHtml = `
             <div class="mt-3 pt-2 border-t border-slate-700/70">
-              <p class="text-[11px] font-bold text-indigo-300 mb-1.5">🎂 입주 기념일 · 이번 달 미입금</p>
+              <p class="text-[11px] font-bold text-indigo-300 mb-1.5">🎂 이번 달 미입금 내역</p>
               <div class="space-y-1">
                 ${unpaidTenants.map(t => {
                   const paid = isRentPaidFor(t, cardMonth);
@@ -534,7 +541,10 @@
               <button data-bid="${b.id}" data-del class="btn text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg px-2 py-1 text-sm" title="건물 삭제">🗑️</button>
             </div>
             <h3 class="font-bold text-white text-lg truncate">🏢 ${escapeHtml(b.name)}</h3>
-            ${b.addr ? `<p class="text-xs text-slate-400 truncate mt-0.5">${escapeHtml(b.addr)}</p>` : ''}
+            <div class="flex items-center gap-1 mt-0.5">
+              <p class="text-xs text-slate-400 truncate flex-1">${b.addr ? escapeHtml(b.addr) : '<span class="text-slate-600">주소 없음</span>'}</p>
+              <button data-bid="${b.id}" data-editaddr class="btn text-slate-500 hover:text-indigo-300 hover:bg-indigo-500/10 rounded-lg px-1.5 py-0.5 text-xs shrink-0" title="주소 수정">✏️</button>
+            </div>
             <div class="flex items-center justify-between mt-4">
               <div>
                 <p class="text-2xl font-extrabold text-white">${tenantCount}<span class="text-sm text-slate-400">/${roomCount}실</span></p>
@@ -557,6 +567,13 @@
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           deleteBuilding(btn.dataset.bid);
+        });
+      });
+      // 주소 수정 버튼 클릭 → 주소 수정
+      grid.querySelectorAll('[data-editaddr]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          editBuildingAddress(btn.dataset.bid);
         });
       });
       // 오늘 입주기념일 세입자의 현재 월 입금 토글 (카드 클릭과 충돌 방지)
@@ -585,6 +602,18 @@
       renderBuildings();
     }
 
+    // 건물 주소 수정 (prompt로 입력받아 저장)
+    function editBuildingAddress(id) {
+      const b = buildings.find(x => x.id === id);
+      if (!b) return;
+      const current = b.addr || '';
+      const next = prompt('건물 주소를 입력하세요.', current);
+      if (next === null) return; // 취소
+      b.addr = next.trim();
+      saveBuildings();
+      renderBuildings();
+    }
+
     // ============ UI: 건물 상세 ============
     function openBuilding(id) {
       const b = buildings.find(x => x.id === id);
@@ -594,6 +623,9 @@
       document.getElementById('buildingDetail').classList.remove('hidden');
       document.getElementById('detailBuildingName').textContent = '🏢 ' + b.name;
       document.getElementById('detailBuildingCount').textContent = `세입자 ${b.tenants.length}/30명`;
+      document.getElementById('detailBuildingAddr').textContent = b.addr ? b.addr : '주소 없음';
+      const editAddrBtn = document.getElementById('detailEditAddr');
+      editAddrBtn.onclick = () => editBuildingAddress(b.id);
       if (!b.commonCosts) b.commonCosts = [];
       renderTenants();
       renderCommonCosts();
