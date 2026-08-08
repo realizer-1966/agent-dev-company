@@ -451,15 +451,17 @@
     }
 
     // ============ UI: 건물 목록 ============
-    // 오늘 입주기념일(월/일 일치, 연도 무관) 세입자 목록. 입주 중(active) 우선.
-    // 기준: 입주일(moveIn)의 월/일이 오늘의 월/일과 정확히 일치하는 세입자 (연도 무관).
+    // 입주기념일(매달 반복, 연도·월 무관) 세입자 목록. 입주 중(active) 우선.
+    // 기준: 입주일(moveIn)의 일(day-of-month)이 1일~오늘의 일 사이인 세입자.
+    // 예) 오늘이 8월 8일이면, 입주일의 일이 1~8일인 세입자 (어느 달/해든 무관).
     function getTodayMoveInTenants(b) {
       const now = new Date();
-      const todayMD = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const todayDay = now.getDate();
       return (b.tenants || []).filter(t => {
         if (!t.moveIn || typeof t.moveIn !== 'string') return false;
-        const md = t.moveIn.slice(5, 10); // YYYY-MM-DD → MM-DD
-        return md === todayMD;
+        const day = Number(t.moveIn.slice(8, 10)); // YYYY-MM-DD → DD
+        if (!Number.isInteger(day)) return false;
+        return day >= 1 && day <= todayDay;
       }).sort((a, c) => {
         const sa = getTenantStatus(a) === 'active' ? 0 : 1;
         const sc = getTenantStatus(c) === 'active' ? 0 : 1;
@@ -491,6 +493,8 @@
       buildings.forEach((b, idx) => {
         const totalRent = b.tenants.reduce((s, t) => s + (Number(t.rent)||0), 0);
         const roomCount = new Set(b.tenants.map(t => t.room).filter(Boolean)).size;
+        // 세입자 수: 입주 예정(upcoming) 세입자는 제외 (호실수 roomCount는 그대로 유지)
+        const tenantCount = b.tenants.filter(t => getTenantStatus(t) !== 'upcoming').length;
         const colors = ['from-indigo-600 to-purple-600','from-emerald-600 to-teal-600','from-rose-600 to-pink-600','from-amber-500 to-orange-600','from-sky-600 to-blue-600','from-fuchsia-600 to-purple-600'];
         const grad = colors[idx % colors.length];
         // 오늘 입주기념일 세입자 (전체), 그중 현재 월 미입금만 나열
@@ -498,13 +502,13 @@
         const unpaidTenants = todayTenants.filter(t => !isRentPaidFor(t, cardMonth));
         let todayHtml;
         if (todayTenants.length === 0) {
-          todayHtml = `<p class="text-[11px] text-slate-500 mt-3 pt-2 border-t border-slate-700/70">오늘 입주 기념일 없음</p>`;
+          todayHtml = `<p class="text-[11px] text-slate-500 mt-3 pt-2 border-t border-slate-700/70">입주 기념일(이번 달 미입금) 없음</p>`;
         } else if (unpaidTenants.length === 0) {
-          todayHtml = `<p class="text-[11px] text-slate-500 mt-3 pt-2 border-t border-slate-700/70">🎂 오늘 입주 기념일 · 이번 달 미입금 없음</p>`;
+          todayHtml = `<p class="text-[11px] text-slate-500 mt-3 pt-2 border-t border-slate-700/70">🎂 입주 기념일 · 이번 달 미입금 없음</p>`;
         } else {
           todayHtml = `
             <div class="mt-3 pt-2 border-t border-slate-700/70">
-              <p class="text-[11px] font-bold text-indigo-300 mb-1.5">🎂 오늘 입주 기념일 · 이번 달 미입금</p>
+              <p class="text-[11px] font-bold text-indigo-300 mb-1.5">🎂 입주 기념일 · 이번 달 미입금</p>
               <div class="space-y-1">
                 ${unpaidTenants.map(t => {
                   const paid = isRentPaidFor(t, cardMonth);
@@ -533,7 +537,7 @@
             ${b.addr ? `<p class="text-xs text-slate-400 truncate mt-0.5">${escapeHtml(b.addr)}</p>` : ''}
             <div class="flex items-center justify-between mt-4">
               <div>
-                <p class="text-2xl font-extrabold text-white">${b.tenants.length}<span class="text-sm text-slate-400">/${roomCount}실</span></p>
+                <p class="text-2xl font-extrabold text-white">${tenantCount}<span class="text-sm text-slate-400">/${roomCount}실</span></p>
                 <p class="text-xs text-slate-500">세입자/호실</p>
               </div>
               <div class="text-right">
