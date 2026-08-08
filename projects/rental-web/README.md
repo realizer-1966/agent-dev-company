@@ -37,10 +37,12 @@ ZIP_B64=$(base64 < rental-web.zip | tr -d '\n')
 curl -s -X POST https://ondev.store/api/deploy -H "Content-Type: application/json" -d "{
   \"app_id\": \"rental-web\",
   \"zip_b64\": \"$ZIP_B64\",
-  \"app_type\": \"web_app\",
+  \"app_type\": \"website\",
   \"site_map\": [\"/\"]
 }"
 ```
+
+현재 배포 claim_url: https://ondev.store/claim/jm8r3n
 
 ## 💾 데이터 저장 방식
 
