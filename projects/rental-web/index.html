@@ -1254,7 +1254,10 @@
           <div class="bg-slate-900 rounded-xl p-3 border border-slate-700">
             <div class="flex items-center justify-between mb-1">
               <span class="text-xs text-slate-400">${date}</span>
-              <button data-nid="${n.id}" class="text-rose-400 hover:text-rose-300 text-xs">삭제</button>
+              <div class="flex items-center gap-2">
+                ${n.image ? `<button data-save-nid="${n.id}" class="text-sky-400 hover:text-sky-300 text-xs">💾 저장</button>` : ''}
+                <button data-nid="${n.id}" class="text-rose-400 hover:text-rose-300 text-xs">삭제</button>
+              </div>
             </div>
             ${costHtml ? `<div class="mb-2">${costHtml}</div>` : ''}
             ${n.text ? `<p class="text-sm text-slate-200 whitespace-pre-wrap mb-2">${escapeHtml(n.text)}</p>` : ''}
@@ -1264,6 +1267,66 @@
       list.querySelectorAll('[data-nid]').forEach(btn => {
         btn.addEventListener('click', () => deleteNote(btn.dataset.nid));
       });
+      list.querySelectorAll('[data-save-nid]').forEach(btn => {
+        btn.addEventListener('click', () => saveNoteImage(btn.dataset.saveNid));
+      });
+    }
+
+    // ============ 기록 이미지 저장 (고유 파일명 다운로드) ============
+    // base64 data URL → Blob → <a download> 클릭으로 다운로드
+    function dataUrlToBlob(dataUrl) {
+      const [meta, b64] = dataUrl.split(',');
+      const mime = (meta.match(/data:([^;]+)/) || [])[1] || 'image/png';
+      const bin = atob(b64);
+      const arr = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      return new Blob([arr], { type: mime });
+    }
+
+    // 파일명에 사용 불가 문자 제거/대체 (한글은 유지)
+    function sanitizeFileName(s) {
+      return String(s || '')
+        .replace(/[\/\\:*?"<>|]/g, '')
+        .replace(/\s+/g, '')
+        .trim();
+    }
+
+    // 호수/이름/계약일/기록날짜/기록id 조합으로 고유 파일명 생성
+    function buildImageFileName(note) {
+      const t = currentTenant || {};
+      const room = sanitizeFileName(t.room || '');
+      const name = sanitizeFileName(t.name || '');
+      const contractDate = sanitizeFileName(t.contractEnd || t.moveIn || '');
+      const created = note.createdAt ? new Date(note.createdAt) : null;
+      const dateStr = created
+        ? `${created.getFullYear()}-${String(created.getMonth() + 1).padStart(2, '0')}-${String(created.getDate()).padStart(2, '0')}`
+        : '';
+      const idPart = note.id ? String(note.id).slice(-4) : '';
+      const parts = [room, name, contractDate, dateStr, idPart].filter(Boolean);
+      const base = parts.join('_') || '기록';
+      // 이미지 MIME에 맞는 확장자
+      const mime = (note.image.match(/data:([^;]+)/) || [])[1] || '';
+      const ext = mime === 'image/jpeg' ? 'jpg' : mime === 'image/png' ? 'png' : 'png';
+      return `${base}.${ext}`;
+    }
+
+    function saveNoteImage(noteId) {
+      if (!currentTenant) return;
+      const note = (currentTenant.notes || []).find(n => n.id === noteId);
+      if (!note || !note.image) return;
+      try {
+        const blob = dataUrlToBlob(note.image);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = buildImageFileName(note);
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch (e) {
+        alert('이미지 저장에 실패했습니다.');
+      }
     }
 
     // ============ 리포트/통계 대시보드 ============
