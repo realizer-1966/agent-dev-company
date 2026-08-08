@@ -451,14 +451,20 @@
     }
 
     // ============ UI: 건물 목록 ============
-    // 오늘 입주기념일(월/일 일치, 연도 무관) 세입자 목록. 입주 중(active) 우선.
-    function getTodayMoveInTenants(b) {
+    // 이번 달 입주기념일(월/일 일치, 연도 무관) 세입자 목록. 입주 중(active) 우선.
+    // 기준: 이번 달 1일 ~ 오늘 사이의 날짜 중 입주기념일(월/일)이 해당하는 세입자.
+    function getThisMonthMoveInTenants(b) {
       const now = new Date();
-      const todayMD = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const thisMonth = String(now.getMonth() + 1).padStart(2, '0');
+      const todayDay = now.getDate();
       return (b.tenants || []).filter(t => {
         if (!t.moveIn || typeof t.moveIn !== 'string') return false;
         const md = t.moveIn.slice(5, 10); // YYYY-MM-DD → MM-DD
-        return md === todayMD;
+        const m = md.slice(0, 2);
+        const d = Number(md.slice(3, 5));
+        if (m !== thisMonth) return false; // 이번 달이 아니면 제외
+        if (d < 1 || d > todayDay) return false; // 1일~오늘 사이만
+        return true;
       }).sort((a, c) => {
         const sa = getTenantStatus(a) === 'active' ? 0 : 1;
         const sc = getTenantStatus(c) === 'active' ? 0 : 1;
@@ -492,18 +498,18 @@
         const roomCount = new Set(b.tenants.map(t => t.room).filter(Boolean)).size;
         const colors = ['from-indigo-600 to-purple-600','from-emerald-600 to-teal-600','from-rose-600 to-pink-600','from-amber-500 to-orange-600','from-sky-600 to-blue-600','from-fuchsia-600 to-purple-600'];
         const grad = colors[idx % colors.length];
-        // 오늘 입주기념일 세입자 (전체), 그중 현재 월 미입금만 나열
-        const todayTenants = getTodayMoveInTenants(b);
+        // 이번 달 입주기념일 세입자 (전체), 그중 현재 월 미입금만 나열
+        const todayTenants = getThisMonthMoveInTenants(b);
         const unpaidTenants = todayTenants.filter(t => !isRentPaidFor(t, cardMonth));
         let todayHtml;
         if (todayTenants.length === 0) {
-          todayHtml = `<p class="text-[11px] text-slate-500 mt-3 pt-2 border-t border-slate-700/70">오늘 입주 기념일 없음</p>`;
+          todayHtml = `<p class="text-[11px] text-slate-500 mt-3 pt-2 border-t border-slate-700/70">이번 달 입주 기념일 없음</p>`;
         } else if (unpaidTenants.length === 0) {
-          todayHtml = `<p class="text-[11px] text-slate-500 mt-3 pt-2 border-t border-slate-700/70">🎂 오늘 입주 기념일 · 이번 달 미입금 없음</p>`;
+          todayHtml = `<p class="text-[11px] text-slate-500 mt-3 pt-2 border-t border-slate-700/70">🎂 이번 달 입주 기념일 · 이번 달 미입금 없음</p>`;
         } else {
           todayHtml = `
             <div class="mt-3 pt-2 border-t border-slate-700/70">
-              <p class="text-[11px] font-bold text-indigo-300 mb-1.5">🎂 오늘 입주 기념일 · 이번 달 미입금</p>
+              <p class="text-[11px] font-bold text-indigo-300 mb-1.5">🎂 이번 달 입주 기념일 · 이번 달 미입금</p>
               <div class="space-y-1">
                 ${unpaidTenants.map(t => {
                   const paid = isRentPaidFor(t, cardMonth);
@@ -554,7 +560,7 @@
           deleteBuilding(btn.dataset.bid);
         });
       });
-      // 오늘 입주기념일 세입자의 현재 월 입금 토글 (카드 클릭과 충돌 방지)
+      // 이번 달 입주기념일 세입자의 현재 월 입금 토글 (카드 클릭과 충돌 방지)
       grid.querySelectorAll('[data-todayrent]').forEach(cb => {
         cb.addEventListener('click', (e) => {
           e.stopPropagation();
