@@ -753,11 +753,13 @@
         </div>`;
     }
 
-    // 호실 전체 이력 모달 열기 (과거~현재 모든 세입자, 입주일 오름차순)
-    function openRoomHistory(room) {
+    // 현재 호실 전체 이력 모달에서 보고 있는 호실 (수정/삭제 후 리스트 재렌더용)
+    let currentHistoryRoom = null;
+
+    // 호실 전체 이력 목록 렌더 (과거~현재 모든 세입자, 입주일 오름차순)
+    function renderRoomHistoryList(roomStr) {
       const b = buildings.find(x => x.id === currentBuildingId);
       if (!b) return;
-      const roomStr = (room || '').trim();
       const tenants = b.tenants
         .filter(t => (t.room || '').trim() === roomStr)
         .sort((a, c) => String(a.moveIn || '').localeCompare(String(c.moveIn || '')));
@@ -766,8 +768,6 @@
       list.innerHTML = '';
       if (tenants.length === 0) {
         list.innerHTML = '<p class="text-center text-slate-500 py-6">이 호실의 거주 이력이 없습니다.</p>';
-        document.getElementById('roomModal').classList.remove('hidden');
-        document.getElementById('roomModal').classList.add('flex');
         return;
       }
       tenants.forEach(t => {
@@ -793,10 +793,39 @@
               <div class="bg-slate-800 rounded-lg py-1.5"><p class="text-slate-500">🚪 퇴거일</p><p class="text-slate-200 font-semibold mt-0.5">${fmtDate(t.moveOut)}</p></div>
               <div class="bg-slate-800 rounded-lg py-1.5"><p class="text-slate-500">💰 보증금/월세</p><p class="text-emerald-300 font-semibold mt-0.5">${fmtMoney(t.deposit)} / ${fmtMoney(t.rent)}</p></div>
             </div>
+            <div class="flex gap-2 mt-3">
+              <button data-tid="${t.id}" data-act="edit" class="btn flex-1 bg-amber-500/80 hover:bg-amber-400 text-white text-xs font-bold py-1.5 rounded-xl">✏️ 수정</button>
+              <button data-tid="${t.id}" data-act="del" class="btn flex-1 bg-rose-600/80 hover:bg-rose-500 text-white text-xs font-bold py-1.5 rounded-xl">🗑️ 삭제</button>
+            </div>
           </div>`;
       });
+      // 수정/삭제 버튼 이벤트 연결 (모달 배경 클릭·다른 카드와 충돌 방지 위해 stopPropagation)
+      list.querySelectorAll('[data-tid]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (btn.dataset.act === 'edit') openEditModal(btn.dataset.tid);
+          else if (btn.dataset.act === 'del') deleteTenant(btn.dataset.tid);
+        });
+      });
+    }
+
+    // 호실 전체 이력 모달 열기
+    function openRoomHistory(room) {
+      const b = buildings.find(x => x.id === currentBuildingId);
+      if (!b) return;
+      const roomStr = (room || '').trim();
+      currentHistoryRoom = roomStr;
+      renderRoomHistoryList(roomStr);
       document.getElementById('roomModal').classList.remove('hidden');
       document.getElementById('roomModal').classList.add('flex');
+    }
+
+    // 호실 전체 이력 모달이 열려 있으면 목록 재렌더 (수정/삭제 후 호출)
+    function refreshRoomHistory() {
+      if (currentHistoryRoom === null) return;
+      const m = document.getElementById('roomModal');
+      if (m.classList.contains('hidden')) return;
+      renderRoomHistoryList(currentHistoryRoom);
     }
 
     function closeRoomHistory() {
@@ -924,6 +953,7 @@
       saveBuildings();
       renderTenants();
       closeEditModal();
+      refreshRoomHistory(); // 호실 전체 이력 모달 열려 있으면 목록 재렌더
     }
 
     // ============ 세입자 CRUD ============
@@ -973,6 +1003,7 @@
       b.tenants = b.tenants.filter(t => t.id !== tid);
       saveBuildings();
       renderTenants();
+      refreshRoomHistory(); // 호실 전체 이력 모달 열려 있으면 목록 재렌더
     }
 
     // ============ 세입자 상세/기록 ============
