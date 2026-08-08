@@ -1049,19 +1049,19 @@
       hideImgPreview();
     }
 
-    // 기록 이미지를 480x640(세로형, 3:4) 이내로 비율 유지 리사이즈 후 JPEG 압축 저장 (용량 절감)
+    // 기록 이미지를 768x1024(세로형, 3:4) 이내로 비율 유지 리사이즈 후 JPEG 압축 저장 (용량 절감)
     function resizeNoteImage(dataUrl, done) {
       const img = new Image();
       img.onload = () => {
         try {
-          const MAX_W = 480, MAX_H = 640;
+          const MAX_W = 768, MAX_H = 1024;
           let w = img.naturalWidth, h = img.naturalHeight;
-          // 원본이 이미 480x640 이내면 리사이즈 생략 (화질 보존)
+          // 원본이 이미 768x1024 이내면 리사이즈 생략 (화질 보존)
           if (w <= MAX_W && h <= MAX_H) {
             done(dataUrl);
             return;
           }
-          // 긴 변이 640, 짧은 변이 최대 480이 되도록 비율 유지 리사이즈
+          // 긴 변이 1024, 짧은 변이 최대 768이 되도록 비율 유지 리사이즈
           const scale = Math.min(MAX_W / w, MAX_H / h);
           w = Math.round(w * scale);
           h = Math.round(h * scale);
