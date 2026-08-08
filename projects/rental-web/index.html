@@ -193,7 +193,12 @@
         <input id="noteCost" type="number" min="0" step="0.01" placeholder="비용 (원)" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400"/>
       </div>
       <textarea id="noteText" rows="2" placeholder="텍스트 기록 (예: 관리비 연체, 시설 점검 등)" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm mb-2 focus:ring-2 focus:ring-indigo-400"></textarea>
-      <input id="noteImg" type="file" accept="image/*" class="w-full text-sm text-slate-300 mb-3 file:mr-3 file:bg-indigo-600 file:text-white file:border-0 file:rounded-xl file:px-4 file:py-2 file:font-bold file:cursor-pointer"/>
+      <div class="flex flex-wrap gap-2 mb-2">
+        <input id="noteImg" type="file" accept="image/*" class="flex-1 min-w-[200px] text-sm text-slate-300 file:mr-3 file:bg-indigo-600 file:text-white file:border-0 file:rounded-xl file:px-4 file:py-2 file:font-bold file:cursor-pointer"/>
+        <button id="noteCamera" type="button" class="btn bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-4 py-2 rounded-xl whitespace-nowrap">📷 사진 촬영</button>
+      </div>
+      <input id="noteCapture" type="file" accept="image/*" capture="environment" class="hidden"/>
+      <div id="noteImgPreview" class="hidden mb-3"></div>
       <button id="noteAdd" class="btn w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl mb-5">기록 추가</button>
 
       <!-- 호수별 비용 합계 -->
@@ -1013,7 +1018,8 @@
       const costVal = document.getElementById('noteCost').value;
       const cost = costVal === '' || costVal === null ? null : Number(costVal);
       const imgInput = document.getElementById('noteImg');
-      const imgFile = imgInput.files[0];
+      const capInput = document.getElementById('noteCapture');
+      const imgFile = imgInput.files[0] || capInput.files[0];
       if (!text && !imgFile && cost === null) { alert('비용, 텍스트 또는 이미지 중 하나를 입력하세요.'); return; }
       if (cost !== null && isNaN(cost)) { alert('비용은 숫자로 입력하세요.'); return; }
       const note = { id: genId(), text, costType, cost, image: null, createdAt: Date.now() };
@@ -1034,6 +1040,41 @@
       document.getElementById('noteCostType').value = '';
       document.getElementById('noteCost').value = '';
       imgInput.value = '';
+      capInput.value = '';
+      hideImgPreview();
+    }
+
+    function showImgPreview(src) {
+      const box = document.getElementById('noteImgPreview');
+      box.innerHTML = '';
+      const img = document.createElement('img');
+      img.src = src;
+      img.className = 'w-full max-h-48 object-cover rounded-lg';
+      box.appendChild(img);
+      box.classList.remove('hidden');
+    }
+
+    function hideImgPreview() {
+      document.getElementById('noteImgPreview').classList.add('hidden');
+      document.getElementById('noteImgPreview').innerHTML = '';
+    }
+
+    function wireImgInputs() {
+      const capInput = document.getElementById('noteCapture');
+      const previewInput = document.getElementById('noteImg');
+      document.getElementById('noteCamera').addEventListener('click', () => {
+        try {
+          capInput.click();
+        } catch (e) {
+          previewInput.click();
+        }
+      });
+      [capInput, previewInput].forEach(inp => {
+        inp.addEventListener('change', () => {
+          const f = inp.files[0];
+          if (f) showImgPreview(URL.createObjectURL(f));
+        });
+      });
     }
 
     function deleteNote(noteId) {
@@ -1506,6 +1547,7 @@
         console.error('DB 열기 실패', err);
       }
       renderBuildings();
+      wireImgInputs();
     }
     init();
   </script>
