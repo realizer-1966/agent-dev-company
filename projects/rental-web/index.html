@@ -1061,12 +1061,10 @@
         return;
       }
       b.commonCosts.forEach(c => {
-        const date = new Date(c.createdAt).toLocaleString('ko-KR', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
         list.innerHTML += `
           <div class="bg-slate-900 rounded-xl px-3 py-2 border border-slate-700 flex items-center justify-between">
             <div>
               <span class="text-sm font-bold text-white">${escapeHtml(c.type || '비용')}</span>
-              <span class="text-xs text-slate-400 ml-2">${date}</span>
             </div>
             <div class="flex items-center gap-3">
               <span class="text-sm font-bold text-emerald-400">${Number(c.cost).toLocaleString('ko-KR')}원</span>
