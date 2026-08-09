@@ -497,14 +497,14 @@
       buildings.forEach((b, idx) => {
         const totalRent = b.tenants.reduce((s, t) => s + (Number(t.rent)||0), 0);
         const roomCount = new Set(b.tenants.map(t => t.room).filter(Boolean)).size;
-        // 세입자 수: 입주 예정(upcoming) 세입자는 제외 (호실수 roomCount는 그대로 유지)
-        const tenantCount = b.tenants.filter(t => getTenantStatus(t) !== 'upcoming').length;
+        // 세입자 수: 입주 중(active) 세입자만 카운트 (호실수 roomCount는 그대로 유지)
+        const tenantCount = b.tenants.filter(t => getTenantStatus(t) === 'active').length;
         const colors = ['from-indigo-600 to-purple-600','from-emerald-600 to-teal-600','from-rose-600 to-pink-600','from-amber-500 to-orange-600','from-sky-600 to-blue-600','from-fuchsia-600 to-purple-600'];
         const grad = colors[idx % colors.length];
-        // 입주일(day-of-month)이 매달 1일~오늘 사이인 세입자 중, 이번 달(YYYY-MM) 입금내역이
-        // 전혀 없는 세입자만 나열 (기록 유무로 판정, paid 여부 무관)
+        // 입주일(day-of-month)이 매달 1일~오늘 사이인 입주 중(active) 세입자 중, 이번 달(YYYY-MM) 입금내역이
+        // 전혀 없는 세입자만 나열 (기록 유무로 판정, paid 여부 무관). 퇴거(midterm/full) 세입자는 제외.
         const recentTenants = getRecentMoveInTenants(b);
-        const unpaidTenants = recentTenants.filter(t => !(t.rentPaid || []).some(r => r.month === cardMonth));
+        const unpaidTenants = recentTenants.filter(t => getTenantStatus(t) === 'active' && !(t.rentPaid || []).some(r => r.month === cardMonth));
         let todayHtml;
         if (unpaidTenants.length === 0) {
           todayHtml = `<p class="text-[11px] text-slate-500 mt-3 pt-2 border-t border-slate-700/70">이번 달 입금내역 없음</p>`;
