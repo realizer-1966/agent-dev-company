@@ -1617,7 +1617,7 @@
       let totalRentMonths = 0, totalPaidMonths = 0, totalThisYearDeposit = 0;
       buildings.forEach(b => {
         const s = computeBuildingStats(b);
-        totalTenants += s.tenants.length;
+        totalTenants += s.active.length; // 총 세입자 = 입주중(active)만 카운트 (퇴거자 제외)
         totalActive += s.active.length;
         totalRent += s.activeRent;   // 입주중 월세 합계 (만원)
         totalMgmt += s.activeMgmt;   // 입주중 관리비 합계 (만원)
@@ -1643,7 +1643,7 @@
           <p class="text-xs text-slate-400 mb-2">👥 인원 현황</p>
           <div class="flex flex-wrap gap-2">
             ${statItem('🏢', '총 건물', `${totalBuildings}개`, '건물 수')}
-            ${statItem('👥', '총 세입자', `${totalTenants}명`, '전체 세입자')}
+            ${statItem('👥', '총 세입자', `${totalTenants}명`, '퇴거 제외 입주자')}
             ${statItem('🏠', '입주 중', `${totalActive}명`, '현재 입주')}
           </div>
         </div>`;
@@ -1654,7 +1654,7 @@
           <div class="flex flex-wrap gap-2">
             ${statItem('💰', '월세 수입', `${fmtMoney(totalRent)}`, '입주중 월세 합계', fmtMoney(totalRent))}
             ${statItem('🧾', '관리비', `${fmtMoney(totalMgmt)}`, '입주중 관리비 합계', fmtMoney(totalMgmt))}
-            ${statItem('💵', '누적 입금', `${totalPaid ? totalPaid.toLocaleString('ko-KR') + '원' : '0원'}`, '입금 완료 합계', totalPaid ? totalPaid.toLocaleString('ko-KR') + '원' : '0원')}
+            ${statItem('💵', '누적 입금', `${fmtMoney(Math.round(totalPaid / 10000))}`, '입금 완료 합계(만원)', fmtMoney(Math.round(totalPaid / 10000)))}
             ${statItem('🪙', '당해연도 퇴거 보증금', `${fmtMoney(totalThisYearDeposit)}`, `${new Date().getFullYear()}년 퇴거 예정/기준 보증금`, fmtMoney(totalThisYearDeposit))}
           </div>
         </div>`;
