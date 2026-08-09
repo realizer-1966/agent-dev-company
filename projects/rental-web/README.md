@@ -43,7 +43,7 @@ curl -s -X POST https://ondev.store/api/deploy -H "Content-Type: application/jso
 }"
 ```
 
-현재 배포 claim_url: https://ondev.store/claim/djry6x
+현재 배포 claim_url: https://ondev.store/claim/2i128u
 
 ## 💾 데이터 저장 방식
 
