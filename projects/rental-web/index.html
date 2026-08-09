@@ -58,9 +58,6 @@
         <span class="w-16"></span>
       </div>
 
-      <!-- 전체 통계 카드 -->
-      <div class="grid grid-cols-1 gap-3 mb-6" id="overallStats"></div>
-
       <!-- 앞으로 3개월 퇴거 예정 보증금 준비금 (월별) -->
       <div class="bg-slate-800 rounded-2xl p-5 mb-6 border border-slate-700">
         <h3 class="font-bold text-white mb-3">📅 앞으로 3개월 퇴거 예정 보증금 준비금</h3>
@@ -1755,58 +1752,6 @@
       return { tenants, active, monthlyRent, activeRent, activeMgmt, paidRent, totalCost, rate, emptyRooms, rentMonths, paidMonths, thisYearDeposit, next3MonthsDeposit: sumNext3MonthsDeposit(tenants) };
     }
 
-    // 전체 통계 카드
-    function renderOverallStats() {
-      const el = document.getElementById('overallStats');
-      const totalBuildings = buildings.length;
-      let totalTenants = 0, totalActive = 0, totalRent = 0, totalMgmt = 0, totalPaid = 0;
-      let totalRentMonths = 0, totalPaidMonths = 0, totalThisYearDeposit = 0;
-      buildings.forEach(b => {
-        const s = computeBuildingStats(b);
-        totalTenants += s.active.length; // 총 세입자 = 입주중(active)만 카운트 (퇴거자 제외)
-        totalActive += s.active.length;
-        totalRent += s.activeRent;   // 입주중 월세 합계 (만원)
-        totalMgmt += s.activeMgmt;   // 입주중 관리비 합계 (만원)
-        totalPaid += s.paidRent;     // 누적 입금 (원)
-        totalRentMonths += s.rentMonths;
-        totalPaidMonths += s.paidMonths;
-        totalThisYearDeposit += s.thisYearDeposit; // 당해연도 퇴거 보증금 준비금 (만원)
-      });
-      const totalRate = totalRentMonths > 0 ? Math.round((totalPaidMonths / totalRentMonths) * 100) : null;
-      // 수평 배치용 통계 항목 하나: [아이콘] [라벨 + 값] 을 한 덩어리로 가로 배치
-      const statItem = (icon, label, value, sub, extraTitle) => `
-        <div class="flex items-center gap-3 bg-slate-900 rounded-xl px-3 py-2.5 min-w-[120px] flex-1">
-          <span class="text-xl shrink-0">${icon}</span>
-          <div class="min-w-0 flex-1">
-            <p class="text-[10px] text-slate-400 truncate">${label}</p>
-            <p class="text-lg font-extrabold text-white truncate" ${extraTitle ? `title="${escapeHtml(extraTitle)}"` : ''}>${value}</p>
-            <p class="text-[10px] text-slate-500 truncate">${sub}</p>
-          </div>
-        </div>`;
-      // 인원 카드: 총 건물 / 총 세입자 / 입주 중 → 가로 배치 (모바일은 자동 줄바꿈)
-      const personCard = `
-        <div class="card bg-slate-800 border border-slate-700 rounded-2xl p-4">
-          <p class="text-xs text-slate-400 mb-2">👥 인원 현황</p>
-          <div class="flex flex-wrap gap-2">
-            ${statItem('🏢', '총 건물', `${totalBuildings}개`, '건물 수')}
-            ${statItem('👥', '총 세입자', `${totalTenants}명`, '퇴거 제외 입주자')}
-            ${statItem('🏠', '입주 중', `${totalActive}명`, '현재 입주')}
-          </div>
-        </div>`;
-      // 금액 카드: 월세 / 관리비 / 누적 입금 / 당해연도 퇴거 보증금 준비금 → 가로 배치
-      const amountCard = `
-        <div class="card bg-slate-800 border border-slate-700 rounded-2xl p-4">
-          <p class="text-xs text-slate-400 mb-2">💵 금액 현황</p>
-          <div class="flex flex-wrap gap-2">
-            ${statItem('💰', '월세 수입', `${fmtMoney(totalRent)}`, '입주중 월세 합계', fmtMoney(totalRent))}
-            ${statItem('🧾', '관리비', `${fmtMoney(totalMgmt)}`, '입주중 관리비 합계', fmtMoney(totalMgmt))}
-            ${statItem('💵', '누적 입금', `${fmtMoney(Math.round(totalPaid / 10000))}`, '입금 완료 합계(만원)', fmtMoney(Math.round(totalPaid / 10000)))}
-            ${statItem('🪙', '당해연도 퇴거 보증금', `${fmtMoney(totalThisYearDeposit)}`, `${new Date().getFullYear()}년 퇴거 예정/기준 보증금`, fmtMoney(totalThisYearDeposit))}
-          </div>
-        </div>`;
-      el.innerHTML = personCard + amountCard;
-    }
-
     // 입금률 바
     function renderRateBar(label, rate, months) {
       if (rate === null) {
@@ -1907,7 +1852,6 @@
     }
 
     function renderStats() {
-      renderOverallStats();
       renderNext3Months();
       // 입금률
       const prEl = document.getElementById('paymentRate');
