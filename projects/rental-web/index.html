@@ -164,20 +164,20 @@
   <!-- 세입자 상세/기록 모달 -->
   <div id="tenantModal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4">
     <div class="bg-slate-800 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto border border-slate-700 fade-in">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="font-bold text-white text-lg" id="tmTitle"></h3>
-        <button id="tmClose" class="text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
+      <div class="flex items-center justify-between gap-2 mb-4">
+        <h3 class="font-bold text-white text-lg min-w-0 truncate" id="tmTitle"></h3>
+        <button id="tmClose" class="text-slate-400 hover:text-white text-2xl leading-none shrink-0">&times;</button>
       </div>
 
-      <div class="bg-slate-900 rounded-xl p-4 mb-4 text-sm grid grid-cols-2 gap-2" id="tmInfo"></div>
+      <div class="bg-slate-900 rounded-xl p-4 mb-4 text-sm grid grid-cols-2 gap-x-2 gap-y-1 items-center min-w-0" id="tmInfo"></div>
 
       <!-- 월세 입금 관리 -->
       <div class="bg-slate-800 border border-slate-600/50 rounded-xl p-4 mb-4">
-        <div class="flex items-center justify-between mb-3">
-          <h4 class="font-bold text-white text-sm">💰 월세 입금 관리 <span class="text-xs text-slate-400 ml-1">(월세 <span id="rentMonthRate">0만원</span>/월)</span></h4>
-          <div class="text-right">
-            <p class="text-xs text-slate-400">입금 합계</p>
-            <p class="text-lg font-extrabold text-emerald-400" id="rentPaidSum">0원</p>
+        <div class="flex items-center justify-between gap-2 mb-3">
+          <h4 class="font-bold text-white text-sm min-w-0 truncate">💰 월세 입금 관리 <span class="text-xs text-slate-400 ml-1">(월세 <span id="rentMonthRate">0만원</span>/월)</span></h4>
+          <div class="text-right shrink-0">
+            <p class="text-xs text-slate-400 whitespace-nowrap">입금 합계</p>
+            <p class="text-lg font-extrabold text-emerald-400 whitespace-nowrap" id="rentPaidSum">0원</p>
           </div>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 mb-3 items-center">
@@ -189,11 +189,11 @@
 
       <!-- 관리비 납부 관리 -->
       <div class="bg-slate-800 border border-slate-600/50 rounded-xl p-4 mb-4">
-        <div class="flex items-center justify-between mb-3">
-          <h4 class="font-bold text-white text-sm">🧾 관리비 납부 관리 <span class="text-xs text-slate-400 ml-1">(관리비 <span id="mgmtMonthRate">0만원</span>/월)</span></h4>
-          <div class="text-right">
-            <p class="text-xs text-slate-400">납부 합계</p>
-            <p class="text-lg font-extrabold text-emerald-400" id="mgmtPaidSum">0원</p>
+        <div class="flex items-center justify-between gap-2 mb-3">
+          <h4 class="font-bold text-white text-sm min-w-0 truncate">🧾 관리비 납부 관리 <span class="text-xs text-slate-400 ml-1">(관리비 <span id="mgmtMonthRate">0만원</span>/월)</span></h4>
+          <div class="text-right shrink-0">
+            <p class="text-xs text-slate-400 whitespace-nowrap">납부 합계</p>
+            <p class="text-lg font-extrabold text-emerald-400 whitespace-nowrap" id="mgmtPaidSum">0원</p>
           </div>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 mb-3 items-center">
@@ -1235,14 +1235,14 @@
       currentTenant = t;
       document.getElementById('tmTitle').textContent = `${t.name} 님 기록`;
       document.getElementById('tmInfo').innerHTML = `
-        <span class="text-slate-400">📞 전화번호</span><span class="text-white text-right">${escapeHtml(t.phone||'-')}</span>
-        <span class="text-slate-400">🏠 호실</span><span class="text-white text-right">${escapeHtml(t.room||'-')}</span>
-        <span class="text-slate-400">💰 보증금</span><span class="text-white text-right">${fmtMoney(t.deposit)}</span>
-        <span class="text-slate-400">📆 월세</span><span class="text-white text-right">${fmtMoney(t.rent)}</span>
-        <span class="text-slate-400">🧾 관리비</span><span class="text-white text-right">${fmtMoney(t.mgmt)}</span>
-        <span class="text-slate-400">📅 입주일</span><span class="text-white text-right">${fmtDate(t.moveIn)}</span>
-        <span class="text-slate-400">📆 만기일</span><span class="text-white text-right">${fmtDate(t.contractEnd)}</span>
-        <span class="text-slate-400">🚪 퇴거일</span><span class="text-white text-right">${fmtDate(t.moveOut)}</span>`;
+        <span class="text-slate-400 min-w-0">📞 전화번호</span><span class="text-white text-right min-w-0 truncate">${escapeHtml(t.phone||'-')}</span>
+        <span class="text-slate-400 min-w-0">🏠 호실</span><span class="text-white text-right min-w-0 truncate">${escapeHtml(t.room||'-')}</span>
+        <span class="text-slate-400 min-w-0">💰 보증금</span><span class="text-white text-right min-w-0 truncate">${fmtMoney(t.deposit)}</span>
+        <span class="text-slate-400 min-w-0">📆 월세</span><span class="text-white text-right min-w-0 truncate">${fmtMoney(t.rent)}</span>
+        <span class="text-slate-400 min-w-0">🧾 관리비</span><span class="text-white text-right min-w-0 truncate">${fmtMoney(t.mgmt)}</span>
+        <span class="text-slate-400 min-w-0">📅 입주일</span><span class="text-white text-right min-w-0 truncate">${fmtDate(t.moveIn)}</span>
+        <span class="text-slate-400 min-w-0">📆 만기일</span><span class="text-white text-right min-w-0 truncate">${fmtDate(t.contractEnd)}</span>
+        <span class="text-slate-400 min-w-0">🚪 퇴거일</span><span class="text-white text-right min-w-0 truncate">${fmtDate(t.moveOut)}</span>`;
       document.getElementById('tenantModal').classList.remove('hidden');
       document.getElementById('tenantModal').classList.add('flex');
       // 호수 라벨 설정 (호실이 없으면 세입자 이름으로 표시)
@@ -1434,14 +1434,14 @@
         const monthLabel = formatMonth(r.month);
         const paid = r.paid;
         list.innerHTML += `
-          <div class="bg-slate-900 rounded-xl px-3 py-2 border border-slate-700 flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <button data-rid="${r.id}" data-act="toggle" class="w-5 h-5 rounded border-2 ${paid ? 'bg-emerald-500 border-emerald-500' : 'border-slate-500'} flex items-center justify-center text-xs text-white">${paid ? '✓' : ''}</button>
-              <span class="text-sm font-bold ${paid ? 'text-slate-200' : 'text-rose-400'}">${monthLabel}</span>
+          <div class="bg-slate-900 rounded-xl px-3 py-2 border border-slate-700 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <button data-rid="${r.id}" data-act="toggle" class="w-5 h-5 shrink-0 rounded border-2 ${paid ? 'bg-emerald-500 border-emerald-500' : 'border-slate-500'} flex items-center justify-center text-xs text-white">${paid ? '✓' : ''}</button>
+              <span class="text-sm font-bold ${paid ? 'text-slate-200' : 'text-rose-400'} truncate">${monthLabel}</span>
             </div>
-            <div class="flex items-center gap-3">
-              <span class="text-xs ${paid ? 'text-emerald-400' : 'text-rose-400 font-bold'}">${paid ? '입금 완료' : '미입금'}</span>
-              <button data-rid="${r.id}" data-act="del" class="text-rose-400 hover:text-rose-300 text-xs">삭제</button>
+            <div class="flex items-center gap-3 shrink-0">
+              <span class="text-xs whitespace-nowrap ${paid ? 'text-emerald-400' : 'text-rose-400 font-bold'}">${paid ? '입금 완료' : '미입금'}</span>
+              <button data-rid="${r.id}" data-act="del" class="text-rose-400 hover:text-rose-300 text-xs whitespace-nowrap">삭제</button>
             </div>
           </div>`;
       });
@@ -1512,14 +1512,14 @@
         const monthLabel = formatMonth(r.month);
         const paid = r.paid;
         list.innerHTML += `
-          <div class="bg-slate-900 rounded-xl px-3 py-2 border border-slate-700 flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <button data-mgmtid="${r.id}" data-act="toggle" class="w-5 h-5 rounded border-2 ${paid ? 'bg-emerald-500 border-emerald-500' : 'border-slate-500'} flex items-center justify-center text-xs text-white">${paid ? '✓' : ''}</button>
-              <span class="text-sm font-bold ${paid ? 'text-slate-200' : 'text-rose-400'}">${monthLabel}</span>
+          <div class="bg-slate-900 rounded-xl px-3 py-2 border border-slate-700 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <button data-mgmtid="${r.id}" data-act="toggle" class="w-5 h-5 shrink-0 rounded border-2 ${paid ? 'bg-emerald-500 border-emerald-500' : 'border-slate-500'} flex items-center justify-center text-xs text-white">${paid ? '✓' : ''}</button>
+              <span class="text-sm font-bold ${paid ? 'text-slate-200' : 'text-rose-400'} truncate">${monthLabel}</span>
             </div>
-            <div class="flex items-center gap-3">
-              <span class="text-xs ${paid ? 'text-emerald-400' : 'text-rose-400 font-bold'}">${paid ? '납부 완료' : '미납부'}</span>
-              <button data-mgmtid="${r.id}" data-act="del" class="text-rose-400 hover:text-rose-300 text-xs">삭제</button>
+            <div class="flex items-center gap-3 shrink-0">
+              <span class="text-xs whitespace-nowrap ${paid ? 'text-emerald-400' : 'text-rose-400 font-bold'}">${paid ? '납부 완료' : '미납부'}</span>
+              <button data-mgmtid="${r.id}" data-act="del" class="text-rose-400 hover:text-rose-300 text-xs whitespace-nowrap">삭제</button>
             </div>
           </div>`;
       });
@@ -1586,19 +1586,19 @@
       notes.forEach(n => {
         const date = new Date(n.createdAt).toLocaleString('ko-KR', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
         const costHtml = (n.cost !== null && n.cost !== undefined)
-          ? `<span class="text-sm font-bold text-emerald-400">${n.costType ? escapeHtml(n.costType) + ' ' : ''}${Number(n.cost).toLocaleString('ko-KR')}원</span>`
+          ? `<span class="text-sm font-bold text-emerald-400 break-words">${n.costType ? escapeHtml(n.costType) + ' ' : ''}${Number(n.cost).toLocaleString('ko-KR')}원</span>`
           : '';
         list.innerHTML += `
           <div class="bg-slate-900 rounded-xl p-3 border border-slate-700">
-            <div class="flex items-center justify-between mb-1">
-              <span class="text-xs text-slate-400">${date}</span>
-              <div class="flex items-center gap-2">
-                ${n.image ? `<button data-save-nid="${n.id}" class="text-sky-400 hover:text-sky-300 text-xs">💾 저장</button>` : ''}
-                <button data-nid="${n.id}" class="text-rose-400 hover:text-rose-300 text-xs">삭제</button>
+            <div class="flex items-center justify-between gap-2 mb-1">
+              <span class="text-xs text-slate-400 min-w-0 truncate">${date}</span>
+              <div class="flex items-center gap-2 shrink-0">
+                ${n.image ? `<button data-save-nid="${n.id}" class="text-sky-400 hover:text-sky-300 text-xs whitespace-nowrap">💾 저장</button>` : ''}
+                <button data-nid="${n.id}" class="text-rose-400 hover:text-rose-300 text-xs whitespace-nowrap">삭제</button>
               </div>
             </div>
             ${costHtml ? `<div class="mb-2">${costHtml}</div>` : ''}
-            ${n.text ? `<p class="text-sm text-slate-200 whitespace-pre-wrap mb-2">${escapeHtml(n.text)}</p>` : ''}
+            ${n.text ? `<p class="text-sm text-slate-200 whitespace-pre-wrap break-words mb-2">${escapeHtml(n.text)}</p>` : ''}
             ${n.image ? `<img src="${n.image}" class="w-full max-h-64 object-cover rounded-lg mt-1 cursor-pointer" onclick="openImageViewer('${n.id}')"/>` : ''}
           </div>`;
       });
