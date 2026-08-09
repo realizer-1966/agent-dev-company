@@ -190,6 +190,22 @@
         <div id="rentList" class="space-y-2 max-h-56 overflow-y-auto"></div>
       </div>
 
+      <!-- 관리비 납부 관리 -->
+      <div class="bg-slate-800 border border-slate-600/50 rounded-xl p-4 mb-4">
+        <div class="flex items-center justify-between mb-3">
+          <h4 class="font-bold text-white text-sm">🧾 관리비 납부 관리 <span class="text-xs text-slate-400 ml-1">(관리비 <span id="mgmtMonthRate">0만원</span>/월)</span></h4>
+          <div class="text-right">
+            <p class="text-xs text-slate-400">납부 합계</p>
+            <p class="text-lg font-extrabold text-emerald-400" id="mgmtPaidSum">0원</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 mb-3 items-center">
+          <input id="mgmtMonth" type="month" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 w-full"/>
+          <button id="mgmtAddBtn" class="btn bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold px-4 py-2.5 rounded-xl whitespace-nowrap">+ 납부 기록</button>
+        </div>
+        <div id="mgmtList" class="space-y-2 max-h-56 overflow-y-auto"></div>
+      </div>
+
       <!-- 기록 작성 -->
       <h4 class="font-bold text-white text-sm mb-2">📝 기록 남기기</h4>
       <div class="grid grid-cols-3 gap-2 mb-2">
@@ -502,10 +518,23 @@
         const tenantCount = b.tenants.filter(t => getTenantStatus(t) === 'active').length;
         const colors = ['from-indigo-600 to-purple-600','from-emerald-600 to-teal-600','from-rose-600 to-pink-600','from-amber-500 to-orange-600','from-sky-600 to-blue-600','from-fuchsia-600 to-purple-600'];
         const grad = colors[idx % colors.length];
-        // 입주일(day-of-month)이 매달 1일~오늘 사이인 입주 중(active) 세입자 중, 이번 달(YYYY-MM) 입금내역이
-        // 전혀 없는 세입자만 나열 (기록 유무로 판정, paid 여부 무관). 퇴거(midterm/full) 세입자는 제외.
+        // 금액 현황: 입주 중(active) 세입자 기준
+        const activeTenants = b.tenants.filter(t => getTenantStatus(t) === 'active');
+        // 총액 = 입주중 세입자 (rent + mgmt) 합계 (만원)
+        const totalAmount = activeTenants.reduce((s, t) => s + (Number(t.rent)||0) + (Number(t.mgmt)||0), 0);
+        // 납부액 = 이번 달(YYYY-MM) 입주중 세입자가 실제로 납부한 금액 합계
+        //   = 월세 납부(rentPaid 해당월 paid=true)한 세입자의 rent 합 + 관리비 납부(mgmtPaid 해당월 paid=true)한 세입자의 mgmt 합 (만원)
+        const paidAmount = activeTenants.reduce((s, t) =>
+          s
+          + ((t.rentPaid || []).some(r => r.month === cardMonth && r.paid) ? (Number(t.rent)||0) : 0)
+          + ((t.mgmtPaid || []).some(r => r.month === cardMonth && r.paid) ? (Number(t.mgmt)||0) : 0), 0);
+        const unpaidAmount = totalAmount - paidAmount;
+        // 입주일(day-of-month)이 매달 1일~오늘 사이인 입주 중(active) 세입자 중, 이번 달(YYYY-MM) 월세 입금 또는
+        // 관리비 납부 기록이 하나라도 없는 세입자만 나열 (기록 유무로 판정, paid 여부 무관). 퇴거(midterm/full) 세입자는 제외.
         const recentTenants = getRecentMoveInTenants(b);
-        const unpaidTenants = recentTenants.filter(t => getTenantStatus(t) === 'active' && !(t.rentPaid || []).some(r => r.month === cardMonth));
+        const unpaidTenants = recentTenants.filter(t => getTenantStatus(t) === 'active'
+          && (!(t.rentPaid || []).some(r => r.month === cardMonth)
+           || !(t.mgmtPaid || []).some(r => r.month === cardMonth)));
         let todayHtml;
         if (unpaidTenants.length === 0) {
           todayHtml = `<p class="text-[11px] text-slate-500 mt-3 pt-2 border-t border-slate-700/70">이번 달 입금내역 없음</p>`;
@@ -516,16 +545,23 @@
               <div class="space-y-1">
                 ${unpaidTenants.map(t => {
                   const paid = isRentPaidFor(t, cardMonth);
+                  const mgmtPaid = isMgmtPaidFor(t, cardMonth);
                   return `
                     <div class="flex items-center justify-between bg-slate-900/70 rounded-lg px-2.5 py-1.5">
                       <span class="text-xs text-slate-200 truncate">
                         <span class="text-slate-400">${escapeHtml(t.room || '-')}호</span> ${escapeHtml(t.name)}
                         ${getTenantStatus(t) === 'active' ? '' : '<span class="text-slate-500">(퇴거)</span>'}
                       </span>
-                      <label class="flex items-center gap-1.5 cursor-pointer select-none shrink-0" title="현재 월 월세 입금 여부">
-                        <span class="text-[10px] ${paid ? 'text-emerald-400' : 'text-rose-400 font-bold'}">${paid ? '입금' : '미입금'}</span>
-                        <input type="checkbox" data-todayrent="${t.id}" ${paid ? 'checked' : ''} class="w-4 h-4 accent-emerald-500 cursor-pointer" />
-                      </label>
+                      <div class="flex items-center gap-2.5 shrink-0">
+                        <label class="flex items-center gap-1 cursor-pointer select-none" title="현재 월 월세 입금 여부">
+                          <span class="text-[10px] ${paid ? 'text-emerald-400' : 'text-rose-400 font-bold'}">월세 ${paid ? '입금' : '미입금'}</span>
+                          <input type="checkbox" data-todayrent="${t.id}" ${paid ? 'checked' : ''} class="w-3.5 h-3.5 accent-emerald-500 cursor-pointer" />
+                        </label>
+                        <label class="flex items-center gap-1 cursor-pointer select-none" title="현재 월 관리비 납부 여부">
+                          <span class="text-[10px] ${mgmtPaid ? 'text-emerald-400' : 'text-rose-400 font-bold'}">관리비 ${mgmtPaid ? '납부' : '미납부'}</span>
+                          <input type="checkbox" data-todaymgmt="${t.id}" ${mgmtPaid ? 'checked' : ''} class="w-3.5 h-3.5 accent-emerald-500 cursor-pointer" />
+                        </label>
+                      </div>
                     </div>`;
                 }).join('')}
               </div>
@@ -552,6 +588,14 @@
                 <p class="text-xs text-slate-500">입주중 보증금 합계</p>
               </div>
             </div>
+            <div class="mt-3 pt-2 border-t border-slate-700/70 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+              <span class="text-slate-300">총 <span class="font-bold text-white">${fmtMoney(totalAmount)}</span></span>
+              <span class="text-slate-500">·</span>
+              <span class="text-slate-300">납부 <span class="font-bold text-emerald-400">${fmtMoney(paidAmount)}</span></span>
+              <span class="text-slate-500">·</span>
+              <span class="text-slate-300">미납 <span class="font-bold ${unpaidAmount > 0 ? 'text-rose-400' : 'text-slate-200'}">${fmtMoney(unpaidAmount)}</span></span>
+              <span class="text-[10px] text-slate-500 ml-auto">이번 달 (${cardMonth})</span>
+            </div>
             ${todayHtml}
           </div>`;
       });
@@ -573,7 +617,7 @@
           editBuildingAddress(btn.dataset.bid);
         });
       });
-      // 오늘 입주기념일 세입자의 현재 월 입금 토글 (카드 클릭과 충돌 방지)
+      // 오늘 입주기념일 세입자의 현재 월 월세 입금 토글 (카드 클릭과 충돌 방지)
       grid.querySelectorAll('[data-todayrent]').forEach(cb => {
         cb.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -585,6 +629,20 @@
           const t = b.tenants.find(x => x.id === cb.dataset.todayrent);
           if (!t) return;
           toggleCardRent(t, cb.checked);
+        });
+      });
+      // 오늘 입주기념일 세입자의 현재 월 관리비 납부 토글 (카드 클릭과 충돌 방지)
+      grid.querySelectorAll('[data-todaymgmt]').forEach(cb => {
+        cb.addEventListener('click', (e) => {
+          e.stopPropagation();
+        });
+        cb.addEventListener('change', (e) => {
+          e.stopPropagation();
+          const b = buildings.find(x => x.id === cb.closest('[data-bid]').dataset.bid);
+          if (!b) return;
+          const t = b.tenants.find(x => x.id === cb.dataset.todaymgmt);
+          if (!t) return;
+          toggleCardMgmt(t, cb.checked);
         });
       });
     }
@@ -1197,6 +1255,10 @@
       if (!t.rentPaid) t.rentPaid = [];
       document.getElementById('rentMonthRate').textContent = fmtMoney(t.rent);
       renderRent();
+      // 관리비 납부 관리 초기화
+      if (!t.mgmtPaid) t.mgmtPaid = [];
+      document.getElementById('mgmtMonthRate').textContent = fmtMoney(t.mgmt);
+      renderMgmt();
       renderNotes();
     }
 
@@ -1428,6 +1490,89 @@
       currentTenant.rentPaid = currentTenant.rentPaid.filter(x => x.id !== rid);
       saveBuildings();
       renderRent();
+    }
+
+    // 특정 세입자의 특정 월 관리비 납부 여부 (mgmtPaid에서 조회)
+    function isMgmtPaidFor(t, month) {
+      const rec = (t.mgmtPaid || []).find(r => r.month === month);
+      return !!(rec && rec.paid);
+    }
+
+    // ============ 관리비 납부 관리 ============
+    function renderMgmt() {
+      if (!currentTenant) return;
+      const t = currentTenant;
+      if (!t.mgmtPaid) t.mgmtPaid = [];
+      const list = document.getElementById('mgmtList');
+      list.innerHTML = '';
+      const paidTotal = t.mgmtPaid.reduce((s, r) => s + (r.paid ? ((Number(t.mgmt)||0) * 10000) : 0), 0);
+      document.getElementById('mgmtPaidSum').textContent = paidTotal ? paidTotal.toLocaleString('ko-KR') + '원' : '0원';
+      if (t.mgmtPaid.length === 0) {
+        list.innerHTML = '<p class="text-xs text-slate-500">아직 납부 기록이 없습니다. 년월을 선택해 기록하세요.</p>';
+        return;
+      }
+      t.mgmtPaid.forEach(r => {
+        const monthLabel = formatMonth(r.month);
+        const paid = r.paid;
+        list.innerHTML += `
+          <div class="bg-slate-900 rounded-xl px-3 py-2 border border-slate-700 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <button data-mgmtid="${r.id}" data-act="toggle" class="w-5 h-5 rounded border-2 ${paid ? 'bg-emerald-500 border-emerald-500' : 'border-slate-500'} flex items-center justify-center text-xs text-white">${paid ? '✓' : ''}</button>
+              <span class="text-sm font-bold ${paid ? 'text-slate-200' : 'text-rose-400'}">${monthLabel}</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="text-xs ${paid ? 'text-emerald-400' : 'text-rose-400 font-bold'}">${paid ? '납부 완료' : '미납부'}</span>
+              <button data-mgmtid="${r.id}" data-act="del" class="text-rose-400 hover:text-rose-300 text-xs">삭제</button>
+            </div>
+          </div>`;
+      });
+      list.querySelectorAll('[data-mgmtid]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (btn.dataset.act === 'toggle') toggleMgmtPaid(btn.dataset.mgmtid);
+          else if (btn.dataset.act === 'del') deleteMgmt(btn.dataset.mgmtid);
+        });
+      });
+    }
+
+    function addMgmt() {
+      if (!currentTenant) return;
+      const month = document.getElementById('mgmtMonth').value;
+      if (!month) { alert('납부할 년월을 선택하세요.'); return; }
+      const t = currentTenant;
+      if (!t.mgmtPaid) t.mgmtPaid = [];
+      if (t.mgmtPaid.some(r => r.month === month)) { alert('이미 해당 월의 납부 기록이 있습니다.'); return; }
+      t.mgmtPaid.unshift({ id: genId(), month, paid: true }); // 기본 납부 완료로 기록
+      saveBuildings();
+      renderMgmt();
+      document.getElementById('mgmtMonth').value = '';
+    }
+
+    function toggleMgmtPaid(rid) {
+      if (!currentTenant) return;
+      const r = currentTenant.mgmtPaid.find(x => x.id === rid);
+      if (!r) return;
+      r.paid = !r.paid;
+      saveBuildings();
+      renderMgmt();
+    }
+
+    function deleteMgmt(rid) {
+      if (!currentTenant) return;
+      if (!confirm('이 월 납부 기록을 삭제하시겠습니까?')) return;
+      currentTenant.mgmtPaid = currentTenant.mgmtPaid.filter(x => x.id !== rid);
+      saveBuildings();
+      renderMgmt();
+    }
+
+    // 카드에서 현재 월 관리비 납부 여부 토글 → mgmtPaid upsert
+    function toggleCardMgmt(t, checked) {
+      if (!t.mgmtPaid) t.mgmtPaid = [];
+      const month = todayMonth();
+      const rec = t.mgmtPaid.find(r => r.month === month);
+      if (rec) rec.paid = !!checked;
+      else t.mgmtPaid.push({ id: genId(), month, paid: !!checked });
+      saveBuildings();
+      renderBuildings();
     }
 
     function renderNotes() {
@@ -1822,6 +1967,7 @@
     document.getElementById('rmClose').addEventListener('click', closeRoomHistory);
     document.getElementById('noteAdd').addEventListener('click', addNote);
     document.getElementById('rentAddBtn').addEventListener('click', addRent);
+    document.getElementById('mgmtAddBtn').addEventListener('click', addMgmt);
     document.getElementById('emClose').addEventListener('click', closeEditModal);
     document.getElementById('emCancel').addEventListener('click', closeEditModal);
     document.getElementById('emSave').addEventListener('click', saveEditTenant);
