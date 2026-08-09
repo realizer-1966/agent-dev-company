@@ -1627,53 +1627,35 @@
         totalThisYearDeposit += s.thisYearDeposit; // 당해연도 퇴거 보증금 준비금 (만원)
       });
       const totalRate = totalRentMonths > 0 ? Math.round((totalPaidMonths / totalRentMonths) * 100) : null;
-      // 인원 카드: 건물 / 총 세입자 / 입주 중
+      // 수평 배치용 통계 항목 하나: [아이콘] [라벨 + 값] 을 한 덩어리로 가로 배치
+      const statItem = (icon, label, value, sub, extraTitle) => `
+        <div class="flex items-center gap-3 bg-slate-900 rounded-xl px-3 py-2.5 min-w-[120px] flex-1">
+          <span class="text-xl shrink-0">${icon}</span>
+          <div class="min-w-0 flex-1">
+            <p class="text-[10px] text-slate-400 truncate">${label}</p>
+            <p class="text-lg font-extrabold text-white truncate" ${extraTitle ? `title="${escapeHtml(extraTitle)}"` : ''}>${value}</p>
+            <p class="text-[10px] text-slate-500 truncate">${sub}</p>
+          </div>
+        </div>`;
+      // 인원 카드: 총 건물 / 총 세입자 / 입주 중 → 가로 배치 (모바일은 자동 줄바꿈)
       const personCard = `
         <div class="card bg-slate-800 border border-slate-700 rounded-2xl p-4">
           <p class="text-xs text-slate-400 mb-2">👥 인원 현황</p>
-          <div class="grid grid-cols-3 gap-2 text-center">
-            <div class="bg-slate-900 rounded-xl py-2.5">
-              <p class="text-xs text-slate-400">🏢 총 건물</p>
-              <p class="text-xl font-extrabold text-white mt-0.5">${totalBuildings}개</p>
-              <p class="text-[10px] text-slate-500">건물 수</p>
-            </div>
-            <div class="bg-slate-900 rounded-xl py-2.5">
-              <p class="text-xs text-slate-400">👥 총 세입자</p>
-              <p class="text-xl font-extrabold text-white mt-0.5">${totalTenants}명</p>
-              <p class="text-[10px] text-slate-500">전체 세입자</p>
-            </div>
-            <div class="bg-slate-900 rounded-xl py-2.5">
-              <p class="text-xs text-slate-400">🏠 입주 중</p>
-              <p class="text-xl font-extrabold text-white mt-0.5">${totalActive}명</p>
-              <p class="text-[10px] text-slate-500">현재 입주</p>
-            </div>
+          <div class="flex flex-wrap gap-2">
+            ${statItem('🏢', '총 건물', `${totalBuildings}개`, '건물 수')}
+            ${statItem('👥', '총 세입자', `${totalTenants}명`, '전체 세입자')}
+            ${statItem('🏠', '입주 중', `${totalActive}명`, '현재 입주')}
           </div>
         </div>`;
-      // 금액 카드: 월세 / 관리비 / 누적 입금 / 당해연도 퇴거 보증금 준비금
+      // 금액 카드: 월세 / 관리비 / 누적 입금 / 당해연도 퇴거 보증금 준비금 → 가로 배치
       const amountCard = `
         <div class="card bg-slate-800 border border-slate-700 rounded-2xl p-4">
           <p class="text-xs text-slate-400 mb-2">💵 금액 현황</p>
-          <div class="grid grid-cols-2 gap-2 text-center">
-            <div class="bg-slate-900 rounded-xl py-2.5">
-              <p class="text-xs text-slate-400">💰 월세 수입</p>
-              <p class="text-lg font-extrabold text-white mt-0.5 truncate" title="${escapeHtml(fmtMoney(totalRent))}">${fmtMoney(totalRent)}</p>
-              <p class="text-[10px] text-slate-500">입주중 월세 합계</p>
-            </div>
-            <div class="bg-slate-900 rounded-xl py-2.5">
-              <p class="text-xs text-slate-400">🧾 관리비</p>
-              <p class="text-lg font-extrabold text-white mt-0.5 truncate" title="${escapeHtml(fmtMoney(totalMgmt))}">${fmtMoney(totalMgmt)}</p>
-              <p class="text-[10px] text-slate-500">입주중 관리비 합계</p>
-            </div>
-            <div class="bg-slate-900 rounded-xl py-2.5">
-              <p class="text-xs text-slate-400">💵 누적 입금</p>
-              <p class="text-lg font-extrabold text-white mt-0.5 truncate" title="${escapeHtml(totalPaid ? totalPaid.toLocaleString('ko-KR') + '원' : '0원')}">${totalPaid ? totalPaid.toLocaleString('ko-KR') + '원' : '0원'}</p>
-              <p class="text-[10px] text-slate-500">입금 완료 합계</p>
-            </div>
-            <div class="bg-slate-900 rounded-xl py-2.5">
-              <p class="text-xs text-slate-400">🪙 당해연도 퇴거 보증금</p>
-              <p class="text-lg font-extrabold text-white mt-0.5 truncate" title="${escapeHtml(fmtMoney(totalThisYearDeposit))}">${fmtMoney(totalThisYearDeposit)}</p>
-              <p class="text-[10px] text-slate-500">${new Date().getFullYear()}년 퇴거 예정/기준 보증금</p>
-            </div>
+          <div class="flex flex-wrap gap-2">
+            ${statItem('💰', '월세 수입', `${fmtMoney(totalRent)}`, '입주중 월세 합계', fmtMoney(totalRent))}
+            ${statItem('🧾', '관리비', `${fmtMoney(totalMgmt)}`, '입주중 관리비 합계', fmtMoney(totalMgmt))}
+            ${statItem('💵', '누적 입금', `${totalPaid ? totalPaid.toLocaleString('ko-KR') + '원' : '0원'}`, '입금 완료 합계', totalPaid ? totalPaid.toLocaleString('ko-KR') + '원' : '0원')}
+            ${statItem('🪙', '당해연도 퇴거 보증금', `${fmtMoney(totalThisYearDeposit)}`, `${new Date().getFullYear()}년 퇴거 예정/기준 보증금`, fmtMoney(totalThisYearDeposit))}
           </div>
         </div>`;
       el.innerHTML = personCard + amountCard;
