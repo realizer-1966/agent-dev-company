@@ -1700,7 +1700,7 @@
       const n3m = next3MonthsYM();
       let total = 0, count = 0;
       (tenants || []).forEach(t => {
-        if (t.moveOut && n3m.some(mm => mm.ym === String(t.moveOut).slice(0, 7))) {
+        if (getTenantStatus(t) === 'active' && t.moveOut && n3m.some(mm => mm.ym === String(t.moveOut).slice(0, 7))) {
           total += Number(t.deposit) || 0;
           count++;
         }
@@ -1712,7 +1712,7 @@
       return next3MonthsYM().map(mm => {
         let total = 0; const tenants = [];
         buildings.forEach(b => (b.tenants || []).forEach(t => {
-          if (t.moveOut && String(t.moveOut).slice(0, 7) === mm.ym) {
+          if (getTenantStatus(t) === 'active' && t.moveOut && String(t.moveOut).slice(0, 7) === mm.ym) {
             total += Number(t.deposit) || 0;
             tenants.push({ building: b.name, room: t.room, name: t.name, deposit: Number(t.deposit) || 0 });
           }
@@ -1746,6 +1746,7 @@
       // 당해연도 퇴거 보증금 준비금: moveOut 연도가 올해인 세입자의 deposit 합계 (만원)
       const thisYear = new Date().getFullYear();
       const thisYearDeposit = tenants.reduce((s, t) => {
+        if (getTenantStatus(t) !== 'active') return s;
         const y = t.moveOut ? Number(String(t.moveOut).slice(0, 4)) : NaN;
         return y === thisYear ? s + (Number(t.deposit) || 0) : s;
       }, 0);
