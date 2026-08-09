@@ -68,12 +68,6 @@
         </div>
       </div>
 
-      <!-- 입금률 -->
-      <div class="bg-slate-800 rounded-2xl p-5 mb-6 border border-slate-700">
-        <h3 class="font-bold text-white mb-3">💰 월세 입금률</h3>
-        <div id="paymentRate" class="space-y-3"></div>
-      </div>
-
       <!-- 건물별 통계 -->
       <h3 class="font-bold text-white mb-3">🏢 건물별 통계</h3>
       <div id="statsBuildings" class="grid md:grid-cols-2 gap-4"></div>
@@ -1734,11 +1728,6 @@
       const tenantCosts = tenants.reduce((s, t) =>
         s + (t.notes || []).reduce((ss, n) => ss + (Number(n.cost) || 0), 0), 0);
       const totalCost = commonCosts + tenantCosts; // 원
-      // 입금률
-      const rentMonths = tenants.reduce((s, t) => s + (t.rentPaid || []).length, 0);
-      const paidMonths = tenants.reduce((s, t) =>
-        s + ((t.rentPaid || []).filter(r => r.paid).length), 0);
-      const rate = rentMonths > 0 ? Math.round((paidMonths / rentMonths) * 100) : null;
       // 비어있는 방(호실): 한 번이라도 호실을 가진 방 중 현재 입주중인 세입자가 없는 방
       const roomMap = {};
       tenants.forEach(t => { if (t.room) (roomMap[t.room] = roomMap[t.room] || []).push(t); });
@@ -1750,30 +1739,7 @@
         const y = t.moveOut ? Number(String(t.moveOut).slice(0, 4)) : NaN;
         return y === thisYear ? s + (Number(t.deposit) || 0) : s;
       }, 0);
-      return { tenants, active, monthlyRent, activeRent, activeMgmt, paidRent, totalCost, rate, emptyRooms, rentMonths, paidMonths, thisYearDeposit, next3MonthsDeposit: sumNext3MonthsDeposit(tenants) };
-    }
-
-    // 입금률 바
-    function renderRateBar(label, rate, months) {
-      if (rate === null) {
-        return `<div class="bg-slate-900 rounded-xl px-4 py-3 border border-slate-700">
-          <div class="flex items-center justify-between mb-1.5">
-            <span class="text-sm font-bold text-white">${label}</span>
-            <span class="text-xs text-slate-400">${months}개월 · 입금 기록 없음</span>
-          </div>
-          <div class="w-full h-2.5 bg-slate-700 rounded-full overflow-hidden"><div class="h-full w-0 bg-slate-500"></div></div>
-        </div>`;
-      }
-      const color = rate >= 90 ? 'bg-emerald-500' : (rate >= 50 ? 'bg-amber-500' : 'bg-rose-500');
-      return `<div class="bg-slate-900 rounded-xl px-4 py-3 border border-slate-700">
-        <div class="flex items-center justify-between mb-1.5">
-          <span class="text-sm font-bold text-white">${label}</span>
-          <span class="text-sm font-extrabold ${rate >= 90 ? 'text-emerald-400' : (rate >= 50 ? 'text-amber-400' : 'text-rose-400')}">${rate}%</span>
-        </div>
-        <div class="w-full h-2.5 bg-slate-700 rounded-full overflow-hidden">
-          <div class="h-full ${color} rounded-full" style="width:${Math.max(rate, 4)}%"></div>
-        </div>
-      </div>`;
+      return { tenants, active, monthlyRent, activeRent, activeMgmt, paidRent, totalCost, emptyRooms, thisYearDeposit, next3MonthsDeposit: sumNext3MonthsDeposit(tenants) };
     }
 
     // 건물별 통계 카드
@@ -1820,10 +1786,6 @@
               <span class="font-bold text-emerald-400">${s.paidRent ? s.paidRent.toLocaleString('ko-KR') + '원' : '0원'}</span>
             </div>
             <div class="flex justify-between items-center bg-slate-900 rounded-lg px-3 py-2">
-              <span class="text-xs text-slate-400">월세 입금률</span>
-              <span class="font-bold ${s.rate === null ? 'text-slate-400' : (s.rate >= 90 ? 'text-emerald-400' : (s.rate >= 50 ? 'text-amber-400' : 'text-rose-400'))}">${s.rate === null ? '-' : s.rate + '%'}</span>
-            </div>
-            <div class="flex justify-between items-center bg-slate-900 rounded-lg px-3 py-2">
               <span class="text-xs text-slate-400">🪙 당해연도 퇴거 보증금 준비금</span>
               <span class="font-bold text-emerald-400">${fmtMoney(s.thisYearDeposit)}</span>
             </div>
@@ -1854,17 +1816,6 @@
 
     function renderStats() {
       renderNext3Months();
-      // 입금률
-      const prEl = document.getElementById('paymentRate');
-      prEl.innerHTML = '';
-      let tRm = 0, tPm = 0;
-      buildings.forEach(b => {
-        const s = computeBuildingStats(b);
-        prEl.innerHTML += renderRateBar(escapeHtml(b.name), s.rate, s.rentMonths);
-        tRm += s.rentMonths; tPm += s.paidMonths;
-      });
-      const totalRate = tRm > 0 ? Math.round((tPm / tRm) * 100) : null;
-      prEl.innerHTML = renderRateBar('<span class="text-emerald-400">전체</span> 입금률', totalRate, tRm) + prEl.innerHTML;
       // 건물별 통계
       const sbEl = document.getElementById('statsBuildings');
       if (buildings.length === 0) {
