@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "unit-converter-skill"
+version = "0.1.0"
+description = "Edge AI Gallery Agent Skill: 단위 변환기 (온도/길이/무게/부피/속도/데이터)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Agent Dev Company" }]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-cov", "pytest-mock"]
+
+[tool.setuptools.packages.find]
+include = ["unit_converter*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

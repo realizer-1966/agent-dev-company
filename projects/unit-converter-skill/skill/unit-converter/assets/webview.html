@@ -1,0 +1,293 @@
+<!--
+ Unit Converter — Interactive WebView
+
+ Rendered inside the Edge AI Gallery chat as an inline webview.
+ Supports three modes via URL query params:
+   - action=convert:      show single conversion result
+   - action=convert_all:  show all-unit equivalents
+   - action=dashboard:    full interactive converter with live input
+
+ @license Apache-2.0
+-->
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>단위 변환기</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff; padding: 16px; min-height: 100vh;
+        }
+        .header {
+            text-align: center; margin-bottom: 20px;
+        }
+        .header h1 { font-size: 1.4rem; font-weight: 700; }
+        .header p { font-size: 0.8rem; opacity: 0.8; margin-top: 4px; }
+
+        .card {
+            background: rgba(255,255,255,0.15); border-radius: 16px;
+            padding: 20px; margin-bottom: 12px;
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+        }
+
+        .category-tabs {
+            display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px;
+        }
+        .category-tabs button {
+            flex: 1; min-width: 70px; padding: 8px 4px;
+            border: none; border-radius: 10px; font-size: 0.72rem; font-weight: 600;
+            background: rgba(255,255,255,0.15); color: #fff; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .category-tabs button.active {
+            background: #fff; color: #667eea; box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+        }
+
+        .input-row { display: flex; gap: 8px; align-items: center; }
+        .input-row input[type="number"] {
+            flex: 1; padding: 12px 14px; border: none; border-radius: 10px;
+            font-size: 1.1rem; font-weight: 600; color: #333; outline: none;
+            background: #fff; min-width: 0;
+        }
+        .input-row select {
+            padding: 12px 8px; border: none; border-radius: 10px;
+            font-size: 0.85rem; color: #333; outline: none;
+            background: #fff; cursor: pointer; max-width: 100px;
+        }
+
+        .arrow { text-align: center; font-size: 1.2rem; margin: 12px 0; opacity: 0.7; }
+
+        .result-box {
+            background: rgba(255,255,255,0.2); border-radius: 12px;
+            padding: 16px; text-align: center; margin-top: 12px;
+        }
+        .result-box .value { font-size: 1.8rem; font-weight: 700; }
+        .result-box .unit { font-size: 0.85rem; opacity: 0.8; }
+
+        .all-results { margin-top: 12px; }
+        .all-results h3 { font-size: 0.8rem; opacity: 0.8; margin-bottom: 8px; }
+        .all-results .row {
+            display: flex; justify-content: space-between;
+            padding: 8px 12px; margin-bottom: 4px;
+            background: rgba(255,255,255,0.1); border-radius: 8px;
+            font-size: 0.85rem;
+        }
+        .all-results .row .val { font-weight: 700; }
+        .all-results .row .unit-name { opacity: 0.7; }
+
+        .info { text-align: center; font-size: 0.7rem; opacity: 0.5; margin-top: 16px; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>📐 단위 변환기</h1>
+    <p>온도 · 길이 · 무게 · 부피 · 속도 · 데이터</p>
+</div>
+
+<div id="app">
+    <div class="card">
+        <div class="category-tabs" id="categoryTabs"></div>
+
+        <div class="input-row">
+            <input type="number" id="valueInput" value="1" placeholder="값 입력" step="any">
+            <select id="fromUnit"></select>
+        </div>
+
+        <div class="arrow">⬇️</div>
+
+        <div class="input-row">
+            <div style="flex:1"></div>
+            <select id="toUnit"></select>
+        </div>
+
+        <div class="result-box" id="resultBox">
+            <div class="value" id="resultValue">—</div>
+            <div class="unit" id="resultUnit"></div>
+        </div>
+    </div>
+
+    <div class="card all-results" id="allResultsCard" style="display:none">
+        <h3>모든 단위로 변환</h3>
+        <div id="allResults"></div>
+    </div>
+</div>
+
+<div class="info">Edge AI Gallery · Unit Converter Skill</div>
+
+<script>
+    // ── Unit definitions (mirror index.html) ──────────────────────────
+    const CATEGORIES = {
+        temperature: { celsius: 1, fahrenheit: 1, kelvin: 1 },
+        length: { meter: 1, kilometer: 1000, centimeter: 0.01, mile: 1609.344, inch: 0.0254, foot: 0.3048, yard: 0.9144 },
+        weight: { kilogram: 1, gram: 0.001, pound: 0.45359237, ounce: 0.028349523, ton: 1000 },
+        volume: { liter: 1, milliliter: 0.001, gallon: 3.785411784, cup: 0.2365882365 },
+        speed: { mps: 1, kmh: 0.277777778, mph: 0.44704, knot: 0.514444444 },
+        data: { byte: 1, kilobyte: 1024, megabyte: 1048576, gigabyte: 1073741824, terabyte: 1099511627776 }
+    };
+
+    const CATEGORY_LABELS = {
+        temperature: '🌡️ 온도', length: '📏 길이', weight: '⚖️ 무게',
+        volume: '🧊 부피', speed: '🚗 속도', data: '💾 데이터'
+    };
+
+    const UNIT_LABELS = {
+        celsius: '°C', fahrenheit: '°F', kelvin: 'K',
+        meter: 'm', kilometer: 'km', centimeter: 'cm', mile: 'mi', inch: 'in', foot: 'ft', yard: 'yd',
+        kilogram: 'kg', gram: 'g', pound: 'lb', ounce: 'oz', ton: 't',
+        liter: 'L', milliliter: 'mL', gallon: 'gal', cup: 'cup',
+        mps: 'm/s', kmh: 'km/h', mph: 'mph', knot: 'knot',
+        byte: 'B', kilobyte: 'KB', megabyte: 'MB', gigabyte: 'GB', terabyte: 'TB'
+    };
+
+    // ── Conversion logic ──────────────────────────────────────────────
+    function convertTemp(val, from, to) {
+        let c;
+        if (from === 'celsius') c = val;
+        else if (from === 'fahrenheit') c = (val - 32) * 5 / 9;
+        else if (from === 'kelvin') c = val - 273.15;
+        if (to === 'celsius') return c;
+        if (to === 'fahrenheit') return c * 9 / 5 + 32;
+        if (to === 'kelvin') return c + 273.15;
+    }
+
+    function convert(val, from, to, category) {
+        if (from === to) return val;
+        if (category === 'temperature') return convertTemp(val, from, to);
+        const units = CATEGORIES[category];
+        return (val * units[from]) / units[to];
+    }
+
+    function fmt(n) {
+        if (Math.abs(n) >= 100) return n.toFixed(2);
+        if (Math.abs(n) >= 1) return parseFloat(n.toFixed(4)).toString();
+        return parseFloat(n.toFixed(6)).toString();
+    }
+
+    // ── UI rendering ──────────────────────────────────────────────────
+    let currentCategory = 'length';
+
+    function renderTabs() {
+        const tabs = document.getElementById('categoryTabs');
+        tabs.innerHTML = '';
+        for (const [cat, label] of Object.entries(CATEGORY_LABELS)) {
+            const btn = document.createElement('button');
+            btn.textContent = label;
+            if (cat === currentCategory) btn.classList.add('active');
+            btn.onclick = () => { currentCategory = cat; renderAll(); };
+            tabs.appendChild(btn);
+        }
+    }
+
+    function populateSelect(sel, exclude) {
+        sel.innerHTML = '';
+        for (const unit of Object.keys(CATEGORIES[currentCategory])) {
+            if (unit === exclude) continue;
+            const opt = document.createElement('option');
+            opt.value = unit;
+            opt.textContent = UNIT_LABELS[unit] || unit;
+            sel.appendChild(opt);
+        }
+    }
+
+    function renderAll() {
+        renderTabs();
+        const fromSel = document.getElementById('fromUnit');
+        const toSel = document.getElementById('toUnit');
+        populateSelect(fromSel);
+        populateSelect(toSel);
+        if (fromSel.options.length > 0) fromSel.selectedIndex = 0;
+        if (toSel.options.length > 1) toSel.selectedIndex = 1;
+        else if (toSel.options.length > 0) toSel.selectedIndex = 0;
+        updateResult();
+    }
+
+    function updateResult() {
+        const val = parseFloat(document.getElementById('valueInput').value);
+        const fromUnit = document.getElementById('fromUnit').value;
+        const toUnit = document.getElementById('toUnit').value;
+
+        if (isNaN(val)) {
+            document.getElementById('resultValue').textContent = '—';
+            document.getElementById('resultUnit').textContent = '';
+            return;
+        }
+
+        try {
+            const result = convert(val, fromUnit, toUnit, currentCategory);
+            document.getElementById('resultValue').textContent = fmt(result);
+            document.getElementById('resultUnit').textContent =
+                UNIT_LABELS[toUnit] || toUnit;
+
+            // Also update all-results
+            const allDiv = document.getElementById('allResults');
+            allDiv.innerHTML = '';
+            for (const [unit, _] of Object.entries(CATEGORIES[currentCategory])) {
+                if (unit === fromUnit) continue;
+                const r = convert(val, fromUnit, unit, currentCategory);
+                const row = document.createElement('div');
+                row.className = 'row';
+                row.innerHTML = `<span class="unit-name">${UNIT_LABELS[unit] || unit}</span><span class="val">${fmt(r)}</span>`;
+                allDiv.appendChild(row);
+            }
+            document.getElementById('allResultsCard').style.display = 'block';
+        } catch (e) {
+            document.getElementById('resultValue').textContent = '오류';
+            document.getElementById('resultUnit').textContent = e.message;
+        }
+    }
+
+    // ── Init from URL params ──────────────────────────────────────────
+    function init() {
+        const params = new URLSearchParams(location.search);
+        const action = params.get('action');
+        const cat = params.get('category');
+        const val = params.get('value');
+        const fromUnit = params.get('from_unit');
+
+        if (cat && CATEGORIES[cat]) currentCategory = cat;
+
+        renderAll();
+
+        if (val !== null) {
+            document.getElementById('valueInput').value = val;
+        }
+        if (fromUnit) {
+            const fromSel = document.getElementById('fromUnit');
+            for (let i = 0; i < fromSel.options.length; i++) {
+                if (fromSel.options[i].value === fromUnit) {
+                    fromSel.selectedIndex = i; break;
+                }
+            }
+        }
+
+        // For convert action, set the toUnit if provided
+        if (action === 'convert') {
+            const toUnit = params.get('to_unit');
+            if (toUnit) {
+                const toSel = document.getElementById('toUnit');
+                for (let i = 0; i < toSel.options.length; i++) {
+                    if (toSel.options[i].value === toUnit) {
+                        toSel.selectedIndex = i; break;
+                    }
+                }
+            }
+        }
+
+        updateResult();
+    }
+
+    // Event listeners
+    document.getElementById('valueInput').addEventListener('input', updateResult);
+    document.getElementById('fromUnit').addEventListener('change', updateResult);
+    document.getElementById('toUnit').addEventListener('change', updateResult);
+
+    init();
+</script>
+</body>
+</html>

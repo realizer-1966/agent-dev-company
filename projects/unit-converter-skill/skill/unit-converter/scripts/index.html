@@ -1,0 +1,234 @@
+<!--
+ Unit Converter Skill — Edge AI Gallery JS entry point.
+
+ Implements window['ai_edge_gallery_get_result'] with three actions:
+   - "convert":      single unit → unit conversion
+   - "convert_all":  single unit → all units in category
+   - "dashboard":    returns interactive webview
+
+ @license Apache-2.0
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unit Converter</title>
+</head>
+<body>
+<script>
+    // ─── Unit definitions (mirrors Python converter.py) ──────────────
+
+    const CATEGORIES = {
+        temperature: { celsius: 1, fahrenheit: 1, kelvin: 1 },
+        length: {
+            meter: 1, kilometer: 1000, centimeter: 0.01,
+            mile: 1609.344, inch: 0.0254, foot: 0.3048, yard: 0.9144
+        },
+        weight: {
+            kilogram: 1, gram: 0.001, pound: 0.45359237,
+            ounce: 0.028349523, ton: 1000
+        },
+        volume: {
+            liter: 1, milliliter: 0.001, gallon: 3.785411784, cup: 0.2365882365
+        },
+        speed: {
+            mps: 1, kmh: 0.277777778, mph: 0.44704, knot: 0.514444444
+        },
+        data: {
+            byte: 1, kilobyte: 1024, megabyte: 1048576,
+            gigabyte: 1073741824, terabyte: 1099511627776
+        }
+    };
+
+    // Aliases: common abbreviations → canonical unit names
+    const ALIASES = {
+        c: 'celsius', celsius: 'celsius', '°c': 'celsius', centigrade: 'celsius',
+        f: 'fahrenheit', fahrenheit: 'fahrenheit', '°f': 'fahrenheit',
+        k: 'kelvin', kelvin: 'kelvin',
+        m: 'meter', meter: 'meter', meters: 'meter', mtr: 'meter',
+        km: 'kilometer', kilometer: 'kilometer', kilometers: 'kilometer',
+        cm: 'centimeter', centimeter: 'centimeter', centimeters: 'centimeter',
+        mi: 'mile', mile: 'mile', miles: 'mile',
+        in: 'inch', inch: 'inch', inches: 'inch',
+        ft: 'foot', foot: 'foot', feet: 'foot',
+        yd: 'yard', yard: 'yard', yards: 'yard',
+        kg: 'kilogram', kilogram: 'kilogram', kilograms: 'kilogram',
+        g: 'gram', gram: 'gram', grams: 'gram',
+        lb: 'pound', pound: 'pound', pounds: 'pound', lbs: 'pound',
+        oz: 'ounce', ounce: 'ounce', ounces: 'ounce',
+        t: 'ton', ton: 'ton', tons: 'ton', tonne: 'ton',
+        l: 'liter', liter: 'liter', liters: 'liter', litre: 'liter',
+        ml: 'milliliter', milliliter: 'milliliter', milliliters: 'milliliter',
+        gal: 'gallon', gallon: 'gallon', gallons: 'gallon',
+        cup: 'cup', cups: 'cup',
+        'm/s': 'mps', mps: 'mps',
+        'km/h': 'kmh', kmh: 'kmh', kph: 'kmh',
+        'mph': 'mph', mph: 'mph',
+        knot: 'knot', knots: 'knot', kn: 'knot',
+        b: 'byte', byte: 'byte', bytes: 'byte',
+        kb: 'kilobyte', kilobyte: 'kilobyte', kilobytes: 'kilobyte',
+        mb: 'megabyte', megabyte: 'megabyte', megabytes: 'megabyte',
+        gb: 'gigabyte', gigabyte: 'gigabyte', gigabytes: 'gigabyte',
+        tb: 'terabyte', terabyte: 'terabyte', terabytes: 'terabyte'
+    };
+
+    // ─── Helpers ─────────────────────────────────────────────────────
+
+    function normalizeUnit(unit) {
+        if (!unit) return null;
+        const lower = String(unit).toLowerCase().trim();
+        return ALIASES[lower] || lower;
+    }
+
+    function detectCategory(unit) {
+        const canonical = normalizeUnit(unit);
+        for (const [cat, units] of Object.entries(CATEGORIES)) {
+            if (units.hasOwnProperty(canonical)) return cat;
+        }
+        return null;
+    }
+
+    function convertTemperature(value, fromUnit, toUnit) {
+        let celsius;
+        if (fromUnit === 'celsius') celsius = value;
+        else if (fromUnit === 'fahrenheit') celsius = (value - 32) * 5 / 9;
+        else if (fromUnit === 'kelvin') celsius = value - 273.15;
+        else throw new Error(`Unknown temperature unit: ${fromUnit}`);
+
+        if (celsius < -273.15) {
+            throw new Error(`Temperature ${value} ${fromUnit} is below absolute zero`);
+        }
+
+        if (toUnit === 'celsius') return celsius;
+        if (toUnit === 'fahrenheit') return celsius * 9 / 5 + 32;
+        if (toUnit === 'kelvin') return celsius + 273.15;
+        throw new Error(`Unknown temperature unit: ${toUnit}`);
+    }
+
+    function convertValue(value, fromUnit, toUnit) {
+        const fu = normalizeUnit(fromUnit);
+        const tu = normalizeUnit(toUnit);
+        const fromCat = detectCategory(fu);
+        const toCat = detectCategory(tu);
+
+        if (!fromCat) throw new Error(`Unknown unit: ${fromUnit}`);
+        if (!toCat) throw new Error(`Unknown unit: ${toUnit}`);
+        if (fromCat !== toCat) {
+            throw new Error(`Cannot convert ${fromUnit} (${fromCat}) to ${toUnit} (${toCat}) — different categories`);
+        }
+        if (fu === tu) return value;
+
+        if (fromCat === 'temperature') {
+            return convertTemperature(value, fu, tu);
+        }
+
+        const units = CATEGORIES[fromCat];
+        const baseValue = value * units[fu];
+        return baseValue / units[tu];
+    }
+
+    function convertAllUnits(value, fromUnit) {
+        const fu = normalizeUnit(fromUnit);
+        const cat = detectCategory(fu);
+        if (!cat) throw new Error(`Unknown unit: ${fromUnit}`);
+
+        const results = {};
+        for (const unit of Object.keys(CATEGORIES[cat])) {
+            if (unit === fu) continue;
+            results[unit] = convertValue(value, fu, unit);
+        }
+        return results;
+    }
+
+    function formatNumber(n) {
+        if (Math.abs(n) >= 100) return n.toFixed(2);
+        if (Math.abs(n) >= 1) return parseFloat(n.toFixed(4)).toString();
+        return parseFloat(n.toFixed(6)).toString();
+    }
+
+    // ─── Main entry point ────────────────────────────────────────────
+
+    window['ai_edge_gallery_get_result'] = async function(data) {
+        try {
+            const params = JSON.parse(data);
+            const action = params.action || 'convert';
+
+            if (action === 'convert') {
+                const value = parseFloat(params.value);
+                const fromUnit = normalizeUnit(params.from_unit);
+                const toUnit = normalizeUnit(params.to_unit);
+
+                if (isNaN(value)) throw new Error('value is required and must be a number');
+                if (!fromUnit) throw new Error('from_unit is required');
+                if (!toUnit) throw new Error('to_unit is required');
+
+                const result = convertValue(value, fromUnit, toUnit);
+                const formatted = formatNumber(result);
+
+                return JSON.stringify({
+                    result: `${params.value} ${params.from_unit} = ${formatted} ${params.to_unit}`,
+                    webview: {
+                        url: `../assets/webview.html?action=convert&value=${encodeURIComponent(params.value)}&from_unit=${encodeURIComponent(fromUnit)}&to_unit=${encodeURIComponent(toUnit)}&result=${encodeURIComponent(formatted)}`,
+                        aspectRatio: 1.5
+                    }
+                });
+
+            } else if (action === 'convert_all') {
+                const value = parseFloat(params.value);
+                const fromUnit = normalizeUnit(params.from_unit);
+
+                if (isNaN(value)) throw new Error('value is required and must be a number');
+                if (!fromUnit) throw new Error('from_unit is required');
+
+                const allResults = convertAllUnits(value, fromUnit);
+                const lines = Object.entries(allResults)
+                    .map(([unit, val]) => `${formatNumber(val)} ${unit}`)
+                    .join('\n');
+
+                const webviewParams = new URLSearchParams({
+                    action: 'convert_all',
+                    value: params.value,
+                    from_unit: fromUnit,
+                    results: JSON.stringify(allResults)
+                });
+
+                return JSON.stringify({
+                    result: `${params.value} ${params.from_unit} equals:\n${lines}`,
+                    webview: {
+                        url: `../assets/webview.html?${webviewParams.toString()}`,
+                        aspectRatio: 1.5
+                    }
+                });
+
+            } else if (action === 'dashboard') {
+                const dashParams = new URLSearchParams({
+                    action: 'dashboard'
+                });
+                if (params.category) dashParams.set('category', params.category);
+                if (params.value !== undefined) dashParams.set('value', params.value);
+                if (params.from_unit) dashParams.set('from_unit', normalizeUnit(params.from_unit));
+
+                return JSON.stringify({
+                    result: 'Opening the unit converter dashboard. Tap the preview card to interact.',
+                    webview: {
+                        url: `../assets/webview.html?${dashParams.toString()}`,
+                        aspectRatio: 1.6
+                    }
+                });
+
+            } else {
+                throw new Error(`Unknown action: ${action}. Use "convert", "convert_all", or "dashboard".`);
+            }
+
+        } catch (e) {
+            return JSON.stringify({
+                result: null,
+                error: e.message
+            });
+        }
+    };
+</script>
+</body>
+</html>
