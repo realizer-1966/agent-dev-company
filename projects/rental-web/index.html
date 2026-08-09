@@ -1627,22 +1627,56 @@
         totalThisYearDeposit += s.thisYearDeposit; // 당해연도 퇴거 보증금 준비금 (만원)
       });
       const totalRate = totalRentMonths > 0 ? Math.round((totalPaidMonths / totalRentMonths) * 100) : null;
-      const cards = [
-        { icon: '🏢', label: '총 건물', value: `${totalBuildings}개`, sub: '건물 수' },
-        { icon: '👥', label: '총 세입자', value: `${totalTenants}명`, sub: '전체 세입자' },
-        { icon: '🏠', label: '입주 중', value: `${totalActive}명`, sub: '현재 입주' },
-        { icon: '💰', label: '월세 수입', value: fmtMoney(totalRent), sub: '입주중 월세 합계' },
-        { icon: '🧾', label: '관리비', value: fmtMoney(totalMgmt), sub: '입주중 관리비 합계' },
-        { icon: '💵', label: '누적 입금', value: totalPaid ? totalPaid.toLocaleString('ko-KR') + '원' : '0원', sub: '입금 완료 합계' },
-        { icon: '🪙', label: `당해연도 퇴거 보증금 준비금`, value: fmtMoney(totalThisYearDeposit), sub: `${new Date().getFullYear()}년 퇴거 예정/기준 보증금` },
-      ];
-      el.innerHTML = cards.map(c => `
+      // 인원 카드: 건물 / 총 세입자 / 입주 중
+      const personCard = `
         <div class="card bg-slate-800 border border-slate-700 rounded-2xl p-4">
-          <p class="text-2xl mb-2">${c.icon}</p>
-          <p class="text-xs text-slate-400">${c.label}</p>
-          <p class="text-xl font-extrabold text-white mt-0.5 truncate" title="${escapeHtml(c.value)}">${c.value}</p>
-          <p class="text-[11px] text-slate-500 mt-0.5">${c.sub}</p>
-        </div>`).join('');
+          <p class="text-xs text-slate-400 mb-2">👥 인원 현황</p>
+          <div class="grid grid-cols-3 gap-2 text-center">
+            <div class="bg-slate-900 rounded-xl py-2.5">
+              <p class="text-xs text-slate-400">🏢 총 건물</p>
+              <p class="text-xl font-extrabold text-white mt-0.5">${totalBuildings}개</p>
+              <p class="text-[10px] text-slate-500">건물 수</p>
+            </div>
+            <div class="bg-slate-900 rounded-xl py-2.5">
+              <p class="text-xs text-slate-400">👥 총 세입자</p>
+              <p class="text-xl font-extrabold text-white mt-0.5">${totalTenants}명</p>
+              <p class="text-[10px] text-slate-500">전체 세입자</p>
+            </div>
+            <div class="bg-slate-900 rounded-xl py-2.5">
+              <p class="text-xs text-slate-400">🏠 입주 중</p>
+              <p class="text-xl font-extrabold text-white mt-0.5">${totalActive}명</p>
+              <p class="text-[10px] text-slate-500">현재 입주</p>
+            </div>
+          </div>
+        </div>`;
+      // 금액 카드: 월세 / 관리비 / 누적 입금 / 당해연도 퇴거 보증금 준비금
+      const amountCard = `
+        <div class="card bg-slate-800 border border-slate-700 rounded-2xl p-4">
+          <p class="text-xs text-slate-400 mb-2">💵 금액 현황</p>
+          <div class="grid grid-cols-2 gap-2 text-center">
+            <div class="bg-slate-900 rounded-xl py-2.5">
+              <p class="text-xs text-slate-400">💰 월세 수입</p>
+              <p class="text-lg font-extrabold text-white mt-0.5 truncate" title="${escapeHtml(fmtMoney(totalRent))}">${fmtMoney(totalRent)}</p>
+              <p class="text-[10px] text-slate-500">입주중 월세 합계</p>
+            </div>
+            <div class="bg-slate-900 rounded-xl py-2.5">
+              <p class="text-xs text-slate-400">🧾 관리비</p>
+              <p class="text-lg font-extrabold text-white mt-0.5 truncate" title="${escapeHtml(fmtMoney(totalMgmt))}">${fmtMoney(totalMgmt)}</p>
+              <p class="text-[10px] text-slate-500">입주중 관리비 합계</p>
+            </div>
+            <div class="bg-slate-900 rounded-xl py-2.5">
+              <p class="text-xs text-slate-400">💵 누적 입금</p>
+              <p class="text-lg font-extrabold text-white mt-0.5 truncate" title="${escapeHtml(totalPaid ? totalPaid.toLocaleString('ko-KR') + '원' : '0원')}">${totalPaid ? totalPaid.toLocaleString('ko-KR') + '원' : '0원'}</p>
+              <p class="text-[10px] text-slate-500">입금 완료 합계</p>
+            </div>
+            <div class="bg-slate-900 rounded-xl py-2.5">
+              <p class="text-xs text-slate-400">🪙 당해연도 퇴거 보증금</p>
+              <p class="text-lg font-extrabold text-white mt-0.5 truncate" title="${escapeHtml(fmtMoney(totalThisYearDeposit))}">${fmtMoney(totalThisYearDeposit)}</p>
+              <p class="text-[10px] text-slate-500">${new Date().getFullYear()}년 퇴거 예정/기준 보증금</p>
+            </div>
+          </div>
+        </div>`;
+      el.innerHTML = personCard + amountCard;
     }
 
     // 입금률 바
