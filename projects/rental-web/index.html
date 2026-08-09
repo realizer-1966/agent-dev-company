@@ -455,20 +455,29 @@
     }
 
     // ============ UI: 건물 목록 ============
-    // 최근 한 달 이내(오늘-30일 ~ 오늘) 입주한 세입자 목록. 입주 중(active) 우선.
-    // 기준: moveIn(입주일)이 (오늘 - 30일) 이상이고 오늘 이하인 세입자. moveIn 없으면 제외.
+    // '이번 달 미입금 내역' 기준: 입주년도와 무관하게, 입주일(moveIn)의 월/일이
+    // 오늘 기준 한 달 전(월/일) ~ 오늘(월/일) 사이에 해당하는 세입자. moveIn 없으면 제외.
+    // (매년 반복되는 입주기념일이 오늘 기준 한 달 전~오늘 사이인 세입자)
     function getRecentMoveInTenants(b) {
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const cutoff = new Date(today);
-      cutoff.setDate(cutoff.getDate() - 30);
+      const prev = new Date(today);
+      prev.setMonth(prev.getMonth() - 1); // 한 달 전 (연도 경계 자동 처리)
+      const todayVal = (today.getMonth() + 1) * 100 + today.getDate();
+      const prevVal = (prev.getMonth() + 1) * 100 + prev.getDate();
       return (b.tenants || []).filter(t => {
         if (!t.moveIn || typeof t.moveIn !== 'string') return false;
         const [y, m, d] = t.moveIn.split('-').map(Number);
         if (!y || !m || !d) return false;
         const moveDate = new Date(y, m - 1, d);
         if (isNaN(moveDate.getTime())) return false;
-        return moveDate >= cutoff && moveDate <= today;
+        const moveVal = (moveDate.getMonth() + 1) * 100 + moveDate.getDate();
+        // 월/일만 비교 (연도 무관). 한 달 전이 전년도 12월로 넘어가는 경우(prevVal > todayVal)는
+        // 원형 범위로 판정: moveVal >= prevVal 이거나 moveVal <= todayVal.
+        if (prevVal <= todayVal) {
+          return moveVal >= prevVal && moveVal <= todayVal;
+        }
+        return moveVal >= prevVal || moveVal <= todayVal;
       }).sort((a, c) => {
         const sa = getTenantStatus(a) === 'active' ? 0 : 1;
         const sc = getTenantStatus(c) === 'active' ? 0 : 1;
