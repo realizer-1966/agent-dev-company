@@ -68,9 +68,11 @@
         </div>
       </div>
 
-      <!-- 건물별 통계 -->
-      <h3 class="font-bold text-white mb-3">🏢 건물별 통계</h3>
-      <div id="statsBuildings" class="grid md:grid-cols-2 gap-4"></div>
+      <!-- 보증금 2천만원 초과 (입주중) -->
+      <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700">
+        <h3 class="font-bold text-white mb-3">💎 보증금 2천만원 초과 (입주중)</h3>
+        <div id="highDepositTenants"></div>
+      </div>
     </section>
 
     <!-- 건물 상세 -->
@@ -1689,18 +1691,6 @@
       }
       return list;
     }
-    // 특정 세입자 배열에서 앞으로 3개월 퇴거 예정 보증금 준비금 합계(만원)와 세입자 수
-    function sumNext3MonthsDeposit(tenants) {
-      const n3m = next3MonthsYM();
-      let total = 0, count = 0;
-      (tenants || []).forEach(t => {
-        if (getTenantStatus(t) === 'active' && t.moveOut && n3m.some(mm => mm.ym === String(t.moveOut).slice(0, 7))) {
-          total += Number(t.deposit) || 0;
-          count++;
-        }
-      });
-      return { total, count };
-    }
     // 전체(전 건물) 기준 앞으로 3개월 월별 퇴거 예정 보증금 준비금 (만원)
     function computeNext3MonthsAll() {
       return next3MonthsYM().map(mm => {
@@ -1714,89 +1704,6 @@
         return { ...mm, total, tenants };
       });
     }
-    function computeBuildingStats(b) {
-      const tenants = b.tenants || [];
-      const active = tenants.filter(t => getTenantStatus(t) === 'active');
-      const monthlyRent = tenants.reduce((s, t) => s + (Number(t.rent) || 0), 0);          // 만원
-      const activeRent = active.reduce((s, t) => s + (Number(t.rent) || 0), 0);            // 만원 (입주중)
-      const activeMgmt = active.reduce((s, t) => s + (Number(t.mgmt) || 0), 0);            // 만원 (입주중)
-      // 누적 입금 합계 (입금 완료된 월 × 월세)
-      const paidRent = tenants.reduce((s, t) =>
-        s + ((t.rentPaid || []).filter(r => r.paid).length * (Number(t.rent) || 0) * 10000), 0); // 원
-      // 누적 비용 합계 = 건물 공용비용 + 세입자 기록 비용
-      const commonCosts = (b.commonCosts || []).reduce((s, c) => s + (Number(c.cost) || 0), 0);
-      const tenantCosts = tenants.reduce((s, t) =>
-        s + (t.notes || []).reduce((ss, n) => ss + (Number(n.cost) || 0), 0), 0);
-      const totalCost = commonCosts + tenantCosts; // 원
-      // 비어있는 방(호실): 한 번이라도 호실을 가진 방 중 현재 입주중인 세입자가 없는 방
-      const roomMap = {};
-      tenants.forEach(t => { if (t.room) (roomMap[t.room] = roomMap[t.room] || []).push(t); });
-      const emptyRooms = Object.keys(roomMap).filter(r => !roomMap[r].some(t => getTenantStatus(t) === 'active')).length;
-      // 당해연도 퇴거 보증금 준비금: moveOut 연도가 올해인 세입자의 deposit 합계 (만원)
-      const thisYear = new Date().getFullYear();
-      const thisYearDeposit = tenants.reduce((s, t) => {
-        if (getTenantStatus(t) !== 'active') return s;
-        const y = t.moveOut ? Number(String(t.moveOut).slice(0, 4)) : NaN;
-        return y === thisYear ? s + (Number(t.deposit) || 0) : s;
-      }, 0);
-      return { tenants, active, monthlyRent, activeRent, activeMgmt, paidRent, totalCost, emptyRooms, thisYearDeposit, next3MonthsDeposit: sumNext3MonthsDeposit(tenants) };
-    }
-
-    // 건물별 통계 카드
-    function renderStatsBuildingCard(b, s, idx) {
-      const colors = ['from-indigo-600 to-purple-600','from-emerald-600 to-teal-600','from-rose-600 to-pink-600','from-amber-500 to-orange-600','from-sky-600 to-blue-600','from-fuchsia-600 to-purple-600'];
-      const grad = colors[idx % colors.length];
-      const occupancy = s.tenants.length > 0 ? Math.round((s.active.length / s.tenants.length) * 100) : 0;
-      return `
-        <div class="card bg-slate-800 border border-slate-700 rounded-2xl p-5">
-          <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center gap-3">
-              <div class="h-10 w-10 rounded-xl bg-gradient-to-br ${grad} flex items-center justify-center text-xl shrink-0">🏢</div>
-              <div>
-                <h4 class="font-bold text-white">${escapeHtml(b.name)}</h4>
-                <p class="text-xs text-slate-500">${escapeHtml(b.addr || '주소 없음')}</p>
-              </div>
-            </div>
-            <span class="text-xs text-slate-400 whitespace-nowrap">빈 방 ${s.emptyRooms}개</span>
-          </div>
-          <div class="grid grid-cols-3 gap-2 text-center mb-4">
-            <div class="bg-slate-900 rounded-xl py-2.5">
-              <p class="text-xs text-slate-400">세입자</p>
-              <p class="text-lg font-extrabold text-white mt-0.5">${s.tenants.length}명</p>
-              <p class="text-[10px] text-slate-500">입주중 ${s.active.length}명</p>
-            </div>
-            <div class="bg-slate-900 rounded-xl py-2.5">
-              <p class="text-xs text-slate-400">월세 합계</p>
-              <p class="text-lg font-extrabold text-white mt-0.5">${fmtMoney(s.monthlyRent)}</p>
-              <p class="text-[10px] text-slate-500">입주중 ${fmtMoney(s.activeRent)}</p>
-            </div>
-            <div class="bg-slate-900 rounded-xl py-2.5">
-              <p class="text-xs text-slate-400">입주율</p>
-              <p class="text-lg font-extrabold ${occupancy >= 80 ? 'text-emerald-400' : (occupancy >= 40 ? 'text-amber-400' : 'text-rose-400')} mt-0.5">${occupancy}%</p>
-              <p class="text-[10px] text-slate-500">${s.active.length}/${s.tenants.length}명</p>
-            </div>
-          </div>
-          <div class="space-y-2 text-sm">
-            <div class="flex justify-between items-center bg-slate-900 rounded-lg px-3 py-2">
-              <span class="text-xs text-slate-400">누적 비용 합계</span>
-              <span class="font-bold text-emerald-400">${s.totalCost ? s.totalCost.toLocaleString('ko-KR') + '원' : '0원'}</span>
-            </div>
-            <div class="flex justify-between items-center bg-slate-900 rounded-lg px-3 py-2">
-              <span class="text-xs text-slate-400">누적 입금 합계</span>
-              <span class="font-bold text-emerald-400">${s.paidRent ? s.paidRent.toLocaleString('ko-KR') + '원' : '0원'}</span>
-            </div>
-            <div class="flex justify-between items-center bg-slate-900 rounded-lg px-3 py-2">
-              <span class="text-xs text-slate-400">🪙 당해연도 퇴거 보증금 준비금</span>
-              <span class="font-bold text-emerald-400">${fmtMoney(s.thisYearDeposit)}</span>
-            </div>
-            <div class="flex justify-between items-center bg-slate-900 rounded-lg px-3 py-2">
-              <span class="text-xs text-slate-400">📅 앞으로 3개월 퇴거 보증금</span>
-              <span class="font-bold text-emerald-400">${fmtMoney(s.next3MonthsDeposit.total)}</span>
-            </div>
-          </div>
-        </div>`;
-    }
-
     // 앞으로 3개월 퇴거 예정 보증금 준비금 (월별) 렌더링
     function renderNext3Months() {
       const el = document.getElementById('next3Months');
@@ -1816,13 +1723,34 @@
 
     function renderStats() {
       renderNext3Months();
-      // 건물별 통계
-      const sbEl = document.getElementById('statsBuildings');
-      if (buildings.length === 0) {
-        sbEl.innerHTML = '<p class="text-center text-slate-500 py-10 col-span-full">등록된 건물이 없어 통계를 표시할 수 없습니다.</p>';
+      renderHighDepositTenants();
+    }
+
+    // 입주중 세입자 중 보증금(deposit, 만원) 2천만원 초과 세입자 목록
+    function renderHighDepositTenants() {
+      const el = document.getElementById('highDepositTenants');
+      const list = [];
+      buildings.forEach(b => (b.tenants || []).forEach(t => {
+        if (getTenantStatus(t) === 'active' && Number(t.deposit) > 2000) {
+          list.push({ building: b.name, room: t.room || '', name: t.name || '', deposit: Number(t.deposit) || 0 });
+        }
+      }));
+      list.sort((a, b) => b.deposit - a.deposit);
+      if (list.length === 0) {
+        el.innerHTML = '<p class="text-sm text-slate-500 py-6 text-center">조건에 맞는 세입자가 없음</p>';
         return;
       }
-      sbEl.innerHTML = buildings.map((b, i) => renderStatsBuildingCard(b, computeBuildingStats(b), i)).join('');
+      el.innerHTML = list.map(t => `
+        <div class="flex items-center justify-between bg-slate-900 rounded-xl px-4 py-3 border border-slate-700 mb-2">
+          <div class="flex items-center gap-3 min-w-0">
+            <span class="text-emerald-400 font-bold shrink-0">💎</span>
+            <div class="min-w-0">
+              <p class="text-sm font-bold text-white truncate">${escapeHtml(t.building)} <span class="text-slate-400 font-normal">${escapeHtml(t.room)}호</span></p>
+              <p class="text-xs text-slate-500 truncate">${escapeHtml(t.name)}</p>
+            </div>
+          </div>
+          <span class="text-sm font-extrabold text-emerald-400 whitespace-nowrap ml-3">${fmtMoney(t.deposit)}</span>
+        </div>`).join('');
     }
 
     // ============ 건물 CRUD ============
