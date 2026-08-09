@@ -455,29 +455,17 @@
     }
 
     // ============ UI: 건물 목록 ============
-    // '이번 달 미입금 내역' 기준: 입주년도와 무관하게, 입주일(moveIn)의 월/일이
-    // 오늘 기준 한 달 전(월/일) ~ 오늘(월/일) 사이에 해당하는 세입자. moveIn 없으면 제외.
-    // (매년 반복되는 입주기념일이 오늘 기준 한 달 전~오늘 사이인 세입자)
+    // '이번 달 입금내역 없음' 기준: 입주일(moveIn)의 일(day-of-month)이 매달 1일 ~ 오늘의 일 사이인
+    // 세입자 (연도·월 무관, 매달 반복되는 입주기념일 기준). moveIn 없으면 제외.
     function getRecentMoveInTenants(b) {
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const prev = new Date(today);
-      prev.setMonth(prev.getMonth() - 1); // 한 달 전 (연도 경계 자동 처리)
-      const todayVal = (today.getMonth() + 1) * 100 + today.getDate();
-      const prevVal = (prev.getMonth() + 1) * 100 + prev.getDate();
+      const todayDay = new Date().getDate();
       return (b.tenants || []).filter(t => {
         if (!t.moveIn || typeof t.moveIn !== 'string') return false;
         const [y, m, d] = t.moveIn.split('-').map(Number);
         if (!y || !m || !d) return false;
         const moveDate = new Date(y, m - 1, d);
         if (isNaN(moveDate.getTime())) return false;
-        const moveVal = (moveDate.getMonth() + 1) * 100 + moveDate.getDate();
-        // 월/일만 비교 (연도 무관). 한 달 전이 전년도 12월로 넘어가는 경우(prevVal > todayVal)는
-        // 원형 범위로 판정: moveVal >= prevVal 이거나 moveVal <= todayVal.
-        if (prevVal <= todayVal) {
-          return moveVal >= prevVal && moveVal <= todayVal;
-        }
-        return moveVal >= prevVal || moveVal <= todayVal;
+        return d <= todayDay;
       }).sort((a, c) => {
         const sa = getTenantStatus(a) === 'active' ? 0 : 1;
         const sc = getTenantStatus(c) === 'active' ? 0 : 1;
@@ -513,18 +501,17 @@
         const tenantCount = b.tenants.filter(t => getTenantStatus(t) !== 'upcoming').length;
         const colors = ['from-indigo-600 to-purple-600','from-emerald-600 to-teal-600','from-rose-600 to-pink-600','from-amber-500 to-orange-600','from-sky-600 to-blue-600','from-fuchsia-600 to-purple-600'];
         const grad = colors[idx % colors.length];
-        // 최근 한 달 이내 입주한 세입자 (전체), 그중 현재 월 미입금만 나열
+        // 입주일(day-of-month)이 매달 1일~오늘 사이인 세입자 중, 이번 달(YYYY-MM) 입금내역이
+        // 전혀 없는 세입자만 나열 (기록 유무로 판정, paid 여부 무관)
         const recentTenants = getRecentMoveInTenants(b);
-        const unpaidTenants = recentTenants.filter(t => !isRentPaidFor(t, cardMonth));
+        const unpaidTenants = recentTenants.filter(t => !(t.rentPaid || []).some(r => r.month === cardMonth));
         let todayHtml;
-        if (recentTenants.length === 0) {
-          todayHtml = `<p class="text-[11px] text-slate-500 mt-3 pt-2 border-t border-slate-700/70">이번 달 미입금 내역 없음</p>`;
-        } else if (unpaidTenants.length === 0) {
-          todayHtml = `<p class="text-[11px] text-slate-500 mt-3 pt-2 border-t border-slate-700/70">🎂 이번 달 미입금 내역 없음</p>`;
+        if (unpaidTenants.length === 0) {
+          todayHtml = `<p class="text-[11px] text-slate-500 mt-3 pt-2 border-t border-slate-700/70">이번 달 입금내역 없음</p>`;
         } else {
           todayHtml = `
             <div class="mt-3 pt-2 border-t border-slate-700/70">
-              <p class="text-[11px] font-bold text-indigo-300 mb-1.5">🎂 이번 달 미입금 내역</p>
+              <p class="text-[11px] font-bold text-indigo-300 mb-1.5">🎂 이번 달 입금내역 없음</p>
               <div class="space-y-1">
                 ${unpaidTenants.map(t => {
                   const paid = isRentPaidFor(t, cardMonth);
