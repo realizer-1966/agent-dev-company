@@ -495,7 +495,7 @@
       empty.classList.add('hidden');
       const cardMonth = todayMonth();
       buildings.forEach((b, idx) => {
-        const totalRent = b.tenants.reduce((s, t) => s + (Number(t.rent)||0), 0);
+        const totalRentMgmt = b.tenants.reduce((s, t) => s + (Number(t.rent)||0) + (Number(t.mgmt)||0), 0);
         const roomCount = new Set(b.tenants.map(t => t.room).filter(Boolean)).size;
         // 세입자 수: 입주 중(active) 세입자만 카운트 (호실수 roomCount는 그대로 유지)
         const tenantCount = b.tenants.filter(t => getTenantStatus(t) === 'active').length;
@@ -547,8 +547,8 @@
                 <p class="text-xs text-slate-500">세입자/호실</p>
               </div>
               <div class="text-right">
-                <p class="text-sm font-bold text-emerald-400">월 ${fmtMoney(totalRent)}</p>
-                <p class="text-xs text-slate-500">월세 합계</p>
+                <p class="text-sm font-bold text-emerald-400">월 ${fmtMoney(totalRentMgmt)}</p>
+                <p class="text-xs text-slate-500">월세·관리비 합계</p>
               </div>
             </div>
             ${todayHtml}
