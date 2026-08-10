@@ -68,9 +68,14 @@
         </div>
       </div>
 
-      <!-- 보증금 2천만원 초과 (입주중) -->
+      <!-- 보증금 기준 초과 (입주중) -->
       <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700">
-        <h3 class="font-bold text-white mb-3">💎 보증금 2천만원 초과 (입주중)</h3>
+        <h3 class="font-bold text-white mb-3" id="highDepositTitle">💎 보증금 2천만원 초과 (입주중)</h3>
+        <div class="flex items-center gap-2 mb-3">
+          <label class="text-xs text-slate-400 whitespace-nowrap" for="highDepositThresholdInput">기준값 (만원)</label>
+          <input type="number" id="highDepositThresholdInput" min="0" step="100" value="2000" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-white w-32" />
+          <button id="highDepositApplyBtn" class="btn bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold px-3 py-1.5 rounded-lg">적용/조회</button>
+        </div>
         <div id="highDepositTenants"></div>
       </div>
     </section>
@@ -1724,12 +1729,27 @@
       renderHighDepositTenants();
     }
 
-    // 입주중 세입자 중 보증금(deposit, 만원) 2천만원 초과 세입자 목록
+    // 입주중 세입자 중 보증금(deposit, 만원) 기준값 초과 세입자 목록
+    const DEPOSIT_THRESHOLD_KEY = 'highDepositThreshold';
+    function getDepositThreshold() {
+      const v = Number(localStorage.getItem(DEPOSIT_THRESHOLD_KEY));
+      return Number.isFinite(v) && v > 0 ? v : 2000;
+    }
+    function setDepositThreshold(v) {
+      const n = Math.max(0, Math.round(Number(v) || 0));
+      localStorage.setItem(DEPOSIT_THRESHOLD_KEY, String(n));
+      return n;
+    }
     function renderHighDepositTenants() {
+      const threshold = getDepositThreshold();
       const el = document.getElementById('highDepositTenants');
+      const titleEl = document.getElementById('highDepositTitle');
+      const inputEl = document.getElementById('highDepositThresholdInput');
+      if (inputEl && document.activeElement !== inputEl) inputEl.value = String(threshold);
+      if (titleEl) titleEl.textContent = `💎 보증금 ${threshold}만원 초과 (입주중)`;
       const list = [];
       buildings.forEach(b => (b.tenants || []).forEach(t => {
-        if (getTenantStatus(t) === 'active' && Number(t.deposit) > 2000) {
+        if (getTenantStatus(t) === 'active' && Number(t.deposit) > threshold) {
           list.push({ building: b.name, room: t.room || '', name: t.name || '', deposit: Number(t.deposit) || 0 });
         }
       }));
@@ -1780,6 +1800,16 @@
     document.getElementById('restoreFile').addEventListener('change', applyRestore);
     document.getElementById('statsBtn').addEventListener('click', openStats);
     document.getElementById('statsBackBtn').addEventListener('click', closeStats);
+    document.getElementById('highDepositApplyBtn').addEventListener('click', () => {
+      const input = document.getElementById('highDepositThresholdInput');
+      setDepositThreshold(input.value);
+      renderHighDepositTenants();
+    });
+    document.getElementById('highDepositThresholdInput').addEventListener('change', () => {
+      const input = document.getElementById('highDepositThresholdInput');
+      setDepositThreshold(input.value);
+      renderHighDepositTenants();
+    });
     document.getElementById('bCancel').addEventListener('click', hideBuildingModal);
     document.getElementById('bSave').addEventListener('click', saveBuilding);
     document.getElementById('addTenantBtn').addEventListener('click', addTenant);
