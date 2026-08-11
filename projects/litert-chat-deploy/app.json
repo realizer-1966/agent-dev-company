@@ -1,0 +1,6 @@
+{
+  "title": "LiteRT Chat — 온디바이스 LLM 데모",
+  "description": "갤러리(Gallery) 스타일 온디바이스 LLM 채팅 데모. 브라우저에서 스킬(시간·계산·날씨·랜덤)과 멀티턴 대화를 실제로 시뮬레이션합니다. 완전 오프라인, 데이터 저장 없음.",
+  "category": "Productivity",
+  "icon": "icon.svg"
+}

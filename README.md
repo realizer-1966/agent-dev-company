@@ -55,6 +55,7 @@ hermes kanban list    # 현재 업무 현황
 | [rental-web](projects/rental-web/) | ✅ 완료 | 임대관리 웹앱 (건물·세입자 관리, OnDev 배포) |
 | [glowscript-agent](projects/glowscript-agent/) | ✅ 완료 | GlowScript/VPython 시뮬레이션 생성·검증 에이전트 (TDD, 56 tests) |
 | [glowscript-llm](projects/glowscript-llm/) | ✅ 완료 | GlowScript LLM 생성 백엔드 (FastAPI, 자연어→코드, TDD, 7 tests) |
+| [litert-chat-deploy](projects/litert-chat-deploy/) | ✅ 완료 | LiteRT Chat 온디바이스 LLM 데모 웹앱 (Vue3, 스킬 호출 시뮬레이션, OnDev 배포) |
 
 ## 운영 자동화
 

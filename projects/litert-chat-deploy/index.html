@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LiteRT Chat — 온디바이스 LLM 데모</title>
+<meta name="description" content="갤러리(gallery) 스타일 온디바이스 LLM 채팅 데모. 스킬(도구) 호출과 멀티턴 대화를 브라우저에서 시뮬레이션합니다.">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<style>
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .glass { background: rgba(30,41,59,.7); backdrop-filter: blur(12px); }
+  .scrollbar::-webkit-scrollbar { width: 6px; }
+  .scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .caret { animation: blink 1s step-end infinite; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .msg-anim { animation: fadeUp .25s ease-out; }
+</style>
+</head>
+<body class="bg-slate-950 text-slate-100">
+<div id="app" class="h-screen flex flex-col max-w-3xl mx-auto">
+
+  <!-- 헤더 -->
+  <header class="glass border-b border-slate-700/50 px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
+    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-emerald-500 flex items-center justify-center text-xl shadow-lg">💬</div>
+    <div class="flex-1 min-w-0">
+      <h1 class="font-bold text-lg leading-tight truncate">LiteRT Chat</h1>
+      <p class="text-xs text-slate-400 flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block"></span>
+        온디바이스 · Gemma 모델 · 스킬 지원
+      </p>
+    </div>
+    <button @click="resetAll" class="text-xs text-slate-400 hover:text-slate-200 border border-slate-600 rounded-lg px-3 py-1.5 transition">지우기</button>
+  </header>
+
+  <!-- 대화 영역 -->
+  <main ref="chatBox" class="flex-1 overflow-y-auto scrollbar px-4 py-5 space-y-4">
+
+    <!-- 소개 카드 -->
+    <div class="glass rounded-2xl p-4 border border-slate-700/40 msg-anim" v-if="messages.length===0">
+      <div class="flex items-center gap-2 text-blue-300 font-semibold mb-2">✨ 온디바이스 LLM 채팅 데모</div>
+      <p class="text-sm text-slate-300 leading-relaxed">갤러리(Gallery)처럼 <b>모델 · 스킬(도구) · MCP</b>를 갖춘 온디바이스 에이전트의 UI/UX 데모입니다. 실제 LLM 없이 브라우저에서 스킬이 진짜로 동작합니다.</p>
+      <div class="flex flex-wrap gap-2 mt-3">
+        <button v-for="c in chips" :key="c" @click="ask(c)" class="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-full px-3 py-1.5 transition">{{c}}</button>
+      </div>
+    </div>
+
+    <!-- 메시지들 -->
+    <div v-for="(m,i) in messages" :key="i" class="msg-anim" :class="m.role==='user' ? 'flex justify-end' : 'flex justify-start'">
+      <div :class="m.role==='user'
+          ? 'bg-blue-600 rounded-2xl rounded-br-md px-4 py-2.5 max-w-[80%]'
+          : 'glass border border-slate-700/40 rounded-2xl rounded-bl-md px-4 py-2.5 max-w-[85%]'">
+        <div class="flex items-center gap-1.5 mb-0.5" v-if="m.role==='bot'">
+          <span class="text-[10px] font-bold text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 rounded px-1.5 py-0.5">온디바이스</span>
+        </div>
+        <!-- 도구 호출 표시 -->
+        <div v-if="m.tool" class="mt-1 mb-1.5 bg-slate-900/70 border border-blue-500/30 rounded-lg px-2.5 py-1.5 text-xs text-blue-200 flex items-start gap-2">
+          <span>🔧</span>
+          <span class="font-mono">{{m.tool.name}}</span>
+          <span class="text-slate-400 font-mono">{{m.tool.args}}</span>
+        </div>
+        <p class="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{{ m.text }}</p>
+        <span v-if="m.streaming" class="caret inline-block w-2 h-4 bg-blue-300 align-text-bottom ml-0.5"></span>
+      </div>
+    </div>
+
+    <!-- 로딩 -->
+    <div v-if="thinking" class="flex justify-start">
+      <div class="glass border border-slate-700/40 rounded-2xl rounded-bl-md px-4 py-3 flex items-center gap-2 text-sm text-slate-300">
+        <span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
+        모델 추론 중…
+      </div>
+    </div>
+  </main>
+
+  <!-- 입력 -->
+  <footer class="glass border-t border-slate-700/50 p-3 pb-4">
+    <div class="flex items-end gap-2">
+      <textarea v-model="draft" @keydown.enter.exact.prevent="send" rows="1"
+        placeholder="메시지를 입력하세요… (스킬: 시간, 계산, 날씨, 랜덤)"
+        class="flex-1 bg-slate-800/80 border border-slate-600 focus:border-blue-500 rounded-xl px-3.5 py-2.5 text-[15px] resize-none outline-none min-h-[48px] max-h-[150px] transition placeholder:text-slate-500"></textarea>
+      <button @click="send" :disabled="busy || !draft.trim()"
+        class="bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-semibold rounded-xl px-5 py-2.5 min-h-[48px] transition">
+        전송
+      </button>
+    </div>
+    <p class="text-[10px] text-slate-500 text-center mt-2">브라우저에서 시뮬레이션 · 데이터는 저장되지 않음 · 실제 백엔드 연동 시 서버 필요</p>
+  </footer>
+</div>
+
+<script>
+const { createApp } = Vue;
+
+const SKILLS = {
+  get_time: {
+    desc: "현재 날짜와 시간",
+    run() {
+      const n = new Date();
+      return `지금은 ${n.getFullYear()}년 ${n.getMonth()+1}월 ${n.getDate()}일 ${String(n.getHours()).padStart(2,'0')}시 ${String(n.getMinutes()).padStart(2,'0')}분입니다.`;
+    }
+  },
+  calculate: {
+    desc: "수식 계산",
+    run(args) {
+      try {
+        const expr = String(args.expr||'').replace(/[^0-9+\-*/().]/g,'');
+        const r = Function('"use strict";return ('+expr+')')();
+        return `${expr} = ${r}`;
+      } catch { return "계산식을 확인해 주세요."; }
+    }
+  },
+  get_weather: {
+    desc: "도시 날씨 (모의)",
+    run(args) {
+      const c = args.city||'서울';
+      const conds = ['맑음','구름 조금','흐림','비'];
+      const t = 15 + Math.floor(Math.random()*18);
+      return `${c}의 현재 날씨: ${conds[Math.floor(Math.random()*conds.length)]}, 기온 ${t}°C (모의 데이터).`;
+    }
+  },
+  random_number: {
+    desc: "랜덤 정수",
+    run(args) {
+      const lo = Number(args.min)||1, hi = Number(args.max)||100;
+      return `랜덤 숫자: ${lo + Math.floor(Math.random()*(hi-lo+1))}`;
+    }
+  }
+};
+
+const app = createApp({
+  data() {
+    return {
+      draft: '',
+      busy: false,
+      thinking: false,
+      messages: [],
+      chips: ['지금 몇 시야?', '1234 × 56 계산해줘', '서울 날씨 알려줘', '1부터 10까지 랜덤 숫자 뽑아줘']
+    };
+  },
+  methods: {
+    async ask(text) { this.draft = text; await this.send(); },
+    async send() {
+      const text = this.draft.trim();
+      if (!text || this.busy) return;
+      this.draft = '';
+      this.messages.push({ role:'user', text });
+      this.busy = true; this.thinking = true;
+      await this.$nextTick(); this.scroll();
+      await new Promise(r=>setTimeout(r, 400));
+      this.thinking = false;
+
+      // 1) 도구 호출 판단 (키워드)
+      let tool = null;
+      if (/몇 시|시간|지금|날짜/.test(text)) tool = { name:'get_time', args:'{}' };
+      else if (/계산|곱|더|빼|나누|×|÷/.test(text) && /\d/.test(text)) {
+        // 수식 추출: '1234 × 56 계산해줘' → '1234*56'
+        let expr = (text.match(/[\d\s]+[\s×x*÷/+\-]+[\d\s]+/) || [''])[0]
+          .trim().replace(/[×x]/g,'*').replace(/÷/g,'/');
+        if (!expr) expr = '2+2';
+        tool = { name:'calculate', args: JSON.stringify({expr}) };
+      }
+      else if (/날씨|온도|기온/.test(text)) {
+        const m = text.match(/[가-힣]+(?:시|도|구|읍|면)\s*날씨/);
+        tool = { name:'get_weather', args: JSON.stringify({city:(m?m[0].replace(/날씨/,'').trim():'서울')}) };
+      }
+      else if (/랜덤|임의|숫자 뽑/.test(text)) tool = { name:'random_number', args:'{}' };
+
+      const bot = { role:'bot', text:'', streaming:true };
+      if (tool) {
+        this.messages.push({ role:'bot', text:'', tool, streaming:true });
+        // 스킬 "실행" 상태 표시 후 스트리밍
+        await new Promise(r=>setTimeout(r, 600));
+        this.messages[this.messages.length-1].streaming = false;
+        const result = SKILLS[tool.name].run(JSON.parse(tool.args||'{}'));
+        await this.streamText(this.messages[this.messages.length-1], result);
+      } else {
+        this.messages.push(bot);
+        const reply = this.fallbackReply(text);
+        await this.streamText(bot, reply);
+      }
+      this.busy = false;
+      this.scroll();
+    },
+    async streamText(msg, full) {
+      // 온디바이스 추론처럼 스트리밍 표시
+      const chunk = full.match(/.{1,3}/g) || [];
+      for (let i=0;i<chunk.length;i++) {
+        msg.text += chunk[i];
+        this.scroll();
+        await new Promise(r=>setTimeout(r, 20));
+      }
+      msg.streaming = false;
+    },
+    fallbackReply(text) {
+      const greetings = /(안녕|하이|hello|hi)/i;
+      const who = /(누구|뭐야|소개)/;
+      if (greetings.test(text)) return "안녕하세요! 온디바이스 LLM 채팅 데모입니다. 저는 모든 추론을 기기에서 처리합니다. 시간, 계산, 날씨, 랜덤 스킬을 쓸 수 있어요.";
+      if (who.test(text)) return "저는 LiteRT-LM으로 구동되는 온디바이스 어시스턴트입니다. 갤러리 스타일로 스킬과 도구를 호출할 수 있어요.";
+      return `'${text}'에 대한 응답 데모입니다. 실제 배포에서는 백엔드 LLM이 이 메시지를 받아 답변합니다. 아래 스킬 중 하나를 시도해 보세요: 시간, 계산, 날씨, 랜덤.`;
+    },
+    resetAll() {
+      this.messages = [];
+      this.draft = '';
+    },
+    scroll() {
+      const el = this.$refs.chatBox;
+      if (el) el.scrollTop = el.scrollHeight;
+    }
+  }
+});
+app.mount('#app');
+</script>
+</body>
+</html>

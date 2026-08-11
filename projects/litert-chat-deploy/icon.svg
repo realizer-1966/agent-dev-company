@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#2563EB"/>
+  <rect x="64" y="64" width="384" height="384" rx="64" fill="#1E293B"/>
+  <!-- 채팅 말풍선 -->
+  <path d="M256 112c-79 0-144 54-144 120 0 38 22 72 57 94-4 14-14 30-34 44 20-2 36-8 50-16 23 7 47 10 71 10 79 0 144-54 144-120S335 112 256 112z" fill="#60A5FA"/>
+  <!-- 온디바이스 칩 -->
+  <circle cx="128" cy="384" r="28" fill="#22C55E"/>
+  <circle cx="192" cy="408" r="14" fill="#22C55E" opacity="0.7"/>
+  <circle cx="88" cy="352" r="12" fill="#22C55E" opacity="0.5"/>
+</svg>
