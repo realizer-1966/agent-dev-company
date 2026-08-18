@@ -111,6 +111,8 @@
         </div>
         <div class="flex items-center gap-2 mb-3">
           <input id="ccCommonCostImg" type="file" accept="image/*" class="flex-1 min-w-[200px] text-sm text-slate-300 file:mr-3 file:bg-indigo-600 file:text-white file:border-0 file:rounded-xl file:px-4 file:py-2 file:font-bold file:cursor-pointer"/>
+          <button id="ccCommonCostCamera" type="button" class="btn bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-4 py-2 rounded-xl whitespace-nowrap">📷 사진 촬영</button>
+          <input id="ccCommonCostCapture" type="file" accept="image/*" capture="environment" class="hidden"/>
           <div id="ccCommonCostImgPreview" class="hidden"></div>
         </div>
         <div id="commonCostsList" class="space-y-2 max-h-56 overflow-y-auto"></div>
@@ -1099,7 +1101,8 @@
       if (cost === null || isNaN(cost)) { alert('공용 비용 금액을 입력하세요.'); return; }
       if (!b.commonCosts) b.commonCosts = [];
       const imgInput = document.getElementById('ccCommonCostImg');
-      const imgFile = imgInput.files[0];
+      const capInput = document.getElementById('ccCommonCostCapture');
+      const imgFile = imgInput.files[0] || capInput.files[0];
       const commonCost = { id: genId(), type: type || '기타', cost, createdAt: Date.now(), image: null };
       const commit = () => {
         b.commonCosts.unshift(commonCost);
@@ -1108,12 +1111,13 @@
         document.getElementById('ccCostType').value = '';
         document.getElementById('ccCost').value = '';
         imgInput.value = '';
+        capInput.value = '';
         hideCommonCostImgPreview();
       };
       if (imgFile) {
         const reader = new FileReader();
         reader.onload = () => {
-          resizeNoteImage(reader.result, (resized) => {
+          resizeCommonCostImage(reader.result, (resized) => {
             commonCost.image = resized;
             commit();
           });
@@ -1151,9 +1155,20 @@
     }
 
     function wireCommonCostImgInput() {
-      document.getElementById('ccCommonCostImg').addEventListener('change', () => {
-        const f = document.getElementById('ccCommonCostImg').files[0];
-        if (f) showCommonCostImgPreview(URL.createObjectURL(f));
+      const fileInput = document.getElementById('ccCommonCostImg');
+      const capInput = document.getElementById('ccCommonCostCapture');
+      document.getElementById('ccCommonCostCamera').addEventListener('click', () => {
+        try {
+          capInput.click();
+        } catch (e) {
+          fileInput.click();
+        }
+      });
+      [capInput, fileInput].forEach(inp => {
+        inp.addEventListener('change', () => {
+          const f = inp.files[0];
+          if (f) showCommonCostImgPreview(URL.createObjectURL(f));
+        });
       });
     }
 
@@ -1396,6 +1411,40 @@
             return;
           }
           // 긴 변이 1024, 짧은 변이 최대 768이 되도록 비율 유지 리사이즈
+          const scale = Math.min(MAX_W / w, MAX_H / h);
+          w = Math.round(w * scale);
+          h = Math.round(h * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          // 투명 PNG는 흰 배경으로 합성
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+          done(canvas.toDataURL('image/jpeg', 0.8));
+        } catch (e) {
+          // 리사이즈 실패 시 원본 그대로 저장 (폴백)
+          done(dataUrl);
+        }
+      };
+      img.onerror = () => { done(dataUrl); };
+      img.src = dataUrl;
+    }
+
+    // 공용 비용 이미지 리사이즈: 1024x768(가로형) 이내로 비율 유지 후 JPG 저장
+    function resizeCommonCostImage(dataUrl, done) {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const MAX_W = 1024, MAX_H = 768;
+          let w = img.naturalWidth, h = img.naturalHeight;
+          // 원본이 이미 1024x768 이내면 리사이즈 생략 (화질 보존)
+          if (w <= MAX_W && h <= MAX_H) {
+            done(dataUrl);
+            return;
+          }
+          // 가로형 기준: 긴 변이 1024, 짧은 변이 최대 768이 되도록 비율 유지 리사이즈
           const scale = Math.min(MAX_W / w, MAX_H / h);
           w = Math.round(w * scale);
           h = Math.round(h * scale);
