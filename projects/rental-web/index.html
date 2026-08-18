@@ -115,7 +115,7 @@
           <input id="ccCommonCostCapture" type="file" accept="image/*" capture="environment" class="hidden"/>
           <div id="ccCommonCostImgPreview" class="hidden"></div>
         </div>
-        <div id="commonCostsList" class="space-y-2 max-h-56 overflow-y-auto"></div>
+        <div id="commonCostsList" class="space-y-2 max-h-[32rem] overflow-y-auto"></div>
       </div>
 
       <!-- 세입자 추가 폼 -->
@@ -1073,19 +1073,21 @@
       }
       b.commonCosts.forEach(c => {
         const imgHtml = c.image
-          ? `<img src="${c.image}" alt="${escapeHtml(c.type || '비용')}" class="w-12 h-12 object-cover rounded-lg cursor-pointer border border-slate-600" onclick="openCommonCostImageViewer('${c.id}')"/>`
+          ? `<img src="${c.image}" alt="${escapeHtml(c.type || '비용')}" class="w-16 h-16 object-cover rounded-lg cursor-pointer border border-slate-600 shrink-0" onclick="openCommonCostImageViewer('${c.id}')"/>`
           : '';
         const saveBtn = c.image
           ? `<button data-ccsave="${c.id}" class="text-sky-400 hover:text-sky-300 text-xs whitespace-nowrap" title="이미지 저장">💾</button>`
           : '';
         list.innerHTML += `
-          <div class="bg-slate-900 rounded-xl px-3 py-2 border border-slate-700 flex items-center justify-between gap-3">
-            <div class="flex items-center gap-3 min-w-0">
+          <div class="bg-slate-900 rounded-xl px-3 py-2.5 border border-slate-700 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0 flex-1">
               ${imgHtml}
-              <span class="text-sm font-bold text-white truncate">${escapeHtml(c.type || '비용')}</span>
+              <div class="min-w-0">
+                <p class="text-sm font-bold text-white truncate">${escapeHtml(c.type || '비용')}</p>
+                <p class="text-xs font-bold text-emerald-400 mt-0.5">${Number(c.cost).toLocaleString('ko-KR')}원</p>
+              </div>
             </div>
-            <div class="flex items-center gap-3">
-              <span class="text-sm font-bold text-emerald-400">${Number(c.cost).toLocaleString('ko-KR')}원</span>
+            <div class="flex items-center gap-2 shrink-0">
               ${saveBtn}
               <button data-ccid="${c.id}" class="text-rose-400 hover:text-rose-300 text-xs">삭제</button>
             </div>
