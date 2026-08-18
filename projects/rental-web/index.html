@@ -2000,11 +2000,14 @@
       el.innerHTML = html;
     }
 
-    // 건물 상세: 해당 건물의 호수별 계약 변동 내역
+    // 건물 상세: 해당 건물의 호수별 계약 변동 내역 (당해년도)
     function renderBuildingContractChanges() {
       const b = buildings.find(x => x.id === currentBuildingId);
       if (!b) return;
       const el = document.getElementById('buildingContractChanges');
+      const year = new Date().getFullYear();
+      const yearStart = `${year}-01-01`;
+      const yearEnd = `${year}-12-31`;
 
       // 호실별 세입자들을 입주일 순으로 정렬
       const roomGroups = {};
@@ -2025,6 +2028,8 @@
         for (let i = 1; i < tenants.length; i++) {
           const prev = tenants[i - 1];
           const curr = tenants[i];
+          // 당해년도에 입주한 세입자만 (curr.moveIn이 1/1~12/31 사이)
+          if (!curr.moveIn || curr.moveIn < yearStart || curr.moveIn > yearEnd) continue;
           const prevRent = Number(prev.rent) || 0;
           const currRent = Number(curr.rent) || 0;
           const prevMgmt = Number(prev.mgmt) || 0;
@@ -2088,10 +2093,13 @@
     }
 
     // 계약 변동 호실: 같은 호실에 과거 세입자와 현재 세입자가 모두 있는 경우,
-    // 이전 세입자와 현재 세입자 간의 월세/관리비 증감을 표시
+    // 이전 세입자와 현재 세입자 간의 월세/관리비 증감을 표시 (당해년도)
     function renderContractChanges() {
       const el = document.getElementById('contractChanges');
       const changes = [];
+      const year = new Date().getFullYear();
+      const yearStart = `${year}-01-01`;
+      const yearEnd = `${year}-12-31`;
 
       buildings.forEach(b => {
         // 호실별로 세입자들을 입주일 순으로 정렬
@@ -2110,6 +2118,8 @@
           for (let i = 1; i < tenants.length; i++) {
             const prev = tenants[i - 1];
             const curr = tenants[i];
+            // 당해년도에 입주한 세입자만 (curr.moveIn이 1/1~12/31 사이)
+            if (!curr.moveIn || curr.moveIn < yearStart || curr.moveIn > yearEnd) continue;
             const prevRent = Number(prev.rent) || 0;
             const currRent = Number(curr.rent) || 0;
             const prevMgmt = Number(prev.mgmt) || 0;
