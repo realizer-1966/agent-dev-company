@@ -533,6 +533,10 @@
           + ((t.rentPaid || []).some(r => r.month === cardMonth && r.paid) ? (Number(t.rent)||0) : 0)
           + ((t.mgmtPaid || []).some(r => r.month === cardMonth && r.paid) ? (Number(t.mgmt)||0) : 0), 0);
         const unpaidAmount = totalAmount - paidAmount;
+        // 공용비용 합계 (만원)
+        const commonCostTotal = (b.commonCosts || []).reduce((s, c) => s + (Number(c.cost) || 0) / 10000, 0);
+        // 수익 = 납부액 - 공용비용 (만원)
+        const profitAmount = paidAmount - commonCostTotal;
         // 입주일(day-of-month)이 매달 1일~오늘 사이인 입주 중(active) 세입자 중, 이번 달(YYYY-MM) 월세 입금 또는
         // 관리비 납부 기록이 하나라도 없는 세입자만 나열 (기록 유무로 판정, paid 여부 무관). 퇴거(midterm/full) 세입자는 제외.
         const recentTenants = getRecentMoveInTenants(b);
@@ -597,7 +601,7 @@
               <span class="text-slate-500">·</span>
               <span class="whitespace-nowrap text-slate-300">납부 <span class="font-bold text-emerald-400">${fmtMoney(paidAmount)}</span></span>
               <span class="text-slate-500">·</span>
-              <span class="whitespace-nowrap text-slate-300">미납 <span class="font-bold ${unpaidAmount > 0 ? 'text-rose-400' : 'text-slate-200'}">${fmtMoney(unpaidAmount)}</span></span>
+              <span class="whitespace-nowrap text-slate-300">수익 <span class="font-bold ${profitAmount >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${fmtMoney(profitAmount)}</span></span>
               <span class="whitespace-nowrap text-[10px] text-slate-500">이번 달 (${cardMonth})</span>
             </div>
             ${todayHtml}
