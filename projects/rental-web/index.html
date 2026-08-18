@@ -64,6 +64,12 @@
         <div id="yearlyProfitTable" class="space-y-2"></div>
       </div>
 
+      <!-- 계약 변동 호실 (월세/관리비 증감) -->
+      <div class="bg-slate-800 rounded-2xl p-5 mb-6 border border-slate-700">
+        <h3 class="font-bold text-white mb-3">🔄 계약 변동 호실 (월세·관리비 증감)</h3>
+        <div id="contractChanges"></div>
+      </div>
+
       <!-- 앞으로 3개월 퇴거 예정 보증금 준비금 (월별) -->
       <div class="bg-slate-800 rounded-2xl p-5 mb-6 border border-slate-700">
         <h3 class="font-bold text-white mb-3">📅 앞으로 3개월 퇴거 예정 보증금 준비금</h3>
@@ -1909,6 +1915,7 @@
 
     function renderStats() {
       renderYearlyProfit();
+      renderContractChanges();
       renderNext3Months();
       renderHighDepositTenants();
     }
@@ -1983,6 +1990,102 @@
           <span class="text-right ${totalProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${fmtMoney(totalProfit)}</span>
         </div>`;
       el.innerHTML = html;
+    }
+
+    // 계약 변동 호실: 같은 호실에 과거 세입자와 현재 세입자가 모두 있는 경우,
+    // 이전 세입자와 현재 세입자 간의 월세/관리비 증감을 표시
+    function renderContractChanges() {
+      const el = document.getElementById('contractChanges');
+      const changes = [];
+
+      buildings.forEach(b => {
+        // 호실별로 세입자들을 입주일 순으로 정렬
+        const roomGroups = {};
+        (b.tenants || []).forEach(t => {
+          const room = (t.room || '').trim();
+          if (!room) return;
+          (roomGroups[room] = roomGroups[room] || []).push(t);
+        });
+
+        Object.keys(roomGroups).forEach(room => {
+          const tenants = roomGroups[room].sort((a, c) =>
+            String(a.moveIn || '').localeCompare(String(c.moveIn || ''))
+          );
+          // 연속된 세입자 쌍에 대해 증감 계산
+          for (let i = 1; i < tenants.length; i++) {
+            const prev = tenants[i - 1];
+            const curr = tenants[i];
+            const prevRent = Number(prev.rent) || 0;
+            const currRent = Number(curr.rent) || 0;
+            const prevMgmt = Number(prev.mgmt) || 0;
+            const currMgmt = Number(curr.mgmt) || 0;
+            const rentDiff = currRent - prevRent;
+            const mgmtDiff = currMgmt - prevMgmt;
+            // 둘 중 하나라도 변동이 있으면 표시
+            if (rentDiff !== 0 || mgmtDiff !== 0) {
+              changes.push({
+                building: b.name,
+                room,
+                prevName: prev.name || '?',
+                currName: curr.name || '?',
+                prevRent, currRent, rentDiff,
+                prevMgmt, currMgmt, mgmtDiff,
+                prevMoveIn: prev.moveIn || '',
+                currMoveIn: curr.moveIn || '',
+                prevMoveOut: prev.moveOut || '',
+              });
+            }
+          }
+        });
+      });
+
+      if (changes.length === 0) {
+        el.innerHTML = '<p class="text-sm text-slate-500 py-6 text-center">계약 변동 내역이 없습니다.</p>';
+        return;
+      }
+
+      el.innerHTML = changes.map(c => {
+        const rentArrow = c.rentDiff > 0 ? '↑' : c.rentDiff < 0 ? '↓' : '→';
+        const rentColor = c.rentDiff > 0 ? 'text-rose-400' : c.rentDiff < 0 ? 'text-emerald-400' : 'text-slate-400';
+        const mgmtArrow = c.mgmtDiff > 0 ? '↑' : c.mgmtDiff < 0 ? '↓' : '→';
+        const mgmtColor = c.mgmtDiff > 0 ? 'text-rose-400' : c.mgmtDiff < 0 ? 'text-emerald-400' : 'text-slate-400';
+        return `
+          <div class="bg-slate-900 rounded-xl p-4 border border-slate-700 mb-2">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-bold text-white">${escapeHtml(c.building)} ${escapeHtml(c.room)}호</span>
+              </div>
+              <span class="text-[10px] text-slate-500">${escapeHtml(c.prevMoveIn)} → ${escapeHtml(c.currMoveIn)}</span>
+            </div>
+            <div class="space-y-1.5">
+              <div class="flex items-center justify-between text-xs">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="text-slate-400 truncate">${escapeHtml(c.prevName)}</span>
+                  <span class="text-slate-500">→</span>
+                  <span class="text-white font-bold truncate">${escapeHtml(c.currName)}</span>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2 text-xs">
+                <div class="bg-slate-800 rounded-lg px-3 py-2">
+                  <p class="text-slate-400 text-[10px] mb-0.5">월세</p>
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-slate-300">${fmtMoney(c.prevRent)}</span>
+                    <span class="${rentColor} font-bold">${rentArrow} ${c.rentDiff !== 0 ? (c.rentDiff > 0 ? '+' : '') + fmtMoney(c.rentDiff) : '변동없음'}</span>
+                  </div>
+                  <p class="text-white font-bold mt-0.5">${fmtMoney(c.currRent)}</p>
+                </div>
+                <div class="bg-slate-800 rounded-lg px-3 py-2">
+                  <p class="text-slate-400 text-[10px] mb-0.5">관리비</p>
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-slate-300">${fmtMoney(c.prevMgmt)}</span>
+                    <span class="${mgmtColor} font-bold">${mgmtArrow} ${c.mgmtDiff !== 0 ? (c.mgmtDiff > 0 ? '+' : '') + fmtMoney(c.mgmtDiff) : '변동없음'}</span>
+                  </div>
+                  <p class="text-white font-bold mt-0.5">${fmtMoney(c.currMgmt)}</p>
+                </div>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
     }
 
     // 입주중 세입자 중 보증금(deposit, 만원) 기준값 초과 세입자 목록
