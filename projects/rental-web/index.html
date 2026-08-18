@@ -70,6 +70,12 @@
         <div id="contractChanges"></div>
       </div>
 
+      <!-- 당해년도 신규 입주 세대 (전 건물) -->
+      <div class="bg-slate-800 rounded-2xl p-5 mb-6 border border-slate-700">
+        <h3 class="font-bold text-white mb-3" id="statsNewTenantsTitle">🆕 당해년도 신규 입주 세대</h3>
+        <div id="statsNewTenantsList"></div>
+      </div>
+
       <!-- 앞으로 3개월 퇴거 예정 보증금 준비금 (월별) -->
       <div class="bg-slate-800 rounded-2xl p-5 mb-6 border border-slate-700">
         <h3 class="font-bold text-white mb-3">📅 앞으로 3개월 퇴거 예정 보증금 준비금</h3>
@@ -133,6 +139,12 @@
       <div class="bg-slate-800 rounded-2xl p-5 mb-6 border border-slate-700">
         <h3 class="font-bold text-white mb-3">🔄 호수별 계약 변동 내역 <span class="text-xs font-normal text-slate-400 ml-1">(월세·관리비 증감)</span></h3>
         <div id="buildingContractChanges"></div>
+      </div>
+
+      <!-- 당해년도 신규 입주 세대 -->
+      <div class="bg-slate-800 rounded-2xl p-5 mb-6 border border-slate-700">
+        <h3 class="font-bold text-white mb-3" id="newTenantsTitle">🆕 당해년도 신규 입주 세대</h3>
+        <div id="newTenantsList"></div>
       </div>
 
       <!-- 세입자 추가 폼 -->
@@ -710,6 +722,7 @@
       renderTenants();
       renderCommonCosts();
       renderBuildingContractChanges();
+      renderNewTenants();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -1924,6 +1937,7 @@
     function renderStats() {
       renderYearlyProfit();
       renderContractChanges();
+      renderStatsNewTenants();
       renderNext3Months();
       renderHighDepositTenants();
     }
@@ -2092,6 +2106,60 @@
       }).join('');
     }
 
+    // 건물 상세: 당해년도 신규 입주 세대
+    function renderNewTenants() {
+      const b = buildings.find(x => x.id === currentBuildingId);
+      if (!b) return;
+      const el = document.getElementById('newTenantsList');
+      const year = new Date().getFullYear();
+      const yearStart = `${year}-01-01`;
+      const yearEnd = `${year}-12-31`;
+      document.getElementById('newTenantsTitle').textContent = `🆕 ${year}년 신규 입주 세대`;
+
+      const newTenants = (b.tenants || []).filter(t =>
+        t.moveIn && t.moveIn >= yearStart && t.moveIn <= yearEnd
+      ).sort((a, c) => String(a.moveIn || '').localeCompare(String(c.moveIn || '')));
+
+      if (newTenants.length === 0) {
+        el.innerHTML = '<p class="text-sm text-slate-500 py-4 text-center">당해년도 신규 입주 세대가 없습니다.</p>';
+        return;
+      }
+
+      el.innerHTML = newTenants.map(t => {
+        const status = getTenantStatus(t);
+        const badge = status === 'upcoming'
+          ? '<span class="bg-sky-500/20 text-sky-400 text-[10px] font-bold px-1.5 py-0.5 rounded-full">입주예정</span>'
+          : status === 'active'
+          ? '<span class="bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-1.5 py-0.5 rounded-full">입주중</span>'
+          : '<span class="bg-slate-500/20 text-slate-400 text-[10px] font-bold px-1.5 py-0.5 rounded-full">퇴거</span>';
+        return `
+          <div class="bg-slate-900 rounded-xl p-3 border border-slate-700 mb-2">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="text-sm font-bold text-white">${escapeHtml(t.room || '-')}호</span>
+                <span class="text-slate-400 text-xs">·</span>
+                <span class="text-sm text-white truncate">${escapeHtml(t.name)}</span>
+              </div>
+              ${badge}
+            </div>
+            <div class="grid grid-cols-3 gap-2 text-xs">
+              <div class="bg-slate-800 rounded-lg px-2 py-1.5">
+                <p class="text-[10px] text-slate-500">입주일</p>
+                <p class="text-slate-200 font-semibold mt-0.5">${fmtDate(t.moveIn)}</p>
+              </div>
+              <div class="bg-slate-800 rounded-lg px-2 py-1.5">
+                <p class="text-[10px] text-slate-500">월세/관리비</p>
+                <p class="text-emerald-300 font-semibold mt-0.5">${fmtMoney(t.rent)} / ${fmtMoney(t.mgmt)}</p>
+              </div>
+              <div class="bg-slate-800 rounded-lg px-2 py-1.5">
+                <p class="text-[10px] text-slate-500">보증금</p>
+                <p class="text-white font-semibold mt-0.5">${fmtMoney(t.deposit)}</p>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
     // 계약 변동 호실: 같은 호실에 과거 세입자와 현재 세입자가 모두 있는 경우,
     // 이전 세입자와 현재 세입자 간의 월세/관리비 증감을 표시 (당해년도)
     function renderContractChanges() {
@@ -2187,6 +2255,65 @@
                   </div>
                   <p class="text-white font-bold mt-0.5">${fmtMoney(c.currMgmt)}</p>
                 </div>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    // 통계: 전 건물 당해년도 신규 입주 세대
+    function renderStatsNewTenants() {
+      const el = document.getElementById('statsNewTenantsList');
+      const year = new Date().getFullYear();
+      const yearStart = `${year}-01-01`;
+      const yearEnd = `${year}-12-31`;
+      document.getElementById('statsNewTenantsTitle').textContent = `🆕 ${year}년 신규 입주 세대 (전 건물)`;
+
+      const list = [];
+      buildings.forEach(b => {
+        (b.tenants || []).forEach(t => {
+          if (t.moveIn && t.moveIn >= yearStart && t.moveIn <= yearEnd) {
+            list.push({ building: b.name, room: t.room || '', name: t.name || '', moveIn: t.moveIn, deposit: t.deposit, rent: t.rent, mgmt: t.mgmt, status: getTenantStatus(t) });
+          }
+        });
+      });
+      list.sort((a, c) => String(a.moveIn || '').localeCompare(String(c.moveIn || '')));
+
+      if (list.length === 0) {
+        el.innerHTML = '<p class="text-sm text-slate-500 py-6 text-center">당해년도 신규 입주 세대가 없습니다.</p>';
+        return;
+      }
+
+      el.innerHTML = list.map(t => {
+        const badge = t.status === 'upcoming'
+          ? '<span class="bg-sky-500/20 text-sky-400 text-[10px] font-bold px-1.5 py-0.5 rounded-full">입주예정</span>'
+          : t.status === 'active'
+          ? '<span class="bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-1.5 py-0.5 rounded-full">입주중</span>'
+          : '<span class="bg-slate-500/20 text-slate-400 text-[10px] font-bold px-1.5 py-0.5 rounded-full">퇴거</span>';
+        return `
+          <div class="bg-slate-900 rounded-xl p-3 border border-slate-700 mb-2">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="text-sm font-bold text-white truncate">${escapeHtml(t.building)}</span>
+                <span class="text-slate-500 text-xs">·</span>
+                <span class="text-sm text-white">${escapeHtml(t.room)}호</span>
+                <span class="text-slate-500 text-xs">·</span>
+                <span class="text-sm text-white truncate">${escapeHtml(t.name)}</span>
+              </div>
+              ${badge}
+            </div>
+            <div class="grid grid-cols-3 gap-2 text-xs">
+              <div class="bg-slate-800 rounded-lg px-2 py-1.5">
+                <p class="text-[10px] text-slate-500">입주일</p>
+                <p class="text-slate-200 font-semibold mt-0.5">${fmtDate(t.moveIn)}</p>
+              </div>
+              <div class="bg-slate-800 rounded-lg px-2 py-1.5">
+                <p class="text-[10px] text-slate-500">월세/관리비</p>
+                <p class="text-emerald-300 font-semibold mt-0.5">${fmtMoney(t.rent)} / ${fmtMoney(t.mgmt)}</p>
+              </div>
+              <div class="bg-slate-800 rounded-lg px-2 py-1.5">
+                <p class="text-[10px] text-slate-500">보증금</p>
+                <p class="text-white font-semibold mt-0.5">${fmtMoney(t.deposit)}</p>
               </div>
             </div>
           </div>`;
