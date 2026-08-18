@@ -1075,20 +1075,27 @@
         const imgHtml = c.image
           ? `<img src="${c.image}" alt="${escapeHtml(c.type || '비용')}" class="w-12 h-12 object-cover rounded-lg cursor-pointer border border-slate-600" onclick="openCommonCostImageViewer('${c.id}')"/>`
           : '';
+        const saveBtn = c.image
+          ? `<button data-ccsave="${c.id}" class="text-sky-400 hover:text-sky-300 text-xs whitespace-nowrap" title="이미지 저장">💾</button>`
+          : '';
         list.innerHTML += `
           <div class="bg-slate-900 rounded-xl px-3 py-2 border border-slate-700 flex items-center justify-between gap-3">
             <div class="flex items-center gap-3 min-w-0">
               ${imgHtml}
-              <span class="text-sm font-bold text-white">${escapeHtml(c.type || '비용')}</span>
+              <span class="text-sm font-bold text-white truncate">${escapeHtml(c.type || '비용')}</span>
             </div>
             <div class="flex items-center gap-3">
               <span class="text-sm font-bold text-emerald-400">${Number(c.cost).toLocaleString('ko-KR')}원</span>
+              ${saveBtn}
               <button data-ccid="${c.id}" class="text-rose-400 hover:text-rose-300 text-xs">삭제</button>
             </div>
           </div>`;
       });
       list.querySelectorAll('[data-ccid]').forEach(btn => {
         btn.addEventListener('click', () => deleteCommonCost(btn.dataset.ccid));
+      });
+      list.querySelectorAll('[data-ccsave]').forEach(btn => {
+        btn.addEventListener('click', () => saveCommonCostImage(btn.dataset.ccsave));
       });
     }
 
@@ -1137,18 +1144,46 @@
       renderCommonCosts();
     }
 
+    // 공용 비용 이미지 저장 (다운로드)
+    function saveCommonCostImage(cid) {
+      const b = buildings.find(x => x.id === currentBuildingId);
+      if (!b) return;
+      const c = (b.commonCosts || []).find(x => x.id === cid);
+      if (!c || !c.image) return;
+      try {
+        const blob = dataUrlToBlob(c.image);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const typePart = sanitizeFileName(c.type || '공용비용');
+        const dateStr = c.createdAt ? new Date(c.createdAt).toISOString().slice(0, 10) : '';
+        const idPart = String(c.id).slice(-4);
+        a.download = `${typePart}_${dateStr}_${idPart}.jpg`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch (e) {
+        alert('이미지 저장에 실패했습니다.');
+      }
+    }
+
     // 공용 비용 이미지 미리보기 (첨부 선택 시)
+    let ccPreviewUrl = null;
     function showCommonCostImgPreview(src) {
       const box = document.getElementById('ccCommonCostImgPreview');
+      if (ccPreviewUrl) { URL.revokeObjectURL(ccPreviewUrl); ccPreviewUrl = null; }
       box.innerHTML = '';
       const img = document.createElement('img');
       img.src = src;
       img.className = 'w-12 h-12 object-cover rounded-lg border border-slate-600';
       box.appendChild(img);
       box.classList.remove('hidden');
+      if (src.startsWith('blob:')) ccPreviewUrl = src;
     }
 
     function hideCommonCostImgPreview() {
+      if (ccPreviewUrl) { URL.revokeObjectURL(ccPreviewUrl); ccPreviewUrl = null; }
       const box = document.getElementById('ccCommonCostImgPreview');
       box.classList.add('hidden');
       box.innerHTML = '';
@@ -1291,6 +1326,8 @@
         contractEnd, // 계약만료일 (자동: 입주일 + 2년)
         moveOut: '', // 등록 시 퇴거일 미기록, 퇴거 시 수정으로 기록
         notes: [],
+        rentPaid: [],
+        mgmtPaid: [],
         createdAt: Date.now()
       };
       b.tenants.push(tenant);
@@ -1377,6 +1414,13 @@
         currentTenant.notes.unshift(note);
         saveBuildings();
         renderNotes();
+        // 폼 초기화는 커밋 완료 후 실행 (비동기 이미지 처리 완료 대기)
+        document.getElementById('noteText').value = '';
+        document.getElementById('noteCostType').value = '';
+        document.getElementById('noteCost').value = '';
+        imgInput.value = '';
+        capInput.value = '';
+        hideImgPreview();
       };
       if (imgFile) {
         const reader = new FileReader();
@@ -1390,12 +1434,6 @@
       } else {
         commit();
       }
-      document.getElementById('noteText').value = '';
-      document.getElementById('noteCostType').value = '';
-      document.getElementById('noteCost').value = '';
-      imgInput.value = '';
-      capInput.value = '';
-      hideImgPreview();
     }
 
     // 기록 이미지를 768x1024(세로형, 3:4) 이내로 비율 유지 리사이즈 후 JPEG 압축 저장 (용량 절감)
@@ -1466,17 +1504,21 @@
       img.src = dataUrl;
     }
 
+    let notePreviewUrl = null;
     function showImgPreview(src) {
       const box = document.getElementById('noteImgPreview');
+      if (notePreviewUrl) { URL.revokeObjectURL(notePreviewUrl); notePreviewUrl = null; }
       box.innerHTML = '';
       const img = document.createElement('img');
       img.src = src;
       img.className = 'w-full max-h-48 object-cover rounded-lg';
       box.appendChild(img);
       box.classList.remove('hidden');
+      if (src.startsWith('blob:')) notePreviewUrl = src;
     }
 
     function hideImgPreview() {
+      if (notePreviewUrl) { URL.revokeObjectURL(notePreviewUrl); notePreviewUrl = null; }
       document.getElementById('noteImgPreview').classList.add('hidden');
       document.getElementById('noteImgPreview').innerHTML = '';
     }
