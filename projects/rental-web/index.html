@@ -58,6 +58,12 @@
         <span class="w-16"></span>
       </div>
 
+      <!-- 당해년도 월별 수입/비용/순이익 -->
+      <div class="bg-slate-800 rounded-2xl p-5 mb-6 border border-slate-700">
+        <h3 class="font-bold text-white mb-3" id="yearlyProfitTitle">📅 당해년도 월별 수입/비용/순이익</h3>
+        <div id="yearlyProfitTable" class="space-y-2"></div>
+      </div>
+
       <!-- 앞으로 3개월 퇴거 예정 보증금 준비금 (월별) -->
       <div class="bg-slate-800 rounded-2xl p-5 mb-6 border border-slate-700">
         <h3 class="font-bold text-white mb-3">📅 앞으로 3개월 퇴거 예정 보증금 준비금</h3>
@@ -1902,8 +1908,81 @@
     }
 
     function renderStats() {
+      renderYearlyProfit();
       renderNext3Months();
       renderHighDepositTenants();
+    }
+
+    // 당해년도 월별 수입/비용/순이익
+    function renderYearlyProfit() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const el = document.getElementById('yearlyProfitTable');
+      document.getElementById('yearlyProfitTitle').textContent = `📅 ${year}년 월별 수입/비용/순이익`;
+
+      // 1월~12월 데이터 집계
+      const months = [];
+      let totalIncome = 0, totalCost = 0;
+      for (let m = 1; m <= 12; m++) {
+        const ym = `${year}-${String(m).padStart(2, '0')}`;
+        // 수입: 전 건물 입주중 세입자의 해당 월 납부(paid:true) 월세 + 관리비 (만원)
+        let income = 0;
+        buildings.forEach(b => {
+          (b.tenants || []).forEach(t => {
+            if (getTenantStatus(t) === 'active') {
+              if ((t.rentPaid || []).some(r => r.month === ym && r.paid)) income += Number(t.rent) || 0;
+              if ((t.mgmtPaid || []).some(r => r.month === ym && r.paid)) income += Number(t.mgmt) || 0;
+            }
+          });
+        });
+        // 비용: 전 건물 공용비용 중 해당 월(createdAt 기준) 것 (만원)
+        let cost = 0;
+        buildings.forEach(b => {
+          (b.commonCosts || []).forEach(c => {
+            if (c.createdAt) {
+              const d = new Date(c.createdAt);
+              if (d.getFullYear() === year && (d.getMonth() + 1) === m) {
+                cost += (Number(c.cost) || 0) / 10000;
+              }
+            }
+          });
+        });
+        const profit = income - cost;
+        totalIncome += income;
+        totalCost += cost;
+        months.push({ m, ym, income, cost, profit });
+      }
+
+      let html = '';
+      // 헤더 행
+      html += `
+        <div class="grid grid-cols-4 gap-2 bg-slate-900 rounded-xl px-3 py-2 border border-slate-700 text-[11px] font-bold text-slate-400">
+          <span>월</span>
+          <span class="text-right text-emerald-400">수입</span>
+          <span class="text-right text-rose-400">비용</span>
+          <span class="text-right text-white">순이익</span>
+        </div>`;
+      // 월별 행
+      months.forEach(mo => {
+        const isCurrent = (mo.m === now.getMonth() + 1);
+        html += `
+          <div class="grid grid-cols-4 gap-2 ${isCurrent ? 'bg-indigo-600/20 border border-indigo-500/40' : 'bg-slate-900 border border-slate-700'} rounded-xl px-3 py-2 text-xs">
+            <span class="font-bold ${isCurrent ? 'text-indigo-300' : 'text-slate-300'}">${mo.m}월${isCurrent ? ' (현재)' : ''}</span>
+            <span class="text-right font-bold text-emerald-400">${mo.income > 0 ? fmtMoney(mo.income) : '-'}</span>
+            <span class="text-right font-bold text-rose-400">${mo.cost > 0 ? fmtMoney(mo.cost) : '-'}</span>
+            <span class="text-right font-bold ${mo.profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${mo.profit !== 0 ? fmtMoney(mo.profit) : '-'}</span>
+          </div>`;
+      });
+      // 합계 행
+      const totalProfit = totalIncome - totalCost;
+      html += `
+        <div class="grid grid-cols-4 gap-2 bg-slate-900 rounded-xl px-3 py-2.5 border border-slate-600 text-sm font-bold">
+          <span class="text-white">합계</span>
+          <span class="text-right text-emerald-400">${fmtMoney(totalIncome)}</span>
+          <span class="text-right text-rose-400">${fmtMoney(totalCost)}</span>
+          <span class="text-right ${totalProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${fmtMoney(totalProfit)}</span>
+        </div>`;
+      el.innerHTML = html;
     }
 
     // 입주중 세입자 중 보증금(deposit, 만원) 기준값 초과 세입자 목록
