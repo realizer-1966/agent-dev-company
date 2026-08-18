@@ -1674,7 +1674,7 @@
         list.innerHTML = '<p class="text-xs text-slate-500">아직 입금 기록이 없습니다. 년월을 선택해 기록하세요.</p>';
         return;
       }
-      t.rentPaid.forEach(r => {
+      t.rentPaid.slice().sort((a, b) => String(a.month).localeCompare(String(b.month))).forEach(r => {
         const monthLabel = formatMonth(r.month);
         const paid = r.paid;
         list.innerHTML += `
@@ -1682,9 +1682,9 @@
             <div class="flex items-center gap-2 min-w-0">
               <button data-rid="${r.id}" data-act="toggle" class="w-5 h-5 shrink-0 rounded border-2 ${paid ? 'bg-emerald-500 border-emerald-500' : 'border-slate-500'} flex items-center justify-center text-xs text-white">${paid ? '✓' : ''}</button>
               <span class="text-sm font-bold ${paid ? 'text-slate-200' : 'text-rose-400'} truncate">${monthLabel}</span>
-            </div>
-            <div class="flex items-center gap-3 shrink-0">
-              <span class="text-xs whitespace-nowrap ${paid ? 'text-emerald-400' : 'text-rose-400 font-bold'}">${paid ? '입금 완료' : '미입금'}</span>
+             </div>
+             <div class="flex items-center gap-3 shrink-0">
+               <span class="text-xs whitespace-nowrap ${paid ? 'text-emerald-400' : 'text-rose-400 font-bold'}">${paid ? '입금 완료' : '미입금'}</span>
               <button data-rid="${r.id}" data-act="del" class="text-rose-400 hover:text-rose-300 text-xs whitespace-nowrap">삭제</button>
             </div>
           </div>`;
@@ -1752,7 +1752,7 @@
         list.innerHTML = '<p class="text-xs text-slate-500">아직 납부 기록이 없습니다. 년월을 선택해 기록하세요.</p>';
         return;
       }
-      t.mgmtPaid.forEach(r => {
+      t.mgmtPaid.slice().sort((a, b) => String(a.month).localeCompare(String(b.month))).forEach(r => {
         const monthLabel = formatMonth(r.month);
         const paid = r.paid;
         list.innerHTML += `
