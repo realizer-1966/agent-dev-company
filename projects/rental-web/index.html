@@ -423,7 +423,7 @@
     // ============ 포맷팅 ============
     function fmtMoney(v) {
       if (v === null || v === undefined || v === '') return '-';
-      return Number(v).toLocaleString('ko-KR') + '만원';
+      return Math.round(Number(v)).toLocaleString('ko-KR') + '만원';
     }
     function fmtDate(d) {
       if (!d) return '-';
