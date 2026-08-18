@@ -2447,10 +2447,49 @@
     document.getElementById('eMoveIn').addEventListener('change', () => autoFillContractEnd('e'));
 
     // ============ 초기화 ============
+    // 마이그레이션: 2026년 7월까지 모든 세입자의 월세/관리비 납부완료 처리
+    // 한 번만 실행 (localStorage 플래그로 중복 실행 방지)
+    async function migratePaidRecords() {
+      if (localStorage.getItem('rentalMigrated202607')) return;
+      const targetYear = 2026;
+      const targetMonths = [];
+      for (let m = 1; m <= 7; m++) targetMonths.push(`${targetYear}-${String(m).padStart(2, '0')}`);
+
+      let changed = false;
+      buildings.forEach(b => {
+        (b.tenants || []).forEach(t => {
+          if (!t.rentPaid) t.rentPaid = [];
+          if (!t.mgmtPaid) t.mgmtPaid = [];
+          targetMonths.forEach(ym => {
+            // 퇴거일이 해당 월보다 이전이면 제외
+            if (t.moveOut && t.moveOut < ym + '-01') return;
+            // 입주일이 해당 월보다 이후면 제외
+            if (t.moveIn && t.moveIn > ym + '-28') return;
+            // rentPaid에 해당 월 기록이 없으면 paid:true로 추가
+            if (!t.rentPaid.some(r => r.month === ym)) {
+              t.rentPaid.push({ id: genId(), month: ym, paid: true });
+              changed = true;
+            }
+            // mgmtPaid에 해당 월 기록이 없으면 paid:true로 추가
+            if (!t.mgmtPaid.some(r => r.month === ym)) {
+              t.mgmtPaid.push({ id: genId(), month: ym, paid: true });
+              changed = true;
+            }
+          });
+        });
+      });
+      if (changed) {
+        await saveBuildings();
+        console.log('마이그레이션 완료: 2026년 7월까지 납부완료 처리');
+      }
+      localStorage.setItem('rentalMigrated202607', '1');
+    }
+
     async function init() {
       try {
         await openDB();
         await loadBuildings();
+        await migratePaidRecords();
       } catch (err) {
         console.error('DB 열기 실패', err);
       }
