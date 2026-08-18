@@ -564,8 +564,11 @@
           + ((t.rentPaid || []).some(r => r.month === cardMonth && r.paid) ? (Number(t.rent)||0) : 0)
           + ((t.mgmtPaid || []).some(r => r.month === cardMonth && r.paid) ? (Number(t.mgmt)||0) : 0), 0);
         const unpaidAmount = totalAmount - paidAmount;
-        // 공용비용 합계 (만원)
-        const commonCostTotal = (b.commonCosts || []).reduce((s, c) => s + (Number(c.cost) || 0) / 10000, 0);
+        // 공용비용 합계 (만원) — 환급 항목은 차감
+        const commonCostTotal = (b.commonCosts || []).reduce((s, c) => {
+          if (c.isRefund) return s - (Number(c.cost) || 0) / 10000; // 환급은 차감
+          return s + (Number(c.cost) || 0) / 10000;
+        }, 0);
         // 수익 = 납부액 - 공용비용 (만원)
         const profitAmount = paidAmount - commonCostTotal;
         // 입주일(day-of-month)이 매달 1일~오늘 사이인 입주 중(active) 세입자 중, 이번 달(YYYY-MM) 월세 입금 또는
@@ -1101,8 +1104,12 @@
       if (!b.commonCosts) b.commonCosts = [];
       const list = document.getElementById('commonCostsList');
       list.innerHTML = '';
-      const total = b.commonCosts.reduce((s, c) => s + (Number(c.cost) || 0), 0);
-      document.getElementById('commonCostSum').textContent = total ? total.toLocaleString('ko-KR') + '원' : '0원';
+      // 일반 비용 합계 (환급 항목 제외)
+      const total = b.commonCosts.reduce((s, c) => s + (c.isRefund ? 0 : (Number(c.cost) || 0)), 0);
+      // 환급 합계
+      const refundTotal = b.commonCosts.reduce((s, c) => s + (c.isRefund ? (Number(c.cost) || 0) : 0), 0);
+      const netTotal = total - refundTotal;
+      document.getElementById('commonCostSum').textContent = netTotal ? netTotal.toLocaleString('ko-KR') + '원' : '0원';
       if (b.commonCosts.length === 0) {
         list.innerHTML = '<p class="text-xs text-slate-500">아직 공용 비용 기록이 없습니다.</p>';
         return;
@@ -1114,13 +1121,15 @@
         const saveBtn = c.image
           ? `<button data-ccsave="${c.id}" class="text-sky-400 hover:text-sky-300 text-xs whitespace-nowrap" title="이미지 저장">💾</button>`
           : '';
+        const costLabel = c.isRefund ? '환급' : '비용';
+        const costColor = c.isRefund ? 'text-rose-400' : 'text-emerald-400';
         list.innerHTML += `
           <div class="bg-slate-900 rounded-xl px-3 py-2.5 border border-slate-700 flex items-center justify-between gap-3">
             <div class="flex items-center gap-3 min-w-0 flex-1">
               ${imgHtml}
               <div class="min-w-0">
                 <p class="text-sm font-bold text-white truncate">${escapeHtml(c.type || '비용')}</p>
-                <p class="text-xs font-bold text-emerald-400 mt-0.5">${Number(c.cost).toLocaleString('ko-KR')}원${c.date ? ' <span class="text-slate-400 font-normal">· ' + escapeHtml(c.date) + '</span>' : ''}</p>
+                <p class="text-xs font-bold ${costColor} mt-0.5">${costLabel} ${Number(c.cost).toLocaleString('ko-KR')}원${c.date ? ' <span class="text-slate-400 font-normal">· ' + escapeHtml(c.date) + '</span>' : ''}</p>
               </div>
             </div>
             <div class="flex items-center gap-2 shrink-0">
@@ -1426,16 +1435,17 @@
       const refundAmount = Math.round((rentMonthly + mgmtMonthly) * remainDays / 30);
       if (refundAmount <= 0) return;
 
-      // 공용비용에 월세환급 항목 추가 (차감이므로 음수)
+      // 공용비용에 월세환급 항목 추가 (양수 비용, isRefund 플래그로 차감 처리)
       if (!b.commonCosts) b.commonCosts = [];
       b.commonCosts.unshift({
         id: genId(),
         type: `월세환급 (${t.room || ''}호 ${t.name || ''})`,
-        cost: -refundAmount, // 차감이므로 음수
+        cost: refundAmount, // 양수 비용으로 저장
         date: t.moveOut,
         createdAt: Date.now(),
         image: null,
         refundTenantId: t.id, // 중복 방지용
+        isRefund: true, // 환급 항목 표시 (합계에서 차감)
       });
       console.log(`월세환급: ${t.name} ${t.room}호, 남은일수=${remainDays}일, 환급액=${refundAmount}원`);
     }
@@ -2064,6 +2074,7 @@
           });
         });
         // 비용: 전 건물 공용비용 중 해당 월(date 기준, 없으면 createdAt fallback) (만원)
+        // 환급 항목(isRefund)은 비용에서 차감
         let cost = 0;
         buildings.forEach(b => {
           (b.commonCosts || []).forEach(c => {
@@ -2071,7 +2082,11 @@
             if (dateStr) {
               const [cy, cm] = dateStr.split('-').map(Number);
               if (cy === year && cm === m) {
-                cost += (Number(c.cost) || 0) / 10000;
+                if (c.isRefund) {
+                  cost -= (Number(c.cost) || 0) / 10000; // 환급은 비용 차감
+                } else {
+                  cost += (Number(c.cost) || 0) / 10000;
+                }
               }
             }
           });
