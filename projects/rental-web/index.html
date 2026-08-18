@@ -1336,6 +1336,10 @@
       // 계약만료일: 입력값 우선, 비었으면 입주일 + 2년 자동 계산
       t.contractEnd = document.getElementById('eContractEnd').value || calcContractEnd(t.moveIn);
       t.moveOut = document.getElementById('eMoveOut').value || '';
+      // 퇴거일이 입력되었거나 중도/만기 퇴거인 경우 납부완료 자동 체크
+      if (t.moveOut) {
+        autoFillPaidRecords(t);
+      }
       saveBuildings();
       renderTenants();
       closeEditModal();
@@ -1343,6 +1347,36 @@
     }
 
     // ============ 세입자 CRUD ============
+    // 세입자의 입주일~퇴거일(또는 오늘)까지 월세/관리비 납부완료 기록 자동 생성
+    // 이미 해당 월 기록이 있으면 건드리지 않음
+    function autoFillPaidRecords(t) {
+      if (!t.moveIn) return;
+      if (!t.rentPaid) t.rentPaid = [];
+      if (!t.mgmtPaid) t.mgmtPaid = [];
+      // 종료월 = 퇴거일이 있으면 퇴거월, 없으면 이번 달
+      const endMonth = t.moveOut ? t.moveOut.slice(0, 7) : todayMonth();
+      // 시작월 = 입주월
+      const startMonth = t.moveIn.slice(0, 7);
+      // startMonth ~ endMonth 까지의 모든 YYYY-MM 생성
+      const [sy, sm] = startMonth.split('-').map(Number);
+      const [ey, em] = endMonth.split('-').map(Number);
+      let y = sy, m = sm;
+      const months = [];
+      while (y < ey || (y === ey && m <= em)) {
+        months.push(`${y}-${String(m).padStart(2, '0')}`);
+        m++;
+        if (m > 12) { m = 1; y++; }
+      }
+      months.forEach(ym => {
+        if (!t.rentPaid.some(r => r.month === ym)) {
+          t.rentPaid.push({ id: genId(), month: ym, paid: true });
+        }
+        if (!t.mgmtPaid.some(r => r.month === ym)) {
+          t.mgmtPaid.push({ id: genId(), month: ym, paid: true });
+        }
+      });
+    }
+
     function addTenant() {
       const b = buildings.find(x => x.id === currentBuildingId);
       if (!b) return;
@@ -1375,6 +1409,7 @@
         b.tenants.forEach(t => {
           if (t.id !== tenant.id && t.room === tenant.room && getTenantStatus(t) === 'active' && t.moveOut === '') {
             t.moveOut = prevMoveOut;
+            autoFillPaidRecords(t); // 퇴거일 설정 시 납부완료 자동 체크
           }
         });
       }
