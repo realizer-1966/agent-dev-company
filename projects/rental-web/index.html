@@ -1383,26 +1383,50 @@
 
     // 중도퇴실 시 월세환급 계산 및 공용비용에 자동 추가
     // 환급액 = (월세 + 관리비) * 남은일수 / 30 (원 단위)
-    // 남은일수 = 만기일 - 퇴거일
+    // 남은일수 계산:
+    //   - 월세납입일 = 입주일(moveIn)의 일자
+    //   - 중도퇴거일이 월세납입일을 지난 경우 → 다음 달 월세납입일부터 만기일까지
+    //   - 중도퇴거일이 월세납입일 이전이거나 같은 경우 → 퇴거일부터 만기일까지
     function addMidtermRefund(t, b) {
-      if (!t.moveOut || !t.contractEnd) return;
+      if (!t.moveOut || !t.contractEnd || !t.moveIn) return;
       if (t.moveOut >= t.contractEnd) return; // 만기퇴거는 환급 없음
       // 이미 해당 세입자의 환급 기록이 있으면 중복 추가 안 함
       if ((b.commonCosts || []).some(c => c.refundTenantId === t.id)) return;
-      // 남은 일수 계산
+
+      // 월세납입일 = 입주일의 일자
+      const moveInDay = parseInt(t.moveIn.split('-')[2], 10);
+      // 퇴거일의 일자
+      const outDay = parseInt(t.moveOut.split('-')[2], 10);
+
+      // 만기일
       const [ey, em, ed] = t.contractEnd.split('-').map(Number);
-      const [oy, om, od] = t.moveOut.split('-').map(Number);
       const endDate = new Date(ey, em - 1, ed);
-      const outDate = new Date(oy, om - 1, od);
-      const remainDays = Math.round((endDate - outDate) / (1000 * 60 * 60 * 24));
+
+      // 환급 기준 시작일 계산
+      const [oy, om] = t.moveOut.split('-').map(Number);
+      let startDate;
+      if (outDay > moveInDay) {
+        // 중도퇴거일이 월세납입일을 지난 경우 → 다음 달 납입일부터 계산
+        const nextMonth = new Date(oy, om, moveInDay); // om은 1-based, Date는 0-based이므로 om이 곧 다음 달
+        startDate = nextMonth;
+      } else {
+        // 중도퇴거일이 납입일 이전이거나 같은 경우 → 퇴거일부터 계산
+        startDate = new Date(oy, om - 1, outDay);
+      }
+
+      // 남은 일수 = 만기일 - 시작일
+      const remainDays = Math.round((endDate - startDate) / (1000 * 60 * 60 * 24));
       if (remainDays <= 0) return;
+
       // 환급액 계산: (월세 + 관리비)는 만원 단위 → 원 단위로 변환
       const rentMonthly = (Number(t.rent) || 0) * 10000;
       const mgmtMonthly = (Number(t.mgmt) || 0) * 10000;
       const refundAmount = Math.round((rentMonthly + mgmtMonthly) * remainDays / 30);
       if (refundAmount <= 0) return;
+
       // 공용비용에 월세환급 항목 추가 (차감이므로 음수)
       if (!b.commonCosts) b.commonCosts = [];
+      const startDateStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
       b.commonCosts.unshift({
         id: genId(),
         type: `월세환급 (${t.room || ''}호 ${t.name || ''})`,
@@ -1412,6 +1436,7 @@
         image: null,
         refundTenantId: t.id, // 중복 방지용
       });
+      console.log(`월세환급: ${t.name} ${t.room}호, 남은일수=${remainDays}일, 환급액=${refundAmount}원 (기준일=${startDateStr})`);
     }
 
     function addTenant() {
