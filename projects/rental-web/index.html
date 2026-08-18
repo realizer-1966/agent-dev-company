@@ -1351,7 +1351,6 @@
       // 퇴거일이 입력되었거나 중도/만기 퇴거인 경우 납부완료 자동 체크
       if (t.moveOut) {
         autoFillPaidRecords(t);
-        addMidtermRefund(t, b); // 중도퇴실 시 월세환급 자동 추가
       }
       saveBuildings();
       renderTenants();
@@ -1390,66 +1389,6 @@
       });
     }
 
-    // 중도퇴실 시 월세환급 계산 및 공용비용에 자동 추가
-    // 환급액 = (월세 + 관리비) * 남은일수 / 30 (원 단위)
-    // 남은일수 계산:
-    //   - 월세납입일 = 입주일(moveIn)의 일자
-    //   - 중도퇴거일이 월세납입일을 지난 경우 → 다음 달 월세납입일부터 만기일까지
-    //   - 중도퇴거일이 월세납입일 이전이거나 같은 경우 → 퇴거일부터 만기일까지
-    function addMidtermRefund(t, b) {
-      if (!t.moveOut || !t.contractEnd || !t.moveIn) return;
-      if (t.moveOut >= t.contractEnd) return; // 만기퇴거는 환급 없음
-      // 이미 해당 세입자의 환급 기록이 있으면 중복 추가 안 함
-      if ((b.commonCosts || []).some(c => c.refundTenantId === t.id)) return;
-
-      // 월세납입일 = 입주일의 일자
-      const moveInDay = parseInt(t.moveIn.split('-')[2], 10);
-      // 퇴거일의 일자
-      const outDay = parseInt(t.moveOut.split('-')[2], 10);
-
-      // 만기일
-      const [ey, em, ed] = t.contractEnd.split('-').map(Number);
-      const endDate = new Date(ey, em - 1, ed);
-
-      // 환급 남은일수 계산
-      const [oy, om] = t.moveOut.split('-').map(Number);
-      let remainDays;
-      if (outDay > moveInDay) {
-        // 조건 1: 중도퇴거일이 월세납입일을 지난 경우
-        // → 다음 달 납입일 - 퇴거일
-        const nextPayDate = new Date(oy, om, moveInDay); // 다음 달 납입일
-        const outDate = new Date(oy, om - 1, outDay); // 퇴거일
-        remainDays = Math.round((nextPayDate - outDate) / (1000 * 60 * 60 * 24));
-      } else {
-        // 조건 2: 중도퇴거일이 월세납입일을 지나지 않은 경우
-        // → 월세납입일 - 중도퇴거일
-        const payDateThisMonth = new Date(oy, om - 1, moveInDay); // 이번 달 납입일
-        const outDate = new Date(oy, om - 1, outDay); // 퇴거일
-        remainDays = Math.round((payDateThisMonth - outDate) / (1000 * 60 * 60 * 24));
-      }
-      if (remainDays <= 0) return;
-
-      // 환급액 계산: (월세 + 관리비)는 만원 단위 → 원 단위로 변환
-      const rentMonthly = (Number(t.rent) || 0) * 10000;
-      const mgmtMonthly = (Number(t.mgmt) || 0) * 10000;
-      const refundAmount = Math.round((rentMonthly + mgmtMonthly) * remainDays / 30);
-      if (refundAmount <= 0) return;
-
-      // 공용비용에 월세환급 항목 추가 (양수 비용, isRefund 플래그로 차감 처리)
-      if (!b.commonCosts) b.commonCosts = [];
-      b.commonCosts.unshift({
-        id: genId(),
-        type: `월세환급 (${t.room || ''}호 ${t.name || ''})`,
-        cost: refundAmount, // 양수 비용으로 저장
-        date: t.moveOut,
-        createdAt: Date.now(),
-        image: null,
-        refundTenantId: t.id, // 중복 방지용
-        isRefund: true, // 환급 항목 표시 (합계에서 차감)
-      });
-      console.log(`월세환급: ${t.name} ${t.room}호, 남은일수=${remainDays}일, 환급액=${refundAmount}원`);
-    }
-
     function addTenant() {
       const b = buildings.find(x => x.id === currentBuildingId);
       if (!b) return;
@@ -1483,7 +1422,6 @@
           if (t.id !== tenant.id && t.room === tenant.room && getTenantStatus(t) === 'active' && t.moveOut === '') {
             t.moveOut = prevMoveOut;
             autoFillPaidRecords(t); // 퇴거일 설정 시 납부완료 자동 체크
-            addMidtermRefund(t, b);  // 중도퇴실 시 월세환급 자동 추가
           }
         });
       }
