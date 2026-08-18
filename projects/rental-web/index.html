@@ -58,9 +58,15 @@
         <span class="w-16"></span>
       </div>
 
-      <!-- 당해년도 월별 수입/비용/순이익 -->
+      <!-- 월별 수입/비용/순이익 (연도 선택) -->
       <div class="bg-slate-800 rounded-2xl p-5 mb-6 border border-slate-700">
-        <h3 class="font-bold text-white mb-3" id="yearlyProfitTitle">📅 당해년도 월별 수입/비용/순이익</h3>
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-bold text-white" id="yearlyProfitTitle">📅 월별 수입/비용/순이익</h3>
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-slate-400 whitespace-nowrap">연도</label>
+            <select id="yearlyProfitYearSelect" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-white"></select>
+          </div>
+        </div>
         <div id="yearlyProfitTable" class="space-y-2"></div>
       </div>
 
@@ -1982,6 +1988,7 @@
     }
 
     function renderStats() {
+      populateYearSelect();
       renderYearlyProfit();
       renderContractChanges();
       renderStatsNewTenants();
@@ -1990,9 +1997,39 @@
     }
 
     // 당해년도 월별 수입/비용/순이익
+    // 연도 선택기 옵션 생성 (데이터 기반 + 당해년도)
+    function populateYearSelect() {
+      const sel = document.getElementById('yearlyProfitYearSelect');
+      if (!sel) return;
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      // 데이터에서 가장 오래된 연도 찾기
+      let minYear = currentYear;
+      buildings.forEach(b => {
+        (b.tenants || []).forEach(t => {
+          if (t.moveIn) minYear = Math.min(minYear, parseInt(t.moveIn.slice(0, 4), 10));
+        });
+        (b.commonCosts || []).forEach(c => {
+          if (c.date) minYear = Math.min(minYear, parseInt(c.date.slice(0, 4), 10));
+        });
+      });
+      // 옵션 생성 (minYear ~ currentYear + 1)
+      const savedYear = localStorage.getItem('rentalProfitYear');
+      sel.innerHTML = '';
+      for (let y = minYear; y <= currentYear + 1; y++) {
+        const opt = document.createElement('option');
+        opt.value = y;
+        opt.textContent = y + '년';
+        if (savedYear && parseInt(savedYear) === y) opt.selected = true;
+        else if (!savedYear && y === currentYear) opt.selected = true;
+        sel.appendChild(opt);
+      }
+    }
+
     function renderYearlyProfit() {
       const now = new Date();
-      const year = now.getFullYear();
+      const sel = document.getElementById('yearlyProfitYearSelect');
+      const year = sel ? parseInt(sel.value) : now.getFullYear();
       const el = document.getElementById('yearlyProfitTable');
       document.getElementById('yearlyProfitTitle').textContent = `📅 ${year}년 월별 수입/비용/순이익`;
 
@@ -2444,6 +2481,12 @@
     document.getElementById('restoreFile').addEventListener('change', applyRestore);
     document.getElementById('statsBtn').addEventListener('click', openStats);
     document.getElementById('statsBackBtn').addEventListener('click', closeStats);
+    // 연도 선택 시 월별 수입/비용/순이익 재렌더
+    document.getElementById('yearlyProfitYearSelect').addEventListener('change', () => {
+      const sel = document.getElementById('yearlyProfitYearSelect');
+      localStorage.setItem('rentalProfitYear', sel.value);
+      renderYearlyProfit();
+    });
     document.getElementById('highDepositApplyBtn').addEventListener('click', () => {
       const input = document.getElementById('highDepositThresholdInput');
       setDepositThreshold(input.value);
