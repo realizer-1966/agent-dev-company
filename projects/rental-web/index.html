@@ -109,6 +109,10 @@
           <input id="ccCost" type="number" min="0" step="0.01" placeholder="비용 (원)" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400"/>
           <button id="ccAddBtn" class="btn bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl">+ 공용 비용 기록</button>
         </div>
+        <div class="flex items-center gap-2 mb-3">
+          <input id="ccCommonCostImg" type="file" accept="image/*" class="flex-1 min-w-[200px] text-sm text-slate-300 file:mr-3 file:bg-indigo-600 file:text-white file:border-0 file:rounded-xl file:px-4 file:py-2 file:font-bold file:cursor-pointer"/>
+          <div id="ccCommonCostImgPreview" class="hidden"></div>
+        </div>
         <div id="commonCostsList" class="space-y-2 max-h-56 overflow-y-auto"></div>
       </div>
 
@@ -1066,9 +1070,13 @@
         return;
       }
       b.commonCosts.forEach(c => {
+        const imgHtml = c.image
+          ? `<img src="${c.image}" alt="${escapeHtml(c.type || '비용')}" class="w-12 h-12 object-cover rounded-lg cursor-pointer border border-slate-600" onclick="openCommonCostImageViewer('${c.id}')"/>`
+          : '';
         list.innerHTML += `
-          <div class="bg-slate-900 rounded-xl px-3 py-2 border border-slate-700 flex items-center justify-between">
-            <div>
+          <div class="bg-slate-900 rounded-xl px-3 py-2 border border-slate-700 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              ${imgHtml}
               <span class="text-sm font-bold text-white">${escapeHtml(c.type || '비용')}</span>
             </div>
             <div class="flex items-center gap-3">
@@ -1090,11 +1098,30 @@
       const cost = costVal === '' ? null : Number(costVal);
       if (cost === null || isNaN(cost)) { alert('공용 비용 금액을 입력하세요.'); return; }
       if (!b.commonCosts) b.commonCosts = [];
-      b.commonCosts.unshift({ id: genId(), type: type || '기타', cost, createdAt: Date.now() });
-      saveBuildings();
-      renderCommonCosts();
-      document.getElementById('ccCostType').value = '';
-      document.getElementById('ccCost').value = '';
+      const imgInput = document.getElementById('ccCommonCostImg');
+      const imgFile = imgInput.files[0];
+      const commonCost = { id: genId(), type: type || '기타', cost, createdAt: Date.now(), image: null };
+      const commit = () => {
+        b.commonCosts.unshift(commonCost);
+        saveBuildings();
+        renderCommonCosts();
+        document.getElementById('ccCostType').value = '';
+        document.getElementById('ccCost').value = '';
+        imgInput.value = '';
+        hideCommonCostImgPreview();
+      };
+      if (imgFile) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          resizeNoteImage(reader.result, (resized) => {
+            commonCost.image = resized;
+            commit();
+          });
+        };
+        reader.readAsDataURL(imgFile);
+      } else {
+        commit();
+      }
     }
 
     function deleteCommonCost(cid) {
@@ -1104,6 +1131,59 @@
       b.commonCosts = b.commonCosts.filter(c => c.id !== cid);
       saveBuildings();
       renderCommonCosts();
+    }
+
+    // 공용 비용 이미지 미리보기 (첨부 선택 시)
+    function showCommonCostImgPreview(src) {
+      const box = document.getElementById('ccCommonCostImgPreview');
+      box.innerHTML = '';
+      const img = document.createElement('img');
+      img.src = src;
+      img.className = 'w-12 h-12 object-cover rounded-lg border border-slate-600';
+      box.appendChild(img);
+      box.classList.remove('hidden');
+    }
+
+    function hideCommonCostImgPreview() {
+      const box = document.getElementById('ccCommonCostImgPreview');
+      box.classList.add('hidden');
+      box.innerHTML = '';
+    }
+
+    function wireCommonCostImgInput() {
+      document.getElementById('ccCommonCostImg').addEventListener('change', () => {
+        const f = document.getElementById('ccCommonCostImg').files[0];
+        if (f) showCommonCostImgPreview(URL.createObjectURL(f));
+      });
+    }
+
+    // 공용 비용 이미지 라이트박스 뷰어
+    let ccIvList = [];     // 이미지 있는 공용 비용 목록 (현재 건물)
+    let ccIvIndex = -1;
+
+    function openCommonCostImageViewer(cid) {
+      const b = buildings.find(x => x.id === currentBuildingId);
+      if (!b) return;
+      const costs = (b.commonCosts || []).filter(c => c.image);
+      if (costs.length === 0) return;
+      ccIvList = costs;
+      ccIvIndex = costs.findIndex(c => c.id === cid);
+      if (ccIvIndex < 0) ccIvIndex = 0;
+      showCommonCostImageViewerImage();
+      document.getElementById('imageViewer').classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function showCommonCostImageViewerImage() {
+      document.getElementById('ivImg').src = ccIvList[ccIvIndex].image;
+      document.getElementById('ivPrev').style.visibility = ccIvList.length > 1 ? 'visible' : 'hidden';
+      document.getElementById('ivNext').style.visibility = ccIvList.length > 1 ? 'visible' : 'hidden';
+    }
+
+    function ccIvMove(dir) {
+      if (ccIvList.length === 0) return;
+      ccIvIndex = (ccIvIndex + dir + ccIvList.length) % ccIvList.length;
+      showCommonCostImageViewerImage();
     }
 
     // 세입자 상태 판정 (현재 날짜 기준)
@@ -1408,6 +1488,8 @@
       document.getElementById('ivImg').src = '';
       ivIndex = -1;
       ivNotes = [];
+      ccIvIndex = -1;
+      ccIvList = [];
     }
 
     function ivMove(dir) {
@@ -1835,15 +1917,20 @@
     document.getElementById('editModal').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeEditModal(); });
     document.getElementById('roomModal').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeRoomHistory(); });
     // 이미지 뷰어 이벤트
+    function ivNavigate(dir) {
+      // 공용 비용 이미지 뷰어가 활성 상태면 그쪽으로 이동
+      if (ccIvList.length > 0) { ccIvMove(dir); return; }
+      ivMove(dir);
+    }
     document.getElementById('ivClose').addEventListener('click', closeImageViewer);
-    document.getElementById('ivPrev').addEventListener('click', () => ivMove(-1));
-    document.getElementById('ivNext').addEventListener('click', () => ivMove(1));
+    document.getElementById('ivPrev').addEventListener('click', () => ivNavigate(-1));
+    document.getElementById('ivNext').addEventListener('click', () => ivNavigate(1));
     document.getElementById('imageViewer').addEventListener('click', (e) => { if (e.target === e.currentTarget || e.target === document.getElementById('ivContainer')) closeImageViewer(); });
     document.addEventListener('keydown', (e) => {
       if (document.getElementById('imageViewer').classList.contains('hidden')) return;
       if (e.key === 'Escape') closeImageViewer();
-      else if (e.key === 'ArrowLeft') ivMove(-1);
-      else if (e.key === 'ArrowRight') ivMove(1);
+      else if (e.key === 'ArrowLeft') ivNavigate(-1);
+      else if (e.key === 'ArrowRight') ivNavigate(1);
     });
 
     // 입주일 변경 시 계약만료일 = 입주일 + 2년 자동 설정 (등록 폼 / 수정 모달)
@@ -1860,6 +1947,7 @@
       }
       renderBuildings();
       wireImgInputs();
+      wireCommonCostImgInput();
     }
     init();
   </script>
