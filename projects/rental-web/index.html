@@ -1402,23 +1402,21 @@
       const [ey, em, ed] = t.contractEnd.split('-').map(Number);
       const endDate = new Date(ey, em - 1, ed);
 
-      // 환급 기준 시작일 및 남은일수 계산
+      // 환급 남은일수 계산
       const [oy, om] = t.moveOut.split('-').map(Number);
       let remainDays;
       if (outDay > moveInDay) {
         // 조건 1: 중도퇴거일이 월세납입일을 지난 경우
-        // → 다음 달 납입일부터 만기일까지 계산
+        // → 다음 달 납입일 - 퇴거일
         const nextPayDate = new Date(oy, om, moveInDay); // 다음 달 납입일
-        remainDays = Math.round((endDate - nextPayDate) / (1000 * 60 * 60 * 24));
+        const outDate = new Date(oy, om - 1, outDay); // 퇴거일
+        remainDays = Math.round((nextPayDate - outDate) / (1000 * 60 * 60 * 24));
       } else {
         // 조건 2: 중도퇴거일이 월세납입일을 지나지 않은 경우
-        // → (월세납입일 - 중도퇴거일) + (만기일 - 다음달 납입일)
+        // → 월세납입일 - 중도퇴거일
         const payDateThisMonth = new Date(oy, om - 1, moveInDay); // 이번 달 납입일
         const outDate = new Date(oy, om - 1, outDay); // 퇴거일
-        const usedDays = Math.round((payDateThisMonth - outDate) / (1000 * 60 * 60 * 24)); // 납입일까지 남은 일수
-        const nextPayDate = new Date(oy, om, moveInDay); // 다음 달 납입일
-        const remainAfterNext = Math.round((endDate - nextPayDate) / (1000 * 60 * 60 * 24)); // 다음달 납입일~만기일
-        remainDays = usedDays + remainAfterNext;
+        remainDays = Math.round((payDateThisMonth - outDate) / (1000 * 60 * 60 * 24));
       }
       if (remainDays <= 0) return;
 
