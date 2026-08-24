@@ -1063,16 +1063,18 @@
               <div class="bg-slate-800 rounded-lg py-1.5"><p class="text-slate-500">💰 보증금/월세</p><p class="text-emerald-300 font-semibold mt-0.5">${fmtMoney(t.deposit)} / ${fmtMoney(t.rent)}</p></div>
             </div>
             <div class="flex gap-2 mt-3">
-              <button data-tid="${t.id}" data-act="edit" class="btn flex-1 bg-amber-500/80 hover:bg-amber-400 text-white text-xs font-bold py-1.5 rounded-xl">✏️ 수정</button>
+              <button data-tid="${t.id}" data-act="detail" class="btn flex-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold py-1.5 rounded-xl">📋 기록 ${t.notes ? t.notes.length : 0}건</button>
+              <button data-tid="${t.id}" data-act="edit" class="btn bg-amber-500/80 hover:bg-amber-400 text-white text-xs font-bold py-1.5 rounded-xl">✏️ 수정</button>
               <button data-tid="${t.id}" data-act="del" class="btn flex-1 bg-rose-600/80 hover:bg-rose-500 text-white text-xs font-bold py-1.5 rounded-xl">🗑️ 삭제</button>
             </div>
           </div>`;
       });
-      // 수정/삭제 버튼 이벤트 연결 (모달 배경 클릭·다른 카드와 충돌 방지 위해 stopPropagation)
+      // 기록/수정/삭제 버튼 이벤트 연결 (모달 배경 클릭·다른 카드와 충돌 방지 위해 stopPropagation)
       list.querySelectorAll('[data-tid]').forEach(btn => {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
-          if (btn.dataset.act === 'edit') openEditModal(btn.dataset.tid);
+          if (btn.dataset.act === 'detail') { openTenant(btn.dataset.tid); closeRoomHistory(); }
+          else if (btn.dataset.act === 'edit') openEditModal(btn.dataset.tid);
           else if (btn.dataset.act === 'del') deleteTenant(btn.dataset.tid);
         });
       });
@@ -1357,6 +1359,7 @@
       // 퇴거일이 입력되었거나 중도/만기 퇴거인 경우 납부완료 자동 체크
       if (t.moveOut) {
         autoFillPaidRecords(t);
+        addMidtermRefund(t, b);
       }
       saveBuildings();
       renderTenants();
@@ -1395,6 +1398,50 @@
       });
     }
 
+    // 중도퇴실 시 월세환급 계산 및 공용비용에 자동 추가
+    // 환급액 = (월세 + 관리비) * 남은일수 / 30 (원 단위)
+    // 남은일수:
+    //   - 조건 1: 퇴거일이 납입일 이후 → 다음달 납입일 - 퇴거일
+    //   - 조건 2: 퇴거일이 납입일 이전 → 납입일 - 퇴거일
+    function addMidtermRefund(t, b) {
+      if (!t.moveOut || !t.contractEnd || !t.moveIn) return;
+      if (t.moveOut >= t.contractEnd) return; // 만기퇴거는 환급 없음
+      if ((b.commonCosts || []).some(c => c.refundTenantId === t.id)) return; // 중복 방지
+
+      const moveInDay = parseInt(t.moveIn.split('-')[2], 10);
+      const outDay = parseInt(t.moveOut.split('-')[2], 10);
+      const [oy, om] = t.moveOut.split('-').map(Number);
+
+      let remainDays;
+      if (outDay > moveInDay) {
+        // 조건 1: 다음달 납입일 - 퇴거일
+        const nextPayDate = new Date(oy, om, moveInDay);
+        const outDate = new Date(oy, om - 1, outDay);
+        remainDays = Math.round((nextPayDate - outDate) / (1000 * 60 * 60 * 24));
+      } else {
+        // 조건 2: 납입일 - 퇴거일
+        const payDateThisMonth = new Date(oy, om - 1, moveInDay);
+        const outDate = new Date(oy, om - 1, outDay);
+        remainDays = Math.round((payDateThisMonth - outDate) / (1000 * 60 * 60 * 24));
+      }
+      if (remainDays <= 0) return;
+
+      const refundAmount = Math.round(((Number(t.rent) || 0) + (Number(t.mgmt) || 0)) * 10000 * remainDays / 30);
+      if (refundAmount <= 0) return;
+
+      if (!b.commonCosts) b.commonCosts = [];
+      b.commonCosts.unshift({
+        id: genId(),
+        type: `월세환급 (${t.room || ''}호 ${t.name || ''})`,
+        cost: refundAmount,
+        date: t.moveOut,
+        createdAt: Date.now(),
+        image: null,
+        refundTenantId: t.id,
+        isRefund: true,
+      });
+    }
+
     function addTenant() {
       const b = buildings.find(x => x.id === currentBuildingId);
       if (!b) return;
@@ -1427,7 +1474,8 @@
         b.tenants.forEach(t => {
           if (t.id !== tenant.id && t.room === tenant.room && getTenantStatus(t) === 'active' && t.moveOut === '') {
             t.moveOut = prevMoveOut;
-            autoFillPaidRecords(t); // 퇴거일 설정 시 납부완료 자동 체크
+            autoFillPaidRecords(t);
+            addMidtermRefund(t, b);
           }
         });
       }
