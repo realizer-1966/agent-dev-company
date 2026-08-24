@@ -986,9 +986,15 @@
     // 퇴거 호실 카드 안 세입자 행 (회색/슬레이트 톤, '퇴거' 배지)
     function renderMovedOutTenantRow(t) {
       const status = getTenantStatus(t);
+      const today = new Date().toISOString().slice(0, 10);
+      const isFuture = t.moveOut && t.moveOut > today;
       const badge = status === 'midterm'
-        ? '<span class="bg-amber-500/20 text-amber-400 text-xs font-bold px-2 py-0.5 rounded-full">중도 퇴거</span>'
-        : '<span class="bg-slate-500/20 text-slate-400 text-xs font-bold px-2 py-0.5 rounded-full">만기 퇴거</span>';
+        ? isFuture
+          ? '<span class="bg-amber-500/20 text-amber-400 text-xs font-bold px-2 py-0.5 rounded-full">중도 퇴거 예정</span>'
+          : '<span class="bg-amber-500/20 text-amber-400 text-xs font-bold px-2 py-0.5 rounded-full">중도 퇴거</span>'
+        : isFuture
+          ? '<span class="bg-slate-500/20 text-slate-400 text-xs font-bold px-2 py-0.5 rounded-full">만기 퇴거 예정</span>'
+          : '<span class="bg-slate-500/20 text-slate-400 text-xs font-bold px-2 py-0.5 rounded-full">만기 퇴거</span>';
       return `
         <div class="bg-slate-900/70 rounded-xl p-4 border border-slate-700/60">
           <div class="flex items-start justify-between">
@@ -1043,8 +1049,18 @@
         let badge;
         if (status === 'upcoming') badge = '<span class="bg-sky-500/20 text-sky-400 text-xs font-bold px-2 py-0.5 rounded-full">입주 예정</span>';
         else if (status === 'active') badge = '<span class="bg-emerald-500/20 text-emerald-400 text-xs font-bold px-2 py-0.5 rounded-full">입주 중</span>';
-        else if (status === 'midterm') badge = '<span class="bg-amber-500/20 text-amber-400 text-xs font-bold px-2 py-0.5 rounded-full">중도 퇴거</span>';
-        else badge = '<span class="bg-slate-500/20 text-slate-400 text-xs font-bold px-2 py-0.5 rounded-full">만기 퇴거</span>';
+        else if (status === 'midterm') {
+          const isFuture = t.moveOut && t.moveOut > new Date().toISOString().slice(0, 10);
+          badge = isFuture
+            ? '<span class="bg-amber-500/20 text-amber-400 text-xs font-bold px-2 py-0.5 rounded-full">중도 퇴거 예정</span>'
+            : '<span class="bg-amber-500/20 text-amber-400 text-xs font-bold px-2 py-0.5 rounded-full">중도 퇴거</span>';
+        }
+        else {
+          const isFuture = t.moveOut && t.moveOut > new Date().toISOString().slice(0, 10);
+          badge = isFuture
+            ? '<span class="bg-slate-500/20 text-slate-400 text-xs font-bold px-2 py-0.5 rounded-full">만기 퇴거 예정</span>'
+            : '<span class="bg-slate-500/20 text-slate-400 text-xs font-bold px-2 py-0.5 rounded-full">만기 퇴거</span>';
+        }
         list.innerHTML += `
           <div class="bg-slate-900 rounded-xl p-4 border border-slate-700">
             <div class="flex items-start justify-between">
@@ -1295,18 +1311,20 @@
 
     // 세입자 상태 판정 (현재 날짜 기준)
     // - upcoming : 입주일(moveIn)이 오늘보다 미래 (아직 입주 전, 입주 예정)
-    // - active   : 퇴거일이 비었거나, 퇴거일이 오늘보다 이후 (입주 중)
-    // - midterm  : 퇴거일 < 계약만료일 (중도 퇴거)
+    // - active   : 퇴거일이 비었거나, 퇴거일이 오늘보다 이후이고 만기일 이후 (입주 중)
+    // - midterm  : 퇴거일이 만기일보다 이전 (중도 퇴거, 퇴거일 미래 포함)
     // - full     : 계약만료일에 맞춰 퇴거 (계약만료 퇴거)
     function getTenantStatus(t) {
       const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
       // 입주 예정: 입주일이 미래면 최우선 판정 (아직 입주 전)
       if (t.moveIn && t.moveIn > today) return 'upcoming';
       if (!t.moveOut) return 'active';               // 퇴거일 미정 → 입주 중
-      if (t.moveOut >= today) return 'active';       // 아직 퇴거일 안 지남 → 입주 중
-      // 과거에 퇴거함 → 중도/만료 판정
-      if (t.contractEnd && t.moveOut < t.contractEnd) return 'midterm'; // 계약만료보다 일찍 퇴거
-      return 'full'; // 계약만료일까지 살고 퇴거
+      // 퇴거일이 만기일보다 이전이면 중도퇴거 (미래 퇴거일 포함)
+      if (t.contractEnd && t.moveOut < t.contractEnd) return 'midterm';
+      // 퇴거일이 오늘 이후이고 만기일 이후 → 아직 입주 중
+      if (t.moveOut >= today) return 'active';
+      // 과거에 퇴거, 만기일 이후 → 만기 퇴거
+      return 'full';
     }
 
     // ============ 세입자 수정 ============
