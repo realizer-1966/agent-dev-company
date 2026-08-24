@@ -2028,9 +2028,14 @@
       return next3MonthsYM().map(mm => {
         let total = 0; const tenants = [];
         buildings.forEach(b => (b.tenants || []).forEach(t => {
-          if (getTenantStatus(t) === 'active' && t.moveOut && String(t.moveOut).slice(0, 7) === mm.ym) {
-            total += Number(t.deposit) || 0;
-            tenants.push({ building: b.name, room: t.room, name: t.name, deposit: Number(t.deposit) || 0 });
+          // active 또는 midterm(중도퇴거 예정 포함) 상관없이
+          // 퇴거일(moveOut)이 해당 월에 있으면 보증금 준비금에 포함
+          if (t.moveOut && String(t.moveOut).slice(0, 7) === mm.ym) {
+            const status = getTenantStatus(t);
+            if (status === 'active' || status === 'midterm') {
+              total += Number(t.deposit) || 0;
+              tenants.push({ building: b.name, room: t.room, name: t.name, deposit: Number(t.deposit) || 0 });
+            }
           }
         }));
         return { ...mm, total, tenants };
