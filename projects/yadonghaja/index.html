@@ -134,6 +134,8 @@ const TYPE_INFO = {
   '요가':   { emoji:'🧘', color:'bg-violet-500/20 text-violet-300' },
   '등산':   { emoji:'⛰️', color:'bg-lime-500/20 text-lime-300' },
   '걷기':   { emoji:'🚶', color:'bg-cyan-500/20 text-cyan-300' },
+  '스쿼시': { emoji:'🎾', color:'bg-teal-500/20 text-teal-300' },
+  '스크린골프': { emoji:'⛳', color:'bg-amber-500/20 text-amber-300' },
 };
 const TIME_SLOTS = ['아침','점심','저녁','야간'];
 const DAY_LABELS = ['월','화','수','목','금','토','일'];
@@ -165,6 +167,8 @@ const TYPE_TEMPLATES = {
   '요가':   ['요가 20분','명상 10분','스트레칭 15분'],
   '등산':   ['등산 1회','하체 운동 15분','계단 오르기 15분'],
   '걷기':   ['만보 8,000보','산책 30분','빠른 걷기 20분'],
+  '스쿼시': ['스쿼시 30분','스쿼시 2게임','라켓 스윙 연습 50회','코트 러닝 15분'],
+  '스크린골프': ['스크린골프 18홀','스크린골프 9홀','퍼팅 연습 20분','드라이버 스윙 50회'],
 };
 const COMMON_TEMPLATES = ['물 2L 마시기','스트레칭 10분','만보 8,000보','빠른 걷기 20분','플랭크 3분'];
 
@@ -231,6 +235,17 @@ async function loadAll() {
   S.ledger   = await dbAll('ledger');
   (await dbAll('kv')).forEach(k => S.kv[k.k] = k.v);
   if (!S.profile) { await firstRunSeed(); }
+  else if (!S.kv.seedv2) { await seedV2Migrate(); }
+}
+
+/* ---------- v1.1 마이그레이션: 스쿼시·스크린골프 종목 추가 ---------- */
+async function seedV2Migrate() {
+  const newPosts = [
+    { types:['스쿼시'], mode:'오프라인', region:'서울', days:[2,4], timeSlot:'저녁', capacity:4, joined:2, intro:'저녁 8시 스쿼시 2게임! 라켓 없으셔도 렌탈 가능해요', authorName:'권스쿼시', authorAvatar:'🎾', mine:false, createdAt:nowISO(), deadline:addDaysStr(todayStr(),7) },
+    { types:['스크린골프'], mode:'오프라인', region:'경기', days:[5,6], timeSlot:'점심', capacity:4, joined:1, intro:'주말 점심 스크린골프 18홀! 스코어 신경 안 써도 돼요', authorName:'황골퍼', authorAvatar:'⛳', mine:false, createdAt:nowISO(), deadline:addDaysStr(todayStr(),10) },
+  ];
+  for (const p of newPosts) { p.id = await dbAdd('posts', p); S.posts.push(p); }
+  await dbPut('kv', { k:'seedv2', v:1 });
 }
 
 /* ---------- 시드 데이터 ---------- */
@@ -255,6 +270,8 @@ async function firstRunSeed() {
     { types:['등산'], mode:'오프라인', region:'부산', days:[6], timeSlot:'아침', capacity:6, joined:4, intro:'일요일 아침 황령산 등산! 커피 드시러 와요', authorName:'정등산', authorAvatar:'⛰️', mine:false, createdAt:nowISO(), deadline:addDaysStr(todayStr(),4) },
     { types:['걷기'], mode:'오프라인', region:'인천', days:[1,3], timeSlot:'점심', capacity:4, joined:1, intro:'점심시간 30분 걷기 모임, 만보 채워요', authorName:'윤걷기', authorAvatar:'🚶', mine:false, createdAt:nowISO(), deadline:addDaysStr(todayStr(),9) },
     { types:['러닝','걷기'], mode:'온라인', region:'온라인', days:[0,2,4,6], timeSlot:'야간', capacity:6, joined:3, intro:'밤 10시 각자 인증만! 야간 러닝·걷기 파트너', authorName:'배러너', authorAvatar:'🏃', mine:false, createdAt:nowISO(), deadline:addDaysStr(todayStr(),12) },
+    { types:['스쿼시'], mode:'오프라인', region:'서울', days:[2,4], timeSlot:'저녁', capacity:4, joined:2, intro:'저녁 8시 스쿼시 2게임! 라켓 없으셔도 렌탈 가능해요', authorName:'권스쿼시', authorAvatar:'🎾', mine:false, createdAt:nowISO(), deadline:addDaysStr(todayStr(),7) },
+    { types:['스크린골프'], mode:'오프라인', region:'경기', days:[5,6], timeSlot:'점심', capacity:4, joined:1, intro:'주말 점심 스크린골프 18홀! 스코어 신경 안 써도 돼요', authorName:'황골퍼', authorAvatar:'⛳', mine:false, createdAt:nowISO(), deadline:addDaysStr(todayStr(),10) },
   ];
   for (const p of seedPosts) { p.id = await dbAdd('posts', p); S.posts.push(p); }
 
