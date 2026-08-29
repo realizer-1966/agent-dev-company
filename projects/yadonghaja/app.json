@@ -1,0 +1,12 @@
+{
+  "name": "야!동하자",
+  "short_name": "야!동",
+  "description": "운동 메이트를 모집하고, 서로 격려하고, 미션을 수행하면 보상을 주는 운동 동기부여 웹앱",
+  "version": "1.0.0",
+  "icon": "icon.png",
+  "display": "standalone",
+  "theme_color": "#F97316",
+  "background_color": "#0F172A",
+  "orientation": "portrait",
+  "start_url": "."
+}

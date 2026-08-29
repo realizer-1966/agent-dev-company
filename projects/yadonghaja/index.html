@@ -1,0 +1,1234 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>야!동하자</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif; }
+    .fade-in { animation: fadeIn 0.25s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    .pop-in { animation: popIn 0.28s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    @keyframes popIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: none; } }
+    .btn { transition: all 0.15s ease; user-select: none; }
+    .btn:active { transform: scale(0.96); }
+    .card { transition: all 0.2s ease; }
+    .card:active { transform: scale(0.98); }
+    input, select, textarea { color-scheme: dark; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .hscroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+    .chip { min-height: 2.75rem; display: inline-flex; align-items: center; padding: 0 14px; border-radius: 9999px; font-weight: 700; font-size: 0.8rem; white-space: nowrap; }
+    .tabbtn { min-height: 2.75rem; }
+    .sheet { transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1); }
+    .sheet.open { transform: translateY(0); }
+    .tabbar { padding-bottom: env(safe-area-inset-bottom); }
+    .points-float { animation: pointsFloat 1.2s ease forwards; pointer-events: none; position: fixed; z-index: 100; font-weight: 900; text-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+    @keyframes pointsFloat { 0% { opacity: 0; transform: translate(-50%, 0) scale(0.8); } 20% { opacity: 1; transform: translate(-50%, -12px) scale(1.15); } 100% { opacity: 0; transform: translate(-50%, -72px) scale(1); } }
+    .cheer-btn { transition: transform 0.1s ease; }
+    .cheer-btn:active { transform: scale(1.35); }
+    .toast { position: fixed; left: 50%; top: 74px; transform: translateX(-50%); z-index: 110; max-width: 90vw; }
+    .streak-flame { animation: flame 2s ease-in-out infinite; display: inline-block; }
+    @keyframes flame { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+    .bar-anim { transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  </style>
+</head>
+<body class="min-h-screen text-slate-200">
+
+  <!-- 헤더 -->
+  <header class="bg-slate-900/80 backdrop-blur border-b border-slate-700 sticky top-0 z-40">
+    <div class="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
+      <h1 class="text-lg font-extrabold text-white tracking-tight"><span class="streak-flame">🔥</span> 야!동</h1>
+      <div class="flex items-center gap-2">
+        <span id="headerStreak" class="chip bg-orange-500/20 text-orange-300 text-xs" title="연속 인증일">🔥 0일</span>
+        <span id="headerPoints" class="chip bg-amber-400/20 text-amber-300 text-xs font-extrabold" title="보유 포인트">0 P</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-md mx-auto px-4 pt-4 pb-28" id="main"></main>
+
+  <!-- 하단 탭바 -->
+  <nav class="tabbar fixed bottom-0 inset-x-0 bg-slate-900/95 backdrop-blur border-t border-slate-700 z-40">
+    <div class="max-w-md mx-auto grid grid-cols-5">
+      <button data-tab="home"    class="tabbtn flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-bold">🏠<span>홈</span></button>
+      <button data-tab="recruit" class="tabbtn flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-bold">👋<span>모집</span></button>
+      <button data-tab="mission" class="tabbtn flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-bold">🎯<span>미션</span></button>
+      <button data-tab="feed"    class="tabbtn flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-bold">📣<span>피드</span></button>
+      <button data-tab="profile" class="tabbtn flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-bold">👤<span>프로필</span></button>
+    </div>
+  </nav>
+
+  <!-- 플로팅 버튼 -->
+  <button id="fab" class="fixed bottom-20 right-4 bg-gradient-to-br from-orange-500 to-rose-500 text-white w-14 h-14 rounded-full text-2xl font-bold shadow-lg shadow-orange-500/40 z-40 btn" style="display:none">+</button>
+
+  <!-- 하단시트 -->
+  <div id="sheetMask" class="fixed inset-0 bg-black/60 z-50 hidden"></div>
+  <div id="sheet" class="sheet fixed bottom-0 inset-x-0 max-w-md mx-auto bg-slate-800 rounded-t-3xl border-t-2 border-orange-500/50 z-50 max-h-[88vh] overflow-y-auto">
+    <div class="sticky top-0 bg-slate-800 pt-3 pb-2 px-4 flex items-center justify-between rounded-t-3xl">
+      <div class="w-10"></div>
+      <h2 id="sheetTitle" class="font-extrabold text-white text-base"></h2>
+      <button id="sheetClose" class="btn w-10 h-10 rounded-full bg-slate-700 text-white text-lg flex items-center justify-center">✕</button>
+    </div>
+    <div id="sheetBody" class="px-4 pb-10"></div>
+  </div>
+
+  <!-- 배지 획득 팝업 -->
+  <div id="badgePop" class="fixed inset-0 z-[60] hidden items-center justify-center p-6">
+    <div class="pop-in bg-slate-800 rounded-3xl p-6 max-w-xs w-full text-center border-2 border-amber-400/60 shadow-2xl shadow-amber-500/20">
+      <p class="text-xs font-bold text-amber-400 mb-2">🎉 배지 획득!</p>
+      <div id="badgePopIcon" class="text-6xl mb-2">🏅</div>
+      <h3 id="badgePopName" class="font-extrabold text-white text-lg mb-1"></h3>
+      <p id="badgePopDesc" class="text-xs text-slate-400"></p>
+    </div>
+  </div>
+
+  <!-- 라이트박스 -->
+  <div id="lightbox" class="fixed inset-0 bg-black/90 z-[70] hidden items-center justify-center p-4">
+    <button id="lightboxClose" class="absolute top-4 right-4 btn w-11 h-11 rounded-full bg-slate-800/90 text-white text-xl flex items-center justify-center">✕</button>
+    <img id="lightboxImg" class="max-w-full max-h-[85vh] rounded-2xl object-contain" alt="인증샷">
+  </div>
+
+  <!-- 토스트 -->
+  <div id="toast" class="toast hidden bg-slate-700/95 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-xl border border-slate-600 text-center"></div>
+
+  <input type="file" id="photoInput" accept="image/*" class="hidden">
+  <input type="file" id="jsonInput"  accept="application/json,.json" class="hidden">
+
+<script>
+'use strict';
+/* ============================================================
+   야!동하자 v1 — 운동 메이트 모집 · 미션 · 응원 · 보상
+   단일 index.html + IndexedDB 로컬 저장 (오프라인 작동)
+   v2에서 Supabase 멀티유저로 전환 가능한 스키마 설계
+   ============================================================ */
+
+/* ---------- 유틸 ---------- */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad = n => String(n).padStart(2,'0');
+const todayStr = () => { const d = new Date(); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); };
+const dateStr = d => d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const yesterdayStr = () => { const d = new Date(); d.setDate(d.getDate()-1); return dateStr(d); };
+const nowISO = () => new Date().toISOString();
+const fmtClock = iso => { const d = new Date(iso); return pad(d.getMonth()+1)+'/'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes()); };
+const fmtDay = iso => iso ? iso.slice(0,10).replace(/-/g,'.') : '';
+const daysBetween = (a,b) => Math.floor((new Date(b+'T00:00:00') - new Date(a+'T00:00:00')) / 86400000);
+const addDaysStr = (s,n) => { const d = new Date(s+'T00:00:00'); d.setDate(d.getDate()+n); return dateStr(d); };
+function hash(str) { let h = 5381; for (let i=0;i<str.length;i++) h = ((h<<5)+h+str.charCodeAt(i))>>>0; return h; }
+function mondayOf(d) { const x = new Date(d); const day = (x.getDay()+6)%7; x.setDate(x.getDate()-day); return x; }
+function weekKeyOf(d) { const m = mondayOf(d || new Date()); return m.getFullYear()+'-'+pad(m.getMonth()+1)+'-'+pad(m.getDate()); }
+const rand = arr => arr[Math.floor(Math.random()*arr.length)];
+
+/* ---------- 상수 ---------- */
+const DB_NAME = 'yadong-db', DB_VER = 1;
+const TYPE_INFO = {
+  '헬스':   { emoji:'🏋️', color:'bg-rose-500/20 text-rose-300' },
+  '러닝':   { emoji:'🏃', color:'bg-emerald-500/20 text-emerald-300' },
+  '홈트':   { emoji:'💪', color:'bg-orange-500/20 text-orange-300' },
+  '자전거': { emoji:'🚴', color:'bg-sky-500/20 text-sky-300' },
+  '요가':   { emoji:'🧘', color:'bg-violet-500/20 text-violet-300' },
+  '등산':   { emoji:'⛰️', color:'bg-lime-500/20 text-lime-300' },
+  '걷기':   { emoji:'🚶', color:'bg-cyan-500/20 text-cyan-300' },
+};
+const TIME_SLOTS = ['아침','점심','저녁','야간'];
+const DAY_LABELS = ['월','화','수','목','금','토','일'];
+const REGIONS = ['서울','경기','인천','부산','대구','대전','광주','제주','온라인'];
+const AVATARS = ['💪','🏃','🧘','🚴','⛰️','🚶','🏋️','⚡','🌟','🍀'];
+
+const LEVELS = [
+  { lv:1, name:'🌱 새싹메이트',    need:0 },
+  { lv:2, name:'🔥 주니어메이트',  need:150 },
+  { lv:3, name:'⚡ 시니어메이트',  need:400 },
+  { lv:4, name:'🏅 에이스메이트',  need:900 },
+  { lv:5, name:'👑 레전드메이트',  need:2000 },
+];
+const BADGES = [
+  { id:'first',    icon:'👟', name:'첫 발걸음',   desc:'첫 인증을 완료했어요',        check:s => s.verifs.length >= 1 },
+  { id:'week7',    icon:'📅', name:'일주일 개근', desc:'7일 연속 인증 달성 (+30P)',   check:s => s.profile.streakBest >= 7 },
+  { id:'month30',  icon:'🏆', name:'한 달 개근',  desc:'30일 연속 인증 달성 (+100P)', check:s => s.profile.streakBest >= 30 },
+  { id:'cheer50',  icon:'📣', name:'인싸메이트',  desc:'응원 50회 보내기',           check:s => s.profile.cheerTotal >= 50 },
+  { id:'verify100',icon:'🎯', name:'미션 마스터', desc:'누적 인증 100회',            check:s => s.verifs.length >= 100 },
+  { id:'group10',  icon:'👥', name:'단체생활',    desc:'그룹 공동 미션 10회 달성',    check:s => s.profile.groupDone >= 10 },
+];
+const BADGE_BONUS = { week7:30, month30:100 };
+
+const TYPE_TEMPLATES = {
+  '헬스':   ['헬스 30분 이상','벤치·스쿼트·데드 3세트','숄더/등 운동 20분'],
+  '러닝':   ['러닝 3km','인터벌 러닝 10분','러닝 5km'],
+  '홈트':   ['홈트 20분','스쿼트 50개','플랭크 3분'],
+  '자전거': ['자전거 5km','실내 사이클 20분','코어 10분'],
+  '요가':   ['요가 20분','명상 10분','스트레칭 15분'],
+  '등산':   ['등산 1회','하체 운동 15분','계단 오르기 15분'],
+  '걷기':   ['만보 8,000보','산책 30분','빠른 걷기 20분'],
+};
+const COMMON_TEMPLATES = ['물 2L 마시기','스트레칭 10분','만보 8,000보','빠른 걷기 20분','플랭크 3분'];
+
+/* 더미 유저 (v1 예시 데이터 — v2에서 실제 유저로 대체) */
+const SEED_USERS = [
+  { name:'김러너',   avatar:'🏃', wp:0 }, { name:'박헬스',  avatar:'🏋️', wp:0 },
+  { name:'최요가',   avatar:'🧘', wp:0 }, { name:'이사이클', avatar:'🚴', wp:0 },
+  { name:'정등산',   avatar:'⛰️', wp:0 }, { name:'한홈트',  avatar:'💪', wp:0 },
+  { name:'윤걷기',   avatar:'🚶', wp:0 }, { name:'조코어',  avatar:'⚡', wp:0 },
+  { name:'서필라',   avatar:'🌟', wp:0 }, { name:'문트레',  avatar:'🍀', wp:0 },
+  { name:'강웨이트', avatar:'🏋️', wp:0 }, { name:'배러너',  avatar:'🏃', wp:0 },
+];
+const SEED_MEMOS = [
+  '오늘도 완주! 다들 화이팅 🔥','땀 흘리고 나니 개운하네요','메이트들 덕분에 계속하게 돼요',
+  '조금만 더! 우리 같이 가요','아침 운동 최고 💪','오늘은 좀 힘들었지만 끝냈어요',
+  '다음 주까지 이 속도 유지!','헬스장 정기권 아깝지 않다ㅎㅎ','점심먹고 가볍게','숨은 안 차지만 성의있게'
+];
+
+/* ---------- IndexedDB ---------- */
+let db = null;
+function openDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(DB_NAME, DB_VER);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('profile'))  d.createObjectStore('profile',  { keyPath:'id' });
+      if (!d.objectStoreNames.contains('missions')) d.createObjectStore('missions', { keyPath:'id', autoIncrement:true });
+      if (!d.objectStoreNames.contains('verifs'))   d.createObjectStore('verifs',   { keyPath:'id', autoIncrement:true });
+      if (!d.objectStoreNames.contains('feed'))     d.createObjectStore('feed',     { keyPath:'id', autoIncrement:true });
+      if (!d.objectStoreNames.contains('posts'))    d.createObjectStore('posts',    { keyPath:'id', autoIncrement:true });
+      if (!d.objectStoreNames.contains('apps'))     d.createObjectStore('apps',      { keyPath:'id', autoIncrement:true });
+      if (!d.objectStoreNames.contains('badges'))   d.createObjectStore('badges',   { keyPath:'id' });
+      if (!d.objectStoreNames.contains('ledger'))   d.createObjectStore('ledger',   { keyPath:'id', autoIncrement:true });
+      if (!d.objectStoreNames.contains('kv'))       d.createObjectStore('kv',        { keyPath:'k' });
+    };
+    req.onsuccess = e => { db = e.target.result; res(db); };
+    req.onerror = () => rej(req.error);
+  });
+}
+function tx(store, mode) { return db.transaction(store, mode).objectStore(store); }
+function dbAll(store)  { return new Promise((res, rej) => { const r = tx(store,'readonly').getAll(); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+function dbGet(store, key) { return new Promise((res, rej) => { const r = tx(store,'readonly').get(key); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+function dbPut(store, obj) { return new Promise((res, rej) => { const r = tx(store,'readwrite').put(obj); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+function dbAdd(store, obj) { return new Promise((res, rej) => { const r = tx(store,'readwrite').add(obj); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+function dbDel(store, key) { return new Promise((res, rej) => { const r = tx(store,'readwrite').delete(key); r.onsuccess = () => res(); r.onerror = () => rej(r.error); }); }
+function dbClear(store) { return new Promise((res, rej) => { const r = tx(store,'readwrite').clear(); r.onsuccess = () => res(); r.onerror = () => rej(r.error); }); }
+
+/* ---------- 상태 ---------- */
+const S = { profile:null, missions:[], verifs:[], feed:[], posts:[], apps:[], badges:[], ledger:[], kv:{} };
+let activeTab = 'home';
+
+function saveProfile()  { return dbPut('profile', S.profile); }
+function saveFeedItem(f){ return dbPut('feed', f); }
+function savePost(p)    { return dbPut('posts', p); }
+
+async function loadAll() {
+  S.profile  = await dbGet('profile','me');
+  S.missions = await dbAll('missions');
+  S.verifs   = await dbAll('verifs');
+  S.feed     = await dbAll('feed');
+  S.posts    = await dbAll('posts');
+  S.apps     = await dbAll('apps');
+  S.badges   = await dbAll('badges');
+  S.ledger   = await dbAll('ledger');
+  (await dbAll('kv')).forEach(k => S.kv[k.k] = k.v);
+  if (!S.profile) { await firstRunSeed(); }
+}
+
+/* ---------- 시드 데이터 ---------- */
+async function firstRunSeed() {
+  const wk = weekKeyOf();
+  S.profile = {
+    id:'me', name:'나', avatar:'💪', points:0, weeklyPoints:0, weekKey:wk,
+    streak:0, streakBest:0, lastVerifyDate:'', interests:['홈트'], difficulty:'보통',
+    cheerTotal:0, cheerCount:0, cheerDate:'', brokenStreak:0, brokenDate:'', lotteryWeek:'',
+    groupDone:0, created:nowISO()
+  };
+  await saveProfile();
+  await dbPut('kv', { k:'seeded', v:1 });
+
+  // 더미 모집글 8건
+  const seedPosts = [
+    { types:['러닝'], mode:'오프라인', region:'서울', days:[0,2,4], timeSlot:'아침', capacity:4, joined:2, intro:'새벽 6시 반에 만나 5km 러닝! 초보도 환영', authorName:'김러너', authorAvatar:'🏃', mine:false, createdAt:nowISO(), deadline:addDaysStr(todayStr(),5) },
+    { types:['헬스'], mode:'오프라인', region:'서울', days:[1,3,5], timeSlot:'저녁', capacity:3, joined:1, intro:'저녁 7시 헬스장 같이 가실 분! 자세 서로 봐줘요', authorName:'박헬스', authorAvatar:'🏋️', mine:false, createdAt:nowISO(), deadline:addDaysStr(todayStr(),7) },
+    { types:['홈트'], mode:'온라인', region:'온라인', days:[0,1,2,3,4], timeSlot:'아침', capacity:6, joined:4, intro:'기상 직후 15분 홈트 챌린지! 영상통화로 같이', authorName:'한홈트', authorAvatar:'💪', mine:false, createdAt:nowISO(), deadline:addDaysStr(todayStr(),10) },
+    { types:['요가'], mode:'온라인', region:'온라인', days:[2,4], timeSlot:'저녁', capacity:4, joined:2, intro:'저녁 9시 온라인 요가 30분, 스트레칭부터', authorName:'최요가', authorAvatar:'🧘', mine:false, createdAt:nowISO(), deadline:addDaysStr(todayStr(),6) },
+    { types:['자전거'], mode:'오프라인', region:'경기', days:[5], timeSlot:'아침', capacity:5, joined:3, intro:'주말 아침 한강·탄천 라이딩 30km', authorName:'이사이클', authorAvatar:'🚴', mine:false, createdAt:nowISO(), deadline:addDaysStr(todayStr(),8) },
+    { types:['등산'], mode:'오프라인', region:'부산', days:[6], timeSlot:'아침', capacity:6, joined:4, intro:'일요일 아침 황령산 등산! 커피 드시러 와요', authorName:'정등산', authorAvatar:'⛰️', mine:false, createdAt:nowISO(), deadline:addDaysStr(todayStr(),4) },
+    { types:['걷기'], mode:'오프라인', region:'인천', days:[1,3], timeSlot:'점심', capacity:4, joined:1, intro:'점심시간 30분 걷기 모임, 만보 채워요', authorName:'윤걷기', authorAvatar:'🚶', mine:false, createdAt:nowISO(), deadline:addDaysStr(todayStr(),9) },
+    { types:['러닝','걷기'], mode:'온라인', region:'온라인', days:[0,2,4,6], timeSlot:'야간', capacity:6, joined:3, intro:'밤 10시 각자 인증만! 야간 러닝·걷기 파트너', authorName:'배러너', authorAvatar:'🏃', mine:false, createdAt:nowISO(), deadline:addDaysStr(todayStr(),12) },
+  ];
+  for (const p of seedPosts) { p.id = await dbAdd('posts', p); S.posts.push(p); }
+
+  // 더미 피드 15건 (최근 72시간)
+  for (let i=0;i<15;i++) {
+    const u = SEED_USERS[hash('feed'+i)%SEED_USERS.length];
+    const types = Object.keys(TYPE_TEMPLATES);
+    const t = types[hash('ftype'+i)%types.length];
+    const ago = (hash('fago'+i)%70 + 2) * 3600000;
+    const item = {
+      userId:'u_'+u.name, userName:u.name, avatar:u.avatar, mine:false, sample:true,
+      missionTitle: TYPE_TEMPLATES[t][hash('fm'+i)%TYPE_TEMPLATES[t].length],
+      memo: SEED_MEMOS[hash('fmemo'+i)%SEED_MEMOS.length],
+      photoDataUrl:'', createdAt:new Date(Date.now()-ago).toISOString(),
+      cheers:{ fire: hash('cf'+i)%6, thumb: hash('ct'+i)%5, muscle: hash('cm'+i)%4 }
+    };
+    item.id = await dbAdd('feed', item); S.feed.push(item);
+  }
+}
+
+/* ---------- 포인트 / 레벨 / 배지 ---------- */
+function levelOf(points) {
+  let cur = LEVELS[0];
+  for (const l of LEVELS) if (points >= l.need) cur = l;
+  return cur;
+}
+function nextLevel(points) { return LEVELS.find(l => l.need > points) || null; }
+
+async function addPoints(amount, reason) {
+  const before = levelOf(S.profile.points).lv;
+  S.profile.points += amount;
+  // 주간 리셋 체크
+  if (S.profile.weekKey !== weekKeyOf()) { S.profile.weekKey = weekKeyOf(); S.profile.weeklyPoints = 0; }
+  S.profile.weeklyPoints += amount;
+  await dbAdd('ledger', { amount, reason, createdAt:nowISO() });
+  await saveProfile();
+  const after = levelOf(S.profile.points).lv;
+  if (after > before) showToast('🎉 레벨업! ' + levelOf(S.profile.points).name);
+  renderHeader();
+}
+
+const badgeQueue = [];
+async function checkBadges() {
+  for (const b of BADGES) {
+    if (S.badges.some(x => x.id === b.id)) continue;
+    if (b.check(S)) {
+      const rec = { id:b.id, earnedAt:nowISO() };
+      await dbPut('badges', rec); S.badges.push(rec);
+      if (BADGE_BONUS[b.id]) await addPoints(BADGE_BONUS[b.id], '배지 보너스: '+b.name);
+      badgeQueue.push(b);
+    }
+  }
+  if (badgeQueue.length) showNextBadge();
+}
+function showNextBadge() {
+  const pop = $('badgePop');
+  if (pop.classList.contains('flex') && !pop.classList.contains('hidden')) return; // 이미 표시 중
+  const b = badgeQueue.shift();
+  if (!b) return;
+  $('badgePopIcon').textContent = b.icon;
+  $('badgePopName').textContent = b.name;
+  $('badgePopDesc').textContent = b.desc;
+  pop.classList.remove('hidden'); pop.classList.add('flex');
+  setTimeout(() => { pop.classList.add('hidden'); pop.classList.remove('flex'); setTimeout(showNextBadge, 250); }, 2200);
+}
+
+/* ---------- 스트릭 ---------- */
+function currentStreak() {
+  const p = S.profile;
+  if (!p.lastVerifyDate) return p.streak;
+  const t = todayStr(), y = yesterdayStr();
+  if (p.lastVerifyDate === t || p.lastVerifyDate === y) return p.streak;
+  return 0;
+}
+async function onVerifyStreak() {
+  const p = S.profile, t = todayStr(), y = yesterdayStr();
+  if (p.lastVerifyDate === t) { /* 오늘 이미 인증함 */ }
+  else if (p.lastVerifyDate === y) p.streak += 1;
+  else p.streak = 1;
+  p.lastVerifyDate = t;
+  if (p.streak > p.streakBest) p.streakBest = p.streak;
+  p.brokenStreak = 0; p.brokenDate = '';
+  await saveProfile();
+}
+
+/* ---------- 미션 생성 ---------- */
+function dailyMissionsFor(date) {
+  const p = S.profile;
+  const interest = (p.interests && p.interests[0]) || '홈트';
+  const specific = TYPE_TEMPLATES[interest] || TYPE_TEMPLATES['홈트'];
+  const pick1 = specific[hash(date+interest)%specific.length];
+  const pool = COMMON_TEMPLATES.filter(t => t !== pick1);
+  const pick2 = pool[hash(date+'c2')%pool.length];
+  const pick3 = pool[hash(date+'c3')%pool.length];
+  return [pick1, pick2, pick3].map(title => ({ date, kind:'daily', title, status:'pending', verifiedAt:null }));
+}
+async function ensureDailyMissions() {
+  const t = todayStr();
+  const have = S.missions.filter(m => m.kind === 'daily' && m.date === t);
+  if (have.length >= 3) return;
+  for (let i = have.length; i < 3; i++) {
+    const m = dailyMissionsFor(t)[i];
+    m.id = await dbAdd('missions', m); S.missions.push(m);
+  }
+}
+async function ensureWeeklyChallenge() {
+  const wk = weekKeyOf();
+  if (S.missions.some(m => m.kind === 'weekly' && m.weekKey === wk)) return;
+  const m = { kind:'weekly', weekKey:wk, title:'이번 주 4일 인증', goal:4, status:'pending', verifiedAt:null };
+  m.id = await dbAdd('missions', m); S.missions.push(m);
+}
+function weekVerifyCount() {
+  const monday = weekKeyOf();
+  const days = new Set(S.verifs.filter(v => v.mine && v.date >= monday).map(v => v.date));
+  return days.size;
+}
+function myGroups() {
+  const mine = S.posts.filter(p => p.mine);
+  const joined = S.posts.filter(p => !p.mine && S.apps.some(a => a.postId === p.id && a.mineApply && a.status === 'accepted'));
+  return [...mine, ...joined];
+}
+function groupMembers(p) {
+  if (p.mine) {
+    return S.apps.filter(a => a.postId === p.id && a.status === 'accepted').map(a => ({ name:a.name, avatar:a.avatar }));
+  }
+  const members = [{ name:p.authorName, avatar:p.authorAvatar }];
+  const n = 1 + hash(weekKeyOf()+p.authorName)%3;
+  for (let i=0;i<n;i++) { const u = SEED_USERS[hash(p.authorName+'m'+i)%SEED_USERS.length]; members.push({ name:u.name, avatar:u.avatar }); }
+  return members;
+}
+async function ensureGroupMission() {
+  const wk = weekKeyOf();
+  if (S.missions.some(m => m.kind === 'group' && m.weekKey === wk)) return;
+  if (myGroups().length === 0) return;
+  const m = { kind:'group', weekKey:wk, title:'우리 그룹 이번 주 인증 12회', goal:12, status:'pending', verifiedAt:null };
+  m.id = await dbAdd('missions', m); S.missions.push(m);
+}
+function groupProgress() {
+  let mine = 0;
+  const monday = weekKeyOf();
+  S.verifs.forEach(v => { if (v.mine && v.date >= monday) mine++; });
+  let sim = 0;
+  myGroups().forEach(p => groupMembers(p).forEach(m => { if (m.name !== S.profile.name) sim += hash(weekKeyOf()+m.name)%4; }));
+  return { mine, sim, total: mine + sim };
+}
+
+/* ---------- 미션 체크 ---------- */
+async function checkMissionCompletions() {
+  const wk = weekKeyOf();
+  const weekly = S.missions.find(m => m.kind === 'weekly' && m.weekKey === wk);
+  if (weekly && weekly.status !== 'done' && weekVerifyCount() >= weekly.goal) {
+    weekly.status = 'done'; weekly.verifiedAt = nowISO(); await dbPut('missions', weekly);
+    await addPoints(50, '주간 챌린지 달성'); showToast('🏆 주간 챌린지 달성! +50P');
+  }
+  const group = S.missions.find(m => m.kind === 'group' && m.weekKey === wk);
+  if (group && group.status !== 'done' && groupProgress().total >= group.goal) {
+    group.status = 'done'; group.verifiedAt = nowISO(); await dbPut('missions', group);
+    S.profile.groupDone += 1; await saveProfile();
+    await addPoints(50, '그룹 공동 미션 달성'); showToast('👥 그룹 공동 미션 달성! +50P');
+  }
+}
+
+/* ---------- 인증 ---------- */
+async function doVerify(missionId, photoDataUrl, memo) {
+  const m = S.missions.find(x => x.id === missionId);
+  if (!m || m.status === 'done') return;
+  m.status = 'done'; m.verifiedAt = nowISO();
+  await dbPut('missions', m);
+
+  const date = todayStr();
+  const v = { missionId:m.id, missionTitle:m.title, date, memo:memo||'', photoDataUrl:photoDataUrl||'', mine:true, createdAt:nowISO() };
+  v.id = await dbAdd('verifs', v); S.verifs.push(v);
+
+  const f = {
+    userId:'me', userName:S.profile.name, avatar:S.profile.avatar, mine:true, sample:false,
+    missionTitle:m.title, memo:memo||'', photoDataUrl:photoDataUrl||'',
+    createdAt:nowISO(), cheers:{ fire:0, thumb:0, muscle:0 }
+  };
+  f.id = await dbAdd('feed', f); S.feed.push(f);
+
+  await onVerifyStreak();
+  await addPoints(10, '일일 미션 인증: '+m.title);
+
+  const t = todayStr();
+  const todays = S.missions.filter(x => x.kind === 'daily' && x.date === t);
+  if (todays.length === 3 && todays.every(x => x.status === 'done')) {
+    await addPoints(20, '일일 미션 전부 완료 보너스');
+    showToast('🌟 오늘의 미션 전부 완료! +20P');
+  }
+  await checkMissionCompletions();
+  await checkBadges();
+  scheduleDummyCheers(f.id);
+  renderHeader();
+  if (activeTab === 'home' || activeTab === 'mission') render();
+}
+
+/* 더미 메이트 응원 시뮬레이션 */
+async function dummyCheer(feedId, silent) {
+  const f = S.feed.find(x => x.id === feedId);
+  if (!f) return;
+  const u = rand(SEED_USERS);
+  const emoji = rand(['fire','thumb','muscle']);
+  f.cheers[emoji] = (f.cheers[emoji]||0) + 1;
+  await saveFeedItem(f);
+  await addPoints(2, '응원 받기');
+  const emojiIcon = { fire:'🔥', thumb:'👍', muscle:'💪' }[emoji];
+  if (!silent) showToast(esc(u.avatar+' '+u.name)+'님이 '+emojiIcon+' 응원했어요!');
+  if (activeTab === 'feed' || activeTab === 'home') render();
+}
+function scheduleDummyCheers(feedId) {
+  const n = 1 + Math.floor(Math.random()*3);
+  for (let i=0;i<n;i++) setTimeout(() => dummyCheer(feedId, false), 3000 + i*4000 + Math.random()*5000);
+}
+
+/* ---------- 응원 보내기 ---------- */
+async function sendCheer(feedId, emoji) {
+  const t = todayStr();
+  if (S.profile.cheerDate !== t) { S.profile.cheerDate = t; S.profile.cheerCount = 0; }
+  if (S.profile.cheerCount >= 5) { showToast('오늘의 응원 포인트는 다 받았어요! 내일 또 응원해 주세요 💕'); return; }
+  const f = S.feed.find(x => x.id === feedId);
+  if (!f) return;
+  f.cheers[emoji] = (f.cheers[emoji]||0) + 1;
+  await saveFeedItem(f);
+  S.profile.cheerCount += 1; S.profile.cheerTotal += 1;
+  await saveProfile();
+  await addPoints(1, '응원 보내기');
+  const emojiIcon = { fire:'🔥', thumb:'👍', muscle:'💪' }[emoji];
+  floatPoints('+1 P');
+  if (S.profile.cheerCount === 5) showToast('오늘 응원 5회 완료! 내일 또 만나요 💕');
+  await checkBadges();
+  render();
+}
+
+/* ---------- 렌더 공통 ---------- */
+function renderHeader() {
+  const st = currentStreak();
+  $('headerStreak').textContent = '🔥 ' + st + '일';
+  $('headerPoints').textContent = S.profile.points.toLocaleString() + ' P';
+}
+function typeBadge(t) { const i = TYPE_INFO[t] || { emoji:'🏃', color:'bg-slate-600 text-slate-200' }; return '<span class="chip '+i.color+' text-xs">'+i.emoji+' '+esc(t)+'</span>'; }
+function dayChips(days) { return days.map(d => '<span class="chip bg-slate-700 text-slate-200 text-[10px]" style="min-height:1.5rem;padding:0 8px;">'+DAY_LABELS[d]+'</span>').join(''); }
+
+function showEmpty(icon, title, sub) {
+  return '<div class="text-center py-14"><p class="text-5xl mb-3">'+icon+'</p><p class="font-bold text-slate-300">'+title+'</p><p class="text-sm text-slate-500 mt-1">'+sub+'</p></div>';
+}
+
+/* ---------- 홈 ---------- */
+function renderHome() {
+  const p = S.profile;
+  const lv = levelOf(p.points), nx = nextLevel(p.points);
+  const pct = nx ? Math.min(100, Math.round((p.points - lv.need) / (nx.need - lv.need) * 100)) : 100;
+  const t = todayStr();
+  const todays = S.missions.filter(m => m.kind === 'daily' && m.date === t);
+  const doneCnt = todays.filter(m => m.status === 'done').length;
+  const myTodayFeeds = S.feed.filter(f => f.mine && f.createdAt.slice(0,10) === t);
+  const rxCheers = myTodayFeeds.reduce((s,f) => s + f.cheers.fire + f.cheers.thumb + f.cheers.muscle, 0);
+  const groups = myGroups();
+  const rank = calcRank();
+
+  let html = '<div class="fade-in space-y-4">';
+
+  // 프로필 카드
+  html += '<div class="bg-slate-800/80 rounded-2xl p-5 border border-slate-700">'
+    + '<p class="text-sm text-slate-400">'+esc(p.avatar)+' <b class="text-white">'+esc(p.name)+'</b>님, 오늘도 야!동해볼까요?</p>'
+    + '<div class="mt-3 flex items-center justify-between text-xs"><span class="font-bold text-orange-300">'+esc(lv.name)+'</span>'
+    + (nx ? '<span class="text-slate-400">다음 레벨까지 '+(nx.need - p.points).toLocaleString()+'P</span>' : '<span class="text-amber-300">최고 레벨! 👑</span>')
+    + '</div>'
+    + '<div class="mt-1.5 h-3 bg-slate-700 rounded-full overflow-hidden"><div class="bar-anim h-full bg-gradient-to-r from-orange-500 to-rose-500 rounded-full" style="width:'+pct+'%"></div></div>'
+    + '</div>';
+
+  // 스트릭 복권
+  if (p.brokenStreak > 0 && daysBetween(p.brokenDate, t) <= 1 && p.lotteryWeek !== weekKeyOf()) {
+    html += '<div class="bg-amber-500/10 border border-amber-500/40 rounded-2xl p-4 flex items-center justify-between">'
+      + '<div><p class="font-bold text-amber-300 text-sm">🔥 스트릭 복권이 있어요!</p><p class="text-xs text-slate-400 mt-0.5">'+p.brokenStreak+'일 연속 기록을 오늘 살릴 수 있어요 (주 1회)</p></div>'
+      + '<button onclick="useLottery()" class="btn bg-amber-500 hover:bg-amber-400 text-slate-900 font-extrabold text-sm px-4 py-2.5 rounded-xl">복구</button></div>';
+  }
+
+  // 오늘의 미션
+  html += '<div class="bg-slate-800/80 rounded-2xl border border-slate-700 overflow-hidden">'
+    + '<div class="px-5 pt-4 pb-2 flex items-center justify-between"><h3 class="font-extrabold text-white">🎯 오늘의 미션</h3><span class="text-xs font-bold text-slate-400">'+doneCnt+'/3 완료</span></div>';
+  if (todays.length === 0) {
+    html += '<p class="px-5 pb-4 text-sm text-slate-500">미션을 생성 중이에요…</p>';
+  } else {
+    todays.forEach(m => {
+      const done = m.status === 'done';
+      html += '<div class="px-5 py-3 flex items-center justify-between border-t border-slate-700/60">'
+        + '<span class="text-sm font-bold '+(done?'text-emerald-400 line-through':'text-slate-200')+'">'+(done?'✅':'⭕')+' '+esc(m.title)+'</span>'
+        + (done ? '<span class="text-xs text-emerald-400 font-bold">인증완료</span>'
+                : '<button onclick="openVerify('+m.id+')" class="btn bg-orange-500 hover:bg-orange-400 text-white font-bold text-xs px-4 py-2 rounded-xl">인증</button>')
+        + '</div>';
+    });
+  }
+  html += '</div>';
+
+  // 받은 응원
+  html += '<div class="bg-slate-800/80 rounded-2xl p-4 border border-slate-700 flex items-center justify-between">'
+    + '<span class="font-bold text-white text-sm">💌 오늘 받은 응원</span>'
+    + '<span class="font-extrabold text-rose-300">🔥'+rxCheers+' · 3종 응원</span></div>';
+
+  // 그룹
+  html += '<div class="bg-slate-800/80 rounded-2xl p-5 border border-slate-700">'
+    + '<div class="flex items-center justify-between mb-3"><h3 class="font-extrabold text-white">👥 내 그룹</h3>'
+    + '<button onclick="switchTab(\'recruit\')" class="btn text-xs font-bold text-orange-300">+ 메이트 찾기</button></div>';
+  if (groups.length === 0) {
+    html += '<p class="text-sm text-slate-500">아직 그룹이 없어요. 모집 탭에서 메이트를 찾아보세요!</p>';
+  } else {
+    const wk = weekKeyOf();
+    groups.forEach(g => {
+      const gp = groupProgress();
+      const members = groupMembers(g);
+      html += '<div class="mb-3 last:mb-0">'
+        + '<p class="font-bold text-slate-200 text-sm">'+esc(g.authorAvatar||'👥')+' '+esc(typesLabel(g.types))+'</p>'
+        + '<p class="text-[11px] text-slate-400 mt-0.5">'+members.map(m=>esc(m.avatar+m.name)).join(' · ')+'</p>'
+        + '<div class="mt-2 flex items-center gap-2"><div class="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden"><div class="h-full bg-emerald-500 rounded-full" style="width:'+Math.min(100, Math.round(gp.total/12*100))+'%"></div></div>'
+        + '<span class="text-[10px] font-bold text-emerald-300">'+gp.total+'/12</span></div>'
+        + '</div>';
+    });
+  }
+  html += '</div>';
+
+  // 주간 요약
+  html += '<div class="bg-slate-800/80 rounded-2xl p-4 border border-slate-700 flex items-center justify-between">'
+    + '<span class="font-bold text-white text-sm">🏅 이번 주</span>'
+    + '<span class="text-xs font-bold text-slate-300">주간 '+p.weeklyPoints.toLocaleString()+'P · 랭킹 '+rank+'위</span></div>';
+
+  html += '</div>';
+  return html;
+}
+function typesLabel(types) { return (types||[]).map(t => (TYPE_INFO[t]||{emoji:''}).emoji+' '+t).join('·'); }
+function calcRank() {
+  const wk = weekKeyOf();
+  const rows = [{ name:S.profile.name, avatar:S.profile.avatar, wp:S.profile.weeklyPoints, me:true }];
+  SEED_USERS.forEach(u => rows.push({ name:u.name, avatar:u.avatar, wp: 20 + hash(wk+u.name)%160, me:false }));
+  rows.sort((a,b) => b.wp - a.wp);
+  return rows.findIndex(r => r.me) + 1;
+}
+
+/* ---------- 모집 ---------- */
+let recruitFilter = '전체', onlineOnly = false;
+function renderRecruit() {
+  let html = '<div class="fade-in space-y-3">';
+  html += '<div class="hscroll no-scrollbar">'
+    + '<button onclick="setFilter(\'전체\')" class="chip '+(recruitFilter==='전체'?'bg-orange-500 text-white':'bg-slate-700 text-slate-200')+'">전체</button>'
+    + Object.keys(TYPE_INFO).map(t => '<button onclick="setFilter(\''+t+'\')" class="chip '+(recruitFilter===t?'bg-orange-500 text-white':'bg-slate-700 text-slate-200')+'">'+TYPE_INFO[t].emoji+' '+t+'</button>').join('')
+    + '</div>';
+  html += '<label class="flex items-center gap-2 text-xs font-bold text-slate-300 px-1"><input type="checkbox" id="onlineOnlyChk" '+(onlineOnly?'checked':'')+' class="w-4 h-4 accent-orange-500"> 온라인 모집만 보기</label>';
+
+  let posts = S.posts.slice().sort((a,b) => (b.mine?1:0)-(a.mine?1:0) || new Date(b.createdAt)-new Date(a.createdAt));
+  if (recruitFilter !== '전체') posts = posts.filter(p => p.types.includes(recruitFilter));
+  if (onlineOnly) posts = posts.filter(p => p.mode === '온라인');
+
+  if (posts.length === 0) {
+    html += showEmpty('👋','모집글이 없어요','+ 버튼으로 첫 모집글을 올려보세요');
+  } else {
+    const t = todayStr();
+    posts.forEach(p => {
+      const expired = p.deadline && p.deadline < t;
+      const iJoined = !p.mine && S.apps.some(a => a.postId === p.id && a.mineApply);
+      const mineApproved = iJoined && S.apps.find(a => a.postId === p.id && a.mineApply).status === 'accepted';
+      const pend = S.apps.filter(a => a.postId === p.id && a.status === 'pending');
+      html += '<div class="card bg-slate-800/80 rounded-2xl p-4 border '+(p.mine?'border-orange-500/50':'border-slate-700')+' cursor-pointer" onclick="openPost('+p.id+')">'
+        + '<div class="flex items-center justify-between">'
+        + '<div class="hscroll no-scrollbar">'+p.types.map(typeBadge).join('')+(p.mode==='온라인'?'<span class="chip bg-sky-500/20 text-sky-300 text-[10px]" style="min-height:1.5rem;padding:0 8px;">온라인</span>':'')+'</div>'
+        + (p.mine ? '<span class="text-[10px] font-extrabold text-orange-300 shrink-0">내 모집글</span>' : '')
+        + '</div>'
+        + '<p class="mt-2 text-sm font-bold text-slate-200">'+esc(p.intro)+'</p>'
+        + '<p class="mt-1.5 text-[11px] text-slate-400">'+esc(p.region)+' · '+esc(p.timeSlot)+' · '+dayChips(p.days)+'</p>'
+        + '<div class="mt-2 flex items-center justify-between">'
+        + '<span class="text-[11px] text-slate-500">'+esc(p.authorAvatar)+' '+esc(p.authorName)+' · 마감 '+esc(p.deadline)+(expired?' (마감)':'')+'</span>'
+        + '<span class="text-xs font-extrabold '+(p.joined>=p.capacity?'text-slate-400':'text-emerald-400')+'">'+p.joined+'/'+p.capacity+'명'+(pend.length?' · 신청 '+pend.length:'')+'</span>'
+        + '</div>'
+        + '</div>';
+    });
+  }
+  html += '<p class="text-[10px] text-slate-500 text-center pt-1">💡 예시 모집글이 포함되어 있어요 (v1 로컬 프로토타입)</p>';
+  html += '</div>';
+  return html;
+}
+function setFilter(t) { recruitFilter = t; render(); }
+
+/* ---------- 미션 ---------- */
+function renderMission() {
+  const wk = weekKeyOf();
+  const weekly = S.missions.find(m => m.kind === 'weekly' && m.weekKey === wk);
+  const group = S.missions.find(m => m.kind === 'group' && m.weekKey === wk);
+  const wv = weekVerifyCount();
+  const t = todayStr();
+  const todays = S.missions.filter(m => m.kind === 'daily' && m.date === t);
+  const gp = groupProgress();
+
+  let html = '<div class="fade-in space-y-4">';
+
+  // 주간 챌린지
+  if (weekly) {
+    const pct = Math.min(100, Math.round(wv / weekly.goal * 100));
+    html += '<div class="bg-gradient-to-br from-indigo-600/30 to-violet-600/20 rounded-2xl p-5 border border-indigo-500/40">'
+      + '<p class="text-[10px] font-extrabold text-indigo-300 mb-1">📅 주간 챌린지 (월요일 갱신)</p>'
+      + '<p class="font-extrabold text-white">'+esc(weekly.title)+(weekly.status==='done'?' ✅':'')+'</p>'
+      + '<div class="mt-3 flex items-center gap-2"><div class="flex-1 h-3 bg-slate-700 rounded-full overflow-hidden"><div class="bar-anim h-full bg-gradient-to-r from-indigo-400 to-violet-400 rounded-full" style="width:'+pct+'%"></div></div>'
+      + '<span class="text-xs font-extrabold text-indigo-200">'+wv+'/'+weekly.goal+'일</span></div>'
+      + '<p class="mt-2 text-[11px] text-slate-400">달성 시 +50P</p></div>';
+  }
+
+  // 그룹 공동 미션
+  html += '<div class="bg-slate-800/80 rounded-2xl p-5 border border-slate-700">'
+    + '<p class="text-[10px] font-extrabold text-emerald-300 mb-1">👥 그룹 공동 미션</p>';
+  if (group) {
+    const pct = Math.min(100, Math.round(gp.total / group.goal * 100));
+    html += '<p class="font-extrabold text-white">'+esc(group.title)+(group.status==='done'?' ✅':'')+'</p>'
+      + '<p class="text-[11px] text-slate-400 mt-1">내 인증 '+gp.mine+'회 + 메이트 '+gp.sim+'회</p>'
+      + '<div class="mt-3 flex items-center gap-2"><div class="flex-1 h-3 bg-slate-700 rounded-full overflow-hidden"><div class="bar-anim h-full bg-emerald-500 rounded-full" style="width:'+pct+'%"></div></div>'
+      + '<span class="text-xs font-extrabold text-emerald-300">'+gp.total+'/'+group.goal+'</span></div>'
+      + '<p class="mt-2 text-[11px] text-slate-400">달성 시 그룹원 전원 +50P</p>';
+  } else {
+    html += '<p class="text-sm text-slate-500">그룹에 가입하면 공동 미션이 열려요.</p>'
+      + '<button onclick="switchTab(\'recruit\')" class="btn mt-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl">메이트 찾으러 가기</button>';
+  }
+  html += '</div>';
+
+  // 오늘의 미션
+  html += '<div class="bg-slate-800/80 rounded-2xl border border-slate-700 overflow-hidden">'
+    + '<p class="px-5 pt-4 pb-2 font-extrabold text-white">🎯 오늘의 미션 ('+todays.filter(m=>m.status==='done').length+'/3)</p>';
+  todays.forEach(m => {
+    const done = m.status === 'done';
+    html += '<div class="px-5 py-3 flex items-center justify-between border-t border-slate-700/60">'
+      + '<span class="text-sm font-bold '+(done?'text-emerald-400 line-through':'text-slate-200')+'">'+(done?'✅':'⭕')+' '+esc(m.title)+'</span>'
+      + (done ? '<span class="text-xs text-emerald-400 font-bold">'+fmtClock(m.verifiedAt)+'</span>'
+              : '<button onclick="openVerify('+m.id+')" class="btn bg-orange-500 hover:bg-orange-400 text-white font-bold text-xs px-4 py-2 rounded-xl">인증</button>')
+      + '</div>';
+  });
+  html += '</div>';
+
+  // 미션 히스토리 (접이식)
+  const hist = S.verifs.filter(v => v.mine).slice().sort((a,b) => new Date(b.date)-new Date(a.date)).slice(0, 30);
+  html += '<details class="bg-slate-800/80 rounded-2xl border border-slate-700">'
+    + '<summary class="px-5 py-4 font-extrabold text-white cursor-pointer select-none">📜 미션 히스토리 ('+S.verifs.filter(v=>v.mine).length+'회)</summary>'
+    + '<div class="px-5 pb-5">';
+  if (hist.length === 0) {
+    html += '<p class="text-sm text-slate-500 py-2">아직 인증 기록이 없어요. 첫 인증을 남겨보세요!</p>';
+  } else {
+    let lastDate = '';
+    hist.forEach(v => {
+      if (v.date !== lastDate) { lastDate = v.date; html += '<p class="text-[10px] font-bold text-slate-400 mt-3 first:mt-0">'+fmtDay(v.date)+'</p>'; }
+      html += '<p class="text-sm text-slate-300 py-1">✅ '+esc(v.missionTitle)+(v.memo?' — '+esc(v.memo):'')+'</p>';
+    });
+  }
+  html += '</div></details>';
+  html += '</div>';
+  return html;
+}
+
+/* ---------- 피드 ---------- */
+let feedSort = 'new';
+function renderFeed() {
+  let items = S.feed.filter(f => f.sample || f.mine);
+  items.sort((a,b) => {
+    if (feedSort === 'cheer') {
+      const ca = a.cheers.fire+a.cheers.thumb+a.cheers.muscle, cb = b.cheers.fire+b.cheers.thumb+b.cheers.muscle;
+      if (cb !== ca) return cb - ca;
+    }
+    return new Date(b.createdAt) - new Date(a.createdAt);
+  });
+
+  let html = '<div class="fade-in space-y-3">';
+  html += '<div class="flex gap-2">'
+    + '<button onclick="feedSortSet(\'new\')" class="chip '+(feedSort==='new'?'bg-orange-500 text-white':'bg-slate-700 text-slate-200')+'">최신순</button>'
+    + '<button onclick="feedSortSet(\'cheer\')" class="chip '+(feedSort==='cheer'?'bg-orange-500 text-white':'bg-slate-700 text-slate-200')+'">응원많은순</button>'
+    + '</div>'
+    + '<p class="text-[10px] text-slate-500">💡 더미 메이트의 예시 인증이 포함되어 있어요 (v1 로컬 프로토타입)</p>';
+
+  if (items.length === 0) {
+    html += showEmpty('📣','피드가 비어있어요','미션을 인증하면 피드에 올라와요');
+  } else {
+    items.slice(0, 50).forEach(f => {
+      const total = f.cheers.fire + f.cheers.thumb + f.cheers.muscle;
+      html += '<div class="bg-slate-800/80 rounded-2xl p-4 border '+(f.mine?'border-orange-500/50':'border-slate-700')+'">'
+        + '<div class="flex items-center gap-2">'
+        + '<span class="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-lg shrink-0">'+esc(f.avatar)+'</span>'
+        + '<div class="flex-1 min-w-0"><p class="text-sm font-bold text-white truncate">'+esc(f.userName)+(f.mine?' (나)':'')+'</p>'
+        + '<p class="text-[10px] text-slate-500">'+fmtClock(f.createdAt)+'</p></div>'
+        + (f.sample ? '<span class="chip bg-slate-700 text-slate-400 text-[9px] shrink-0" style="min-height:1.25rem;padding:0 7px;">예시</span>' : '')
+        + '</div>'
+        + '<p class="mt-2 text-xs font-bold text-orange-300">🎯 '+esc(f.missionTitle)+'</p>'
+        + (f.memo ? '<p class="mt-1 text-sm text-slate-300">'+esc(f.memo)+'</p>' : '')
+        + (f.photoDataUrl
+            ? '<img src="'+f.photoDataUrl+'" class="mt-2 w-full max-h-64 object-cover rounded-xl cursor-pointer" alt="인증샷" onclick="openLightbox(this.src)">'
+            : '<div class="mt-2 h-28 rounded-xl bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-4xl opacity-60">'+esc(f.avatar)+'</div>')
+        + '<div class="mt-3 flex items-center gap-2">'
+        + '<button onclick="sendCheer('+f.id+',\'fire\')" class="cheer-btn btn bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 font-bold text-xs px-3 py-2 rounded-xl">🔥 '+f.cheers.fire+'</button>'
+        + '<button onclick="sendCheer('+f.id+',\'thumb\')" class="cheer-btn btn bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 font-bold text-xs px-3 py-2 rounded-xl">👍 '+f.cheers.thumb+'</button>'
+        + '<button onclick="sendCheer('+f.id+',\'muscle\')" class="cheer-btn btn bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 font-bold text-xs px-3 py-2 rounded-xl">💪 '+f.cheers.muscle+'</button>'
+        + (total >= 5 ? '<span class="text-[10px] text-amber-300 font-bold ml-auto">인기 인증! 🌟</span>' : '')
+        + '</div>'
+        + '</div>';
+    });
+  }
+  html += '</div>';
+  return html;
+}
+function feedSortSet(s) { feedSort = s; render(); }
+
+/* ---------- 프로필 ---------- */
+function renderProfile() {
+  const p = S.profile;
+  const lv = levelOf(p.points), nx = nextLevel(p.points);
+  const pct = nx ? Math.min(100, Math.round((p.points - lv.need) / (nx.need - lv.need) * 100)) : 100;
+  const rank = calcRank();
+
+  let html = '<div class="fade-in space-y-4">';
+
+  // 프로필 카드
+  html += '<div class="bg-slate-800/80 rounded-2xl p-5 border border-slate-700">'
+    + '<div class="flex items-center gap-3">'
+    + '<button id="avatarBtn" class="btn w-14 h-14 rounded-full bg-gradient-to-br from-orange-500/30 to-rose-500/30 border-2 border-orange-500/50 flex items-center justify-center text-3xl shrink-0">'+esc(p.avatar)+'</button>'
+    + '<div class="flex-1">'
+    + '<input id="nameInput" value="'+esc(p.name)+'" maxlength="10" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2 text-white font-bold text-sm" placeholder="이름/닉네임">'
+    + '<button onclick="saveName()" class="btn mt-2 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg">이름 저장</button>'
+    + '</div></div>'
+    + '<div class="mt-4 flex items-center justify-between text-xs"><span class="font-extrabold text-orange-300">'+esc(lv.name)+'</span><span class="text-slate-400">총 '+p.points.toLocaleString()+'P</span></div>'
+    + '<div class="mt-1.5 h-3 bg-slate-700 rounded-full overflow-hidden"><div class="bar-anim h-full bg-gradient-to-r from-orange-500 to-rose-500 rounded-full" style="width:'+pct+'%"></div></div>'
+    + (nx ? '<p class="mt-1 text-[10px] text-slate-500">'+esc(nx.name)+'까지 '+(nx.need-p.points).toLocaleString()+'P</p>' : '')
+    + '</div>';
+
+  // 요약
+  html += '<div class="grid grid-cols-3 gap-2">'
+    + '<div class="bg-slate-800/80 rounded-2xl p-3 border border-slate-700 text-center"><p class="text-[10px] text-slate-400 font-bold">이번 주</p><p class="font-extrabold text-white text-sm mt-1">'+p.weeklyPoints.toLocaleString()+'P</p></div>'
+    + '<div class="bg-slate-800/80 rounded-2xl p-3 border border-slate-700 text-center"><p class="text-[10px] text-slate-400 font-bold">주간 랭킹</p><p class="font-extrabold text-white text-sm mt-1">'+rank+'위</p></div>'
+    + '<div class="bg-slate-800/80 rounded-2xl p-3 border border-slate-700 text-center"><p class="text-[10px] text-slate-400 font-bold">최고 스트릭</p><p class="font-extrabold text-white text-sm mt-1">'+p.streakBest+'일</p></div>'
+    + '</div>';
+
+  // 배지
+  html += '<div class="bg-slate-800/80 rounded-2xl p-5 border border-slate-700">'
+    + '<p class="font-extrabold text-white mb-3">🏅 배지 ('+S.badges.length+'/'+BADGES.length+')</p>'
+    + '<div class="grid grid-cols-3 gap-2">';
+  BADGES.forEach(b => {
+    const earned = S.badges.some(x => x.id === b.id);
+    html += '<div class="rounded-xl p-2 text-center border '+(earned?'border-amber-400/60 bg-amber-400/10':'border-slate-700 bg-slate-900/50 opacity-50')+'">'
+      + '<p class="text-2xl">'+(earned?b.icon:'🔒')+'</p>'
+      + '<p class="text-[10px] font-bold '+(earned?'text-amber-300':'text-slate-400')+' mt-1">'+esc(b.name)+'</p></div>';
+  });
+  html += '</div></div>';
+
+  // 주간 랭킹 (접이식)
+  const wk = weekKeyOf();
+  const rows = [{ name:p.name, avatar:p.avatar, wp:p.weeklyPoints, me:true }];
+  SEED_USERS.forEach(u => rows.push({ name:u.name, avatar:u.avatar, wp: 20 + hash(wk+u.name)%160, me:false }));
+  rows.sort((a,b) => b.wp - a.wp);
+  const medals = ['🥇','🥈','🥉'];
+  html += '<details class="bg-slate-800/80 rounded-2xl border border-slate-700">'
+    + '<summary class="px-5 py-4 font-extrabold text-white cursor-pointer select-none">🏆 주간 랭킹 (월요일 리셋)</summary>'
+    + '<div class="px-5 pb-5 space-y-1.5">';
+  rows.slice(0, 10).forEach((r, i) => {
+    html += '<div class="flex items-center justify-between rounded-xl px-3 py-2 '+(r.me?'bg-orange-500/15 border border-orange-500/40':'bg-slate-900/50')+'">'
+      + '<span class="text-sm font-bold '+(r.me?'text-orange-300':'text-slate-300')+'">'+(i<3?medals[i]:'<span class="text-slate-500 text-xs font-bold">'+(i+1)+'위</span>')+' '+esc(r.avatar)+' '+esc(r.name)+(r.me?' (나)':'')+'</span>'
+      + '<span class="text-xs font-extrabold text-slate-300">'+r.wp.toLocaleString()+'P</span></div>';
+  });
+  html += '</div></details>';
+
+  // 설정 (접이식)
+  html += '<details class="bg-slate-800/80 rounded-2xl border border-slate-700">'
+    + '<summary class="px-5 py-4 font-extrabold text-white cursor-pointer select-none">⚙️ 설정</summary>'
+    + '<div class="px-5 pb-5 space-y-4">'
+    + '<div><p class="text-xs font-bold text-slate-400 mb-2">관심 운동 (내일의 미션에 반영)</p>'
+    + '<div class="flex flex-wrap gap-2">'
+    + Object.keys(TYPE_INFO).map(t => {
+        const on = p.interests.includes(t);
+        return '<button onclick="toggleInterest(\''+t+'\')" class="chip '+(on?'bg-orange-500 text-white':'bg-slate-700 text-slate-300')+'">'+TYPE_INFO[t].emoji+' '+t+'</button>';
+      }).join('')
+    + '</div></div>'
+    + '<div><p class="text-xs font-bold text-slate-400 mb-2">알림 시간 (v2 푸시 연동 예정)</p>'
+    + '<input type="time" id="notifyTime" value="'+esc(p.notifyTime||'08:00')+'" class="bg-slate-900 border border-slate-600 rounded-xl px-3 py-2 text-white text-sm">'
+    + '<button onclick="saveNotify()" class="btn ml-2 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold px-3 py-2 rounded-lg">저장</button></div>'
+    + '<div class="flex gap-2 pt-1">'
+    + '<button onclick="backup()" class="btn flex-1 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold py-3 rounded-xl">📤 백업</button>'
+    + '<button onclick="restore()" class="btn flex-1 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold py-3 rounded-xl">📥 복원</button>'
+    + '<button onclick="resetAll()" class="btn flex-1 bg-rose-700/70 hover:bg-rose-600 text-white text-xs font-bold py-3 rounded-xl">🗑 초기화</button>'
+    + '</div>'
+    + '<p class="text-[10px] text-slate-500">모든 데이터는 이 브라우저에만 저장됩니다 (IndexedDB). 기기 이동 시 백업·복원을 이용하세요.</p>'
+    + '</div></details>';
+
+  html += '</div>';
+  return html;
+}
+async function saveName() {
+  const v = $('nameInput').value.trim();
+  if (!v) { showToast('이름을 입력해주세요'); return; }
+  S.profile.name = v; await saveProfile(); showToast('이름을 저장했어요'); render();
+}
+async function toggleInterest(t) {
+  const arr = S.profile.interests;
+  const i = arr.indexOf(t);
+  if (i >= 0) { if (arr.length === 1) { showToast('최소 1개는 선택해야 해요'); return; } arr.splice(i,1); }
+  else arr.push(t);
+  await saveProfile(); render();
+}
+async function saveNotify() {
+  S.profile.notifyTime = $('notifyTime').value; await saveProfile(); showToast('알림 시간을 저장했어요');
+}
+
+/* ---------- 스트릭 복권 ---------- */
+async function useLottery() {
+  const p = S.profile;
+  if (p.lotteryWeek === weekKeyOf()) return;
+  p.streak = p.brokenStreak; p.brokenStreak = 0; p.brokenDate = '';
+  p.lotteryWeek = weekKeyOf();
+  p.lastVerifyDate = yesterdayStr(); // 어제 인증한 것으로 복구
+  await saveProfile();
+  showToast('복권 당첨! 🔥 '+p.streak+'일 스트릭을 되찾았어요');
+  renderHeader(); render();
+}
+
+/* ---------- 탭 전환 ---------- */
+function switchTab(name) {
+  activeTab = name;
+  document.querySelectorAll('.tabbtn').forEach(b => {
+    const on = b.dataset.tab === name;
+    b.className = 'tabbtn flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-bold ' + (on ? 'text-orange-400' : 'text-slate-400');
+  });
+  $('fab').style.display = name === 'recruit' ? 'block' : 'none';
+  try { history.replaceState(null, '', '#' + name); } catch(e) {}
+  render();
+}
+function render() {
+  const el = $('main');
+  if (activeTab === 'home')    el.innerHTML = renderHome();
+  if (activeTab === 'recruit') el.innerHTML = renderRecruit();
+  if (activeTab === 'mission') el.innerHTML = renderMission();
+  if (activeTab === 'feed')    el.innerHTML = renderFeed();
+  if (activeTab === 'profile') el.innerHTML = renderProfile();
+  const chk = $('onlineOnlyChk');
+  if (chk) chk.onchange = e => { onlineOnly = e.target.checked; render(); };
+}
+
+/* ---------- 하단시트 ---------- */
+function openSheet(title, bodyHtml) {
+  $('sheetTitle').textContent = title;
+  $('sheetBody').innerHTML = bodyHtml;
+  $('sheetMask').classList.remove('hidden');
+  $('sheet').classList.add('open');
+}
+function closeSheet() {
+  $('sheetMask').classList.add('hidden');
+  $('sheet').classList.remove('open');
+}
+
+/* ---------- 인증 시트 ---------- */
+let verifyPhoto = '';
+function openVerify(missionId) {
+  const m = S.missions.find(x => x.id === missionId);
+  if (!m || m.status === 'done') return;
+  verifyPhoto = '';
+  openSheet('미션 인증', ''
+    + '<div class="space-y-4 pt-2">'
+    + '<p class="text-sm font-bold text-orange-300">🎯 '+esc(m.title)+'</p>'
+    + '<div id="photoPreview" class="hidden rounded-2xl overflow-hidden border border-slate-600"><img class="w-full max-h-56 object-cover" alt="미리보기"></div>'
+    + '<div class="flex gap-2">'
+    + '<button onclick="pickPhoto()" class="btn flex-1 bg-slate-700 hover:bg-slate-600 text-white font-bold text-sm py-3 rounded-xl">📷 사진 촬영/선택</button>'
+    + '<button onclick="clearPhoto()" class="btn bg-slate-700 hover:bg-slate-600 text-white text-sm px-4 rounded-xl">지우기</button>'
+    + '</div>'
+    + '<textarea id="memoInput" maxlength="100" rows="2" placeholder="한 줄 소감 (선택) — 예: 오늘도 해냈다!" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm resize-none"></textarea>'
+    + '<p class="text-[11px] text-slate-500">사진 또는 소감 중 하나는 필수예요. 인증 즉시 +10P!</p>'
+    + '<button onclick="submitVerify('+m.id+')" class="btn w-full bg-gradient-to-r from-orange-500 to-rose-500 text-white font-extrabold py-4 rounded-2xl text-base">✅ 인증 완료</button>'
+    + '</div>');
+}
+function pickPhoto() { $('photoInput').value = ''; $('photoInput').click(); }
+function clearPhoto() { verifyPhoto = ''; $('photoPreview').classList.add('hidden'); }
+$('photoInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 800;
+      let w = img.width, h = img.height;
+      if (w > MAX || h > MAX) { const r = Math.min(MAX/w, MAX/h); w = Math.round(w*r); h = Math.round(h*r); }
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      verifyPhoto = c.toDataURL('image/jpeg', 0.7);
+      const pv = $('photoPreview');
+      pv.querySelector('img').src = verifyPhoto;
+      pv.classList.remove('hidden');
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+async function submitVerify(missionId) {
+  const memo = $('memoInput').value.trim();
+  if (!verifyPhoto && !memo) { showToast('사진이나 소감 중 하나는 남겨주세요!'); return; }
+  closeSheet();
+  floatPoints('+10 P');
+  showToast('✅ 인증 완료! 피드에 올라갔어요');
+  await doVerify(missionId, verifyPhoto, memo);
+}
+
+/* ---------- 모집글 시트 ---------- */
+let formState = { types:new Set(), days:new Set(), timeSlot:'' };
+function openRecruitForm() {
+  formState = { types:new Set(), days:new Set(), timeSlot:'아침' };
+  openSheet('메이트 모집하기', ''
+    + '<div class="space-y-4 pt-2">'
+    + '<div><p class="text-xs font-bold text-slate-400 mb-2">운동 종류 (여러 개 선택)</p>'
+    + '<div class="flex flex-wrap gap-2" id="formTypes">'
+    + Object.keys(TYPE_INFO).map(t => '<button onclick="toggleForm(\'types\',\''+t+'\')" data-t="'+t+'" class="chip bg-slate-700 text-slate-300">'+TYPE_INFO[t].emoji+' '+t+'</button>').join('')
+    + '</div></div>'
+    + '<div class="flex gap-3"><div class="flex-1"><p class="text-xs font-bold text-slate-400 mb-2">방식</p>'
+    + '<select id="formMode" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-3 text-white text-sm"><option>오프라인</option><option>온라인</option></select></div>'
+    + '<div class="flex-1"><p class="text-xs font-bold text-slate-400 mb-2">모집 인원</p>'
+    + '<select id="formCap" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-3 text-white text-sm"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option></select></div></div>'
+    + '<div><p class="text-xs font-bold text-slate-400 mb-2">지역 (오프라인일 때)</p>'
+    + '<select id="formRegion" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-3 text-white text-sm">'
+    + REGIONS.map(r => '<option>'+r+'</option>').join('') + '</select></div>'
+    + '<div><p class="text-xs font-bold text-slate-400 mb-2">요일 (여러 개 선택)</p>'
+    + '<div class="flex gap-2" id="formDays">'
+    + DAY_LABELS.map((d,i) => '<button onclick="toggleForm(\'days\','+i+')" data-d="'+i+'" class="chip bg-slate-700 text-slate-300">'+d+'</button>').join('')
+    + '</div></div>'
+    + '<div><p class="text-xs font-bold text-slate-400 mb-2">시간대</p>'
+    + '<div class="flex gap-2" id="formSlot">'
+    + TIME_SLOTS.map(s => '<button onclick="setSlot(\''+s+'\')" data-s="'+s+'" class="chip bg-slate-700 text-slate-300">'+s+'</button>').join('')
+    + '</div></div>'
+    + '<div><p class="text-xs font-bold text-slate-400 mb-2">한 줄 소개</p>'
+    + '<textarea id="formIntro" maxlength="60" rows="2" placeholder="예: 새벽 러닝 메이트 구해요! 초보 환영 🏃" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm resize-none"></textarea></div>'
+    + '<div><p class="text-xs font-bold text-slate-400 mb-2">모집 마감일</p>'
+    + '<input type="date" id="formDeadline" value="'+addDaysStr(todayStr(),7)+'" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-3 text-white text-sm"></div>'
+    + '<button onclick="savePost()" class="btn w-full bg-gradient-to-r from-orange-500 to-rose-500 text-white font-extrabold py-4 rounded-2xl text-base">🚀 모집글 올리기</button>'
+    + '</div>');
+  // 기본 시간대 하이라이트
+  setSlot('아침');
+}
+function toggleForm(kind, val) {
+  const set = formState[kind];
+  if (set.has(val)) set.delete(val); else set.add(val);
+  const attr = kind === 'types' ? 't' : 'd';
+  document.querySelectorAll('#form'+(kind==='types'?'Types':'Days')+' button').forEach(b => {
+    const v = kind === 'types' ? b.dataset.t : Number(b.dataset.d);
+    const on = set.has(v);
+    b.className = 'chip ' + (on ? 'bg-orange-500 text-white' : 'bg-slate-700 text-slate-300');
+  });
+}
+function setSlot(s) {
+  formState.timeSlot = s;
+  document.querySelectorAll('#formSlot button').forEach(b => {
+    b.className = 'chip ' + (b.dataset.s === s ? 'bg-orange-500 text-white' : 'bg-slate-700 text-slate-300');
+  });
+}
+async function savePost() {
+  const types = [...formState.types];
+  const days = [...formState.days];
+  if (types.length === 0) { showToast('운동 종류를 1개 이상 선택해주세요'); return; }
+  if (days.length === 0) { showToast('요일을 1개 이상 선택해주세요'); return; }
+  const mode = $('formMode').value;
+  const intro = $('formIntro').value.trim();
+  if (!intro) { showToast('한 줄 소개를 적어주세요'); return; }
+  const region = mode === '온라인' ? '온라인' : $('formRegion').value;
+  const p = {
+    types, mode, region, days, timeSlot:formState.timeSlot,
+    capacity:Number($('formCap').value), joined:0, intro,
+    authorName:S.profile.name, authorAvatar:S.profile.avatar, mine:true,
+    createdAt:nowISO(), deadline:$('formDeadline').value || addDaysStr(todayStr(),7)
+  };
+  p.id = await dbAdd('posts', p); S.posts.push(p);
+  closeSheet();
+  showToast('🚀 모집글을 올렸어요! 메이트들이 신청하면 알려드릴게요');
+  render();
+  // 더미 메이트 신청 시뮬레이션
+  const n = Math.min(p.capacity, 1 + Math.floor(Math.random()*2));
+  for (let i=0;i<n;i++) setTimeout(() => dummyApply(p.id), 15000 + i*20000 + Math.random()*20000);
+}
+async function dummyApply(postId) {
+  const p = S.posts.find(x => x.id === postId);
+  if (!p || !p.mine) return;
+  if (p.joined >= p.capacity) return;
+  if (S.apps.filter(a => a.postId === postId && a.status !== 'rejected').length >= p.capacity) return;
+  const u = rand(SEED_USERS);
+  if (S.apps.some(a => a.postId === postId && a.name === u.name)) return;
+  const app = { postId, name:u.name, avatar:u.avatar, status:'pending', mineApply:false, createdAt:nowISO() };
+  app.id = await dbAdd('apps', app); S.apps.push(app);
+  showToast('📨 '+esc(u.avatar+' '+u.name)+'님이 내 모집글에 신청했어요!');
+  if (activeTab === 'recruit') render();
+}
+
+/* 모집글 상세 */
+function openPost(postId) {
+  const p = S.posts.find(x => x.id === postId);
+  if (!p) return;
+  const t = todayStr();
+  const expired = p.deadline && p.deadline < t;
+  const myApp = S.apps.find(a => a.postId === p.id && a.mineApply);
+  const apps = S.apps.filter(a => a.postId === p.id);
+
+  let body = '<div class="space-y-4 pt-2">'
+    + '<div class="flex flex-wrap gap-2">'+p.types.map(typeBadge).join('')
+    + (p.mode==='온라인'?'<span class="chip bg-sky-500/20 text-sky-300 text-xs">온라인</span>':'<span class="chip bg-slate-700 text-slate-200 text-xs">오프라인</span>')+'</div>'
+    + '<p class="text-base font-bold text-white">'+esc(p.intro)+'</p>'
+    + '<div class="bg-slate-900/70 rounded-xl p-4 space-y-1.5 text-sm text-slate-300">'
+    + '<p>📍 지역: <b>'+esc(p.region)+'</b></p>'
+    + '<p>🕐 시간대: <b>'+esc(p.timeSlot)+'</b> · '+dayChips(p.days)+'</p>'
+    + '<p>👥 모집 인원: <b>'+p.joined+'/'+p.capacity+'명</b></p>'
+    + '<p>✍️ 방장: '+esc(p.authorAvatar)+' '+esc(p.authorName)+(p.mine?' (나)':'')+'</p>'
+    + '<p>⏰ 마감: <b>'+esc(p.deadline)+'</b>'+(expired?' (마감)':'')+'</p>'
+    + '</div>';
+
+  if (p.mine) {
+    body += '<div><p class="text-xs font-bold text-slate-400 mb-2">신청 목록 ('+apps.length+')</p>';
+    if (apps.length === 0) body += '<p class="text-sm text-slate-500 py-2">아직 신청이 없어요. 조금만 기다려보세요!</p>';
+    apps.forEach(a => {
+      body += '<div class="flex items-center justify-between bg-slate-900/70 rounded-xl px-3 py-2.5 mb-2">'
+        + '<span class="text-sm font-bold text-slate-200">'+esc(a.avatar)+' '+esc(a.name)+'</span>'
+        + (a.status === 'pending'
+            ? '<span class="flex gap-2"><button onclick="decideApp('+a.id+',\'accepted\')" class="btn bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-2 rounded-lg">수락</button>'
+              + '<button onclick="decideApp('+a.id+',\'rejected\')" class="btn bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold px-3 py-2 rounded-lg">거절</button></span>'
+            : '<span class="text-xs font-bold '+(a.status==='accepted'?'text-emerald-400':'text-slate-500')+'">'+(a.status==='accepted'?'✅ 수락됨':'거절됨')+'</span>')
+        + '</div>';
+    });
+    body += '</div>';
+  } else {
+    if (expired) body += '<p class="text-sm text-slate-500">마감된 모집글이에요.</p>';
+    else if (myApp) body += '<p class="text-sm font-bold '+(myApp.status==='accepted'?'text-emerald-400':'text-amber-300')+'">'
+      + (myApp.status==='accepted'?'✅ 가입 완료! 그룹 미션이 열렸어요':'⏳ 방장의 수락을 기다리고 있어요…')+'</p>';
+    else if (p.joined >= p.capacity) body += '<p class="text-sm text-slate-500">모집 인원이 가득 찼어요.</p>';
+    else body += '<button onclick="applyPost('+p.id+')" class="btn w-full bg-gradient-to-r from-orange-500 to-rose-500 text-white font-extrabold py-4 rounded-2xl">✋ 신청하기</button>';
+  }
+  body += '</div>';
+  openSheet(p.mine?'내 모집글':'모집글 상세', body);
+}
+async function applyPost(postId) {
+  const p = S.posts.find(x => x.id === postId);
+  if (!p || p.joined >= p.capacity) { closeSheet(); return; }
+  const app = { postId, name:S.profile.name, avatar:S.profile.avatar, status:'pending', mineApply:true, createdAt:nowISO() };
+  app.id = await dbAdd('apps', app); S.apps.push(app);
+  closeSheet();
+  showToast('✋ 신청 완료! 방장이 수락하면 그룹이 열려요');
+  render();
+  // 방장 자동 수락 시뮬레이션 (6~14초)
+  setTimeout(() => autoAccept(app.id), 6000 + Math.random()*8000);
+}
+async function autoAccept(appId) {
+  const a = S.apps.find(x => x.id === appId);
+  if (!a || !a.mineApply || a.status !== 'pending') return;
+  const p = S.posts.find(x => x.id === a.postId);
+  if (!p) return;
+  a.status = 'accepted';
+  await dbPut('apps', a);
+  p.joined += 1;
+  await savePost(p);
+  showToast('🎉 '+esc(p.authorAvatar+' '+p.authorName)+'방장이 수락했어요! 그룹 미션이 열렸어요');
+  await ensureGroupMission();
+  render();
+}
+async function decideApp(appId, decision) {
+  const a = S.apps.find(x => x.id === appId);
+  if (!a || a.status !== 'pending') return;
+  a.status = decision;
+  await dbPut('apps', a);
+  const p = S.posts.find(x => x.id === a.postId);
+  if (p && decision === 'accepted') { p.joined += 1; await savePost(p); }
+  if (decision === 'accepted') {
+    showToast('✅ '+esc(a.name)+'님과 한 팀이 되었어요!');
+    await ensureGroupMission();
+  } else {
+    showToast('신청을 거절했어요');
+  }
+  openPost(a.postId);
+  if (activeTab === 'recruit' || activeTab === 'home') render();
+}
+
+/* ---------- 백업/복원/초기화 ---------- */
+async function backup() {
+  const data = {
+    app:'yadonghaja', version:1, exportedAt:nowISO(),
+    profile:S.profile, missions:S.missions, verifs:S.verifs, feed:S.feed,
+    posts:S.posts, apps:S.apps, badges:S.badges, ledger:S.ledger
+  };
+  const blob = new Blob([JSON.stringify(data)], { type:'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'yadong-backup-'+todayStr()+'.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  showToast('📤 백업 파일을 저장했어요');
+}
+function restore() { $('jsonInput').value = ''; $('jsonInput').click(); }
+$('jsonInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async ev => {
+    try {
+      const d = JSON.parse(ev.target.result);
+      if (d.app !== 'yadonghaja' || !d.profile) throw new Error('잘못된 파일');
+      for (const s of ['missions','verifs','feed','posts','apps','badges','ledger']) await dbClear(s);
+      await dbClear('profile');
+      await dbPut('profile', d.profile);
+      for (const s of ['missions','verifs','feed','posts','apps','badges','ledger']) for (const it of (d[s]||[])) await dbPut(s, it);
+      showToast('📥 복원 완료!');
+      await loadAll(); boot(true);
+    } catch (err) { showToast('복원 실패: 올바른 백업 파일이 아니에요'); }
+  };
+  reader.readAsText(file);
+});
+async function resetAll() {
+  if (!confirm('모든 데이터를 삭제하고 처음부터 시작할까요? 되돌릴 수 없어요.')) return;
+  for (const s of ['profile','missions','verifs','feed','posts','apps','badges','ledger','kv']) await dbClear(s);
+  location.reload();
+}
+
+/* ---------- 라이트박스/토스트/플로팅 ---------- */
+function openLightbox(src) { $('lightboxImg').src = src; $('lightbox').classList.remove('hidden'); $('lightbox').classList.add('flex'); }
+function closeLightbox() { $('lightbox').classList.add('hidden'); $('lightbox').classList.remove('flex'); }
+let toastTimer = null;
+function showToast(msg) {
+  const t = $('toast');
+  t.innerHTML = msg;
+  t.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.add('hidden'), 2600);
+}
+function floatPoints(text) {
+  const el = document.createElement('div');
+  el.className = 'points-float text-orange-400 text-2xl';
+  el.style.left = '50%'; el.style.top = '40%';
+  el.textContent = text;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1300);
+}
+
+/* ---------- 부트 ---------- */
+async function boot(isRestore) {
+  const p = S.profile;
+  // 주간 리셋
+  const wk = weekKeyOf();
+  if (p.weekKey !== wk) { p.weekKey = wk; p.weeklyPoints = 0; await saveProfile(); }
+  // 스트릭 끊김 감지 → 복권 대상
+  if (p.lastVerifyDate && p.streak > 0) {
+    const gap = daysBetween(p.lastVerifyDate, todayStr());
+    if (gap > 1) { p.brokenStreak = p.streak; p.streak = 0; p.brokenDate = todayStr(); await saveProfile(); }
+  }
+  await ensureDailyMissions();
+  await ensureWeeklyChallenge();
+  await ensureGroupMission();
+  await checkMissionCompletions();
+  await checkBadges();
+  renderHeader();
+  // 해시 라우팅
+  const h = (location.hash || '').replace('#','');
+  switchTab(['home','recruit','mission','feed','profile'].includes(h) ? h : 'home');
+  // 이전 세션 미처리 신청 자동 수락 (내가 신청했던 것)
+  S.apps.filter(a => a.mineApply && a.status === 'pending').forEach(a => {
+    const gapMs = Date.now() - new Date(a.createdAt).getTime();
+    if (gapMs > 20000) autoAccept(a.id);
+  });
+  // 최근 내 피드에 받은 응원 시뮬레이션 (재방문 환영)
+  const recent = S.feed.filter(f => f.mine && (Date.now() - new Date(f.createdAt)) < 36*3600000);
+  recent.forEach(f => {
+    const total = f.cheers.fire + f.cheers.thumb + f.cheers.muscle;
+    if (total === 0 && Math.random() < 0.5) dummyCheer(f.id, true);
+  });
+}
+
+/* ---------- 이벤트 바인딩 ---------- */
+document.querySelectorAll('.tabbtn').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+$('fab').addEventListener('click', openRecruitForm);
+$('sheetClose').addEventListener('click', closeSheet);
+$('sheetMask').addEventListener('click', closeSheet);
+$('lightboxClose').addEventListener('click', closeLightbox);
+$('lightbox').addEventListener('click', e => { if (e.target === $('lightbox')) closeLightbox(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeSheet(); closeLightbox(); } });
+
+/* ---------- 시작 ---------- */
+openDB().then(() => loadAll()).then(() => boot(false)).catch(err => {
+  console.error(err);
+  $('main').innerHTML = '<div class="text-center py-16"><p class="text-5xl mb-3">😵</p><p class="font-bold text-slate-300">앱을 불러오지 못했어요</p><p class="text-xs text-slate-500 mt-1">'+esc(String(err&&err.message||err))+'</p></div>';
+});
+</script>
+</body>
+</html>
