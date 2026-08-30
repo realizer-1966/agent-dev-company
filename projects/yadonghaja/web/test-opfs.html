@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>야!동하자 OPFS 테스트</title>
+  <style>
+    body { background: #0f172a; color: #fff; font-family: monospace; padding: 20px; }
+    .log { background: #1e293b; padding: 10px; margin: 10px 0; border-radius: 8px; }
+    .success { color: #22c55e; }
+    .error { color: #ef4444; }
+    button { background: #f97316; color: white; border: none; padding: 10px 20px; border-radius: 8px; margin: 5px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>🧪 OPFS 동기화 테스트</h1>
+  <div id="controls">
+    <button onclick="testWrite()">쓰기 테스트</button>
+    <button onclick="testRead()">읽기 테스트</button>
+    <button onclick="clearLog()">로그 삭제</button>
+  </div>
+  <div id="log" class="log"></div>
+  
+  <script type="module">
+    const log = document.getElementById('log');
+    function addLog(msg, type='info') {
+      const div = document.createElement('div');
+      div.className = type === 'error' ? 'error' : type === 'success' ? 'success' : '';
+      div.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+      log.appendChild(div);
+      log.scrollTop = log.scrollHeight;
+    }
+    window.addLog = addLog;
+    window.clearLog = () => log.innerHTML = '';
+    
+    async function testWrite() {
+      addLog('쓰기 테스트 시작...');
+      try {
+        const actorId = 'test_' + crypto.randomUUID().slice(0, 8);
+        localStorage.setItem('test_actor', actorId);
+        
+        // Syncular 어댑터 생성
+        const { createSyncAdapter } = await import('./src/sync.js');
+        const sync = await createSyncAdapter(actorId, 'http://127.0.0.1:8788');
+        
+        // 데이터 쓰기
+        await sync.mutate('posts', {
+          id: 'post_test',
+          public_id: 'main',
+          author_id: actorId,
+          author_name: '테스터',
+          author_avatar: '🧪',
+          types: '["테스트"]',
+          mode: '오프라인',
+          region: '서울',
+          days: '[]',
+          time_slot: '언제나',
+          capacity: 1,
+          intro: 'OPFS 테스트용 모집글',
+          deadline: '2026-12-31',
+          created_at_ms: Date.now(),
+        });
+        
+        addLog('✅ 쓰기 완료: post_test', 'success');
+        
+        // 확인
+        const rows = await sync.query('SELECT * FROM posts WHERE public_id = ?1', ['main']);
+        addLog('📋 posts 테이블: ' + rows.length + '개 행', 'success');
+        rows.forEach(r => addLog('  - ' + r.intro));
+        
+      } catch (e) {
+        addLog('❌ 오류: ' + e.message, 'error');
+        console.error(e);
+      }
+    }
+    
+    async function testRead() {
+      addLog('읽기 테스트 시작...');
+      try {
+        const actorId = localStorage.getItem('test_actor') || 'unknown';
+        const { createSyncAdapter } = await import('./src/sync.js');
+        const sync = await createSyncAdapter(actorId, 'http://127.0.0.1:8788');
+        
+        const rows = await sync.query('SELECT * FROM posts WHERE public_id = ?1', ['main']);
+        addLog('📋 posts 테이블: ' + rows.length + '개 행', 'success');
+        rows.forEach(r => addLog('  - ' + r.intro + ' (' + r.author_name + ')'));
+        
+      } catch (e) {
+        addLog('❌ 오류: ' + e.message, 'error');
+      }
+    }
+    
+    addLog('테스트 준비 완료. "쓰기 테스트" 버튼을 클릭하세요.');
+  </script>
+</body>
+</html>
