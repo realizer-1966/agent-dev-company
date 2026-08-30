@@ -58,6 +58,7 @@ await build({
   plugins: [vendorRewrite],
   minify: true,
   legalComments: 'none',
+  external: ['@syncular/client/wasm-database'],
 });
 
 // 앱 번들

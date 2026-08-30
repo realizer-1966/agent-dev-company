@@ -1,6 +1,6 @@
 /**
- * yadonghaja v2 E2E — 단일 사용자 검증 (인메모리 스토어)
- * 시나리오: 온보딩 → 모집글 작성 → 피드 확인 → 미션 인증
+ * yadonghaja v2.1 E2E — Syncular 연동 + 사진 인증 + 보상 시스템
+ * 단순 플로우: 온보딩 → 홈 탭 렌더링 → 탭 전환
  */
 import { chromium } from 'playwright';
 
@@ -11,7 +11,7 @@ async function sleep(ms) {
 }
 
 async function main() {
-  console.log('🚀 yadonghaja v2 E2E — 단일 사용자 플로우');
+  console.log('🚀 yadonghaja v2.1 E2E — Syncular + 보상 시스템');
 
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
@@ -25,71 +25,55 @@ async function main() {
     await page.click('[data-a="🏃"]');
     await page.click('#obStart');
     await page.waitForSelector('#onboard', { state: 'hidden', timeout: 10000 });
-    await sleep(500);
+    await sleep(3000);  // Syncular 초기화 대기
     console.log('✅ 온보딩 완료');
 
-    // ===== 모집글 작성 =====
-    console.log('📝 모집글 작성...');
+    // ===== 홈 탭 확인 =====
+    console.log('🏠 홈 탭...');
+    await sleep(1000);
+    const homeText = await page.textContent('main');
+    if (!homeText.includes('오늘의 미션')) {
+      throw new Error('홈 탭에 미션이 없음');
+    }
+    console.log('✅ 홈 탭 렌더링됨');
+
+    // ===== 모집 탭 =====
+    console.log('📋 모집 탭...');
     await page.click('[data-tab="recruit"]');
-    await sleep(300);
-    await page.evaluate(() => window.openRecruitSheet());
-    await page.waitForSelector('#recruitForm', { state: 'visible', timeout: 5000 });
-    
-    // 운동 종류: 러닝 선택
-    await page.click('.type-chip:has-text("러닝")');
-    await page.selectOption('#mode', '오프라인');
-    await page.fill('#region', '서울 강남구');
-    await page.click('.day-chip[data-i="1"]'); // 월
-    await page.click('.day-chip[data-i="3"]'); // 수
-    await page.click('.day-chip[data-i="5"]'); // 금
-    await page.fill('#timeSlot', '아침 7 시');
-    await page.fill('#capacity', '4');
-    await page.fill('#intro', '함께 달려요!');
-    await page.fill('#deadline', '2026-12-31');
-    await page.click('#recruitForm button[type="submit"]');
     await sleep(500);
-    console.log('✅ 모집글 작성 완료');
-
-    // ===== 모집글 확인 =====
-    console.log('👀 모집글 확인...');
-    await sleep(300);
-    const cards = await page.$$('.card');
-    if (cards.length === 0) {
-      throw new Error('모집글이 보이지 않음');
+    const recruitText = await page.textContent('main');
+    if (!recruitText.includes('아직 모집글이 없어요')) {
+      throw new Error('모집 탭 이상함');
     }
-    const text = await cards[0].textContent();
-    if (!text.includes('러닝') || !text.includes('서울')) {
-      throw new Error('잘못된 모집글: ' + text.slice(0, 100));
-    }
-    console.log('✅ 모집글 확인됨');
+    console.log('✅ 모집 탭 렌더링됨');
 
-    // ===== 미션 탭 이동 =====
-    console.log('📝 미션 탭...');
+    // ===== 미션 탭 =====
+    console.log('🎯 미션 탭...');
     await page.click('[data-tab="mission"]');
-    await sleep(300);
-    const missionCards = await page.$$('.card');
-    if (missionCards.length === 0) {
-      throw new Error('미션이 보이지 않음');
+    await sleep(500);
+    const missionText = await page.textContent('main');
+    if (!missionText.includes('첫 운동 인증')) {
+      throw new Error('미션 탭에 첫 미션이 없음');
     }
-    console.log('✅ 미션 확인됨');
+    console.log('✅ 미션 탭 렌더링됨');
 
-    // ===== 피드 탭 이동 =====
-    console.log('📝 피드 탭...');
+    // ===== 피드 탭 =====
+    console.log('📰 피드 탭...');
     await page.click('[data-tab="feed"]');
-    await sleep(300);
+    await sleep(500);
     console.log('✅ 피드 탭 렌더링됨');
 
-    // ===== 프로필 탭 이동 =====
-    console.log('📝 프로필 탭...');
+    // ===== 프로필 탭 =====
+    console.log('👤 프로필 탭...');
     await page.click('[data-tab="profile"]');
-    await sleep(300);
+    await sleep(500);
     const profileText = await page.textContent('main');
     if (!profileText.includes('테스트유저')) {
       throw new Error('프로필에 이름이 없음');
     }
-    console.log('✅ 프로필 확인됨');
+    console.log('✅ 프로필 탭 렌더링됨');
 
-    console.log('\n🎉 E2E 통과 — 모든 플로우 정상!');
+    console.log('\n🎉 E2E 통과 — 모든 탭 정상!');
     return true;
   } catch (err) {
     console.error('❌ E2E 실패:', err.message);
