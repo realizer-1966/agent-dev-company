@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>야!동하자 v2 디버그</title>
+  <style>body{background:#0f172a;color:#fff;font-family:monospace;padding:20px;}</style>
+</head>
+<body>
+  <h1>야!동하자 v2 디버그</h1>
+  <div id="log"></div>
+  <script type="module">
+    const log = (m) => {
+      const p = document.createElement('div');
+      p.textContent = `[${new Date().toLocaleTimeString()}] ${m}`;
+      document.getElementById('log').appendChild(p);
+    };
+    log('페이지 로드됨');
+
+    import { createSyncAdapter } from './sync.js';
+    log('sync.js import 완료');
+
+    const actorId = 'u_debug_' + Date.now();
+    log('actorId 생성: ' + actorId);
+
+    (async () => {
+      try {
+        log('createSyncAdapter 호출...');
+        const sync = await createSyncAdapter({
+          actorId,
+          endpoints: {
+            syncUrl: 'http://127.0.0.1:8788/sync',
+            segmentsUrl: 'http://127.0.0.1:8788/segments',
+            blobsUrl: 'http://127.0.0.1:8788/blobs',
+          },
+        });
+        log('✅ createSyncAdapter 성공');
+        log('구독 등록...');
+        sync.subscribe('publicPosts', { table: 'posts', scopes: { public_id: ['main'] } });
+        log('syncUntilIdle...');
+        await sync.handle.syncUntilIdle();
+        log('✅ 동기화 완료');
+      } catch (err) {
+        log('❌ 에러: ' + err.message);
+        log('스택: ' + err.stack);
+      }
+    })();
+  </script>
+</body>
+</html>

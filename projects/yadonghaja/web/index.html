@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>야!동하자</title>
+  <link rel="manifest" href="site.webmanifest">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif; }
+    .fade-in { animation: fadeIn 0.25s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    .pop-in { animation: popIn 0.28s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    @keyframes popIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: none; } }
+    .btn { transition: all 0.15s ease; user-select: none; }
+    .btn:active { transform: scale(0.96); }
+    .card { transition: all 0.2s ease; }
+    .card:active { transform: scale(0.98); }
+    input, select, textarea { color-scheme: dark; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .hscroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+    .chip { min-height: 2.75rem; display: inline-flex; align-items: center; padding: 0 14px; border-radius: 9999px; font-weight: 700; font-size: 0.8rem; white-space: nowrap; }
+    .tabbtn { min-height: 2.75rem; }
+    .sheet { transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1); }
+    .sheet.open { transform: translateY(0); }
+    .tabbar { padding-bottom: env(safe-area-inset-bottom); }
+    .points-float { animation: pointsFloat 1.2s ease forwards; pointer-events: none; position: fixed; z-index: 100; font-weight: 900; text-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+    @keyframes pointsFloat { 0% { opacity: 0; transform: translate(-50%, 0) scale(0.8); } 20% { opacity: 1; transform: translate(-50%, -12px) scale(1.15); } 100% { opacity: 0; transform: translate(-50%, -72px) scale(1); } }
+    .cheer-btn { transition: transform 0.1s ease; }
+    .streak-flame { animation: flame 2s ease-in-out infinite; display: inline-block; }
+    @keyframes flame { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+    .bar-anim { transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  </style>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="야!동하자">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="icon.png">
+</head>
+<body class="min-h-screen text-slate-100">
+
+  <!-- 헤더: 프로필/포인트 -->
+  <header class="fixed top-0 inset-x-0 z-30 bg-slate-900/90 backdrop-blur border-b border-slate-700">
+    <div class="max-w-md mx-auto flex items-center justify-between px-4 h-14">
+      <div class="flex items-center gap-2">
+        <span class="text-xl">⚡️</span>
+        <span class="font-black text-lg bg-gradient-to-r from-orange-400 to-rose-400 bg-clip-text text-transparent">야!동하자</span>
+        <span id="headerStreak" class="streak-flame text-sm font-bold text-orange-300">🔥 0일</span>
+      </div>
+      <span id="headerPoints" class="text-sm font-extrabold text-amber-300">0 P</span>
+    </div>
+    <div class="max-w-md mx-auto px-4 pb-1.5 flex items-center gap-2 text-[11px] text-slate-400">
+      <span id="connDot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+      <span id="connLabel">동기화 대기</span>
+    </div>
+  </header>
+
+  <!-- 온보딩 (이름+아바타 → user_profiles+missions 생성) -->
+  <div id="onboard" class="fixed inset-0 z-50 bg-slate-950 flex items-center justify-center p-6" style="display:none">
+    <div class="w-full max-w-sm text-center pop-in">
+      <div class="text-6xl mb-3">⚡️</div>
+      <h1 class="text-2xl font-black mb-1">야!동하자</h1>
+      <p class="text-sm text-slate-400 mb-6">메이트와 함께 운동 미션, 응원하고 보상받기</p>
+      <input id="obName" placeholder="이름 또는 닉네임" class="w-full bg-slate-900 border border-slate-600 rounded-2xl px-4 py-3.5 text-center text-white mb-4 text-lg font-bold">
+      <div id="obAvatars" class="flex flex-wrap justify-center gap-3 mb-6"></div>
+      <button id="obStart" class="btn w-full bg-gradient-to-r from-orange-500 to-rose-500 text-white font-extrabold py-4 rounded-2xl text-lg">시작하기</button>
+      <p class="text-[11px] text-slate-500 mt-3">서버와 실시간 동기화되는 v2 프로토타입입니다</p>
+    </div>
+  </div>
+
+  <!-- 메인 -->
+  <main class="max-w-md mx-auto px-4 pt-20 pb-28" id="main"></main>
+
+  <!-- 하단 탭바 -->
+  <nav class="tabbar fixed bottom-0 inset-x-0 bg-slate-900/95 backdrop-blur border-t border-slate-700 z-40">
+    <div class="max-w-md mx-auto grid grid-cols-5">
+      <button data-tab="home"    class="tabbtn flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-bold">🏠<span>홈</span></button>
+      <button data-tab="recruit" class="tabbtn flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-bold">👋<span>모집</span></button>
+      <button data-tab="mission" class="tabbtn flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-bold">✅<span>미션</span></button>
+      <button data-tab="feed"    class="tabbtn flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-bold">🔥<span>피드</span></button>
+      <button data-tab="profile" class="tabbtn flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-bold">🏆<span>프로필</span></button>
+    </div>
+  </nav>
+
+  <!-- 플로팅 버튼 -->
+  <button id="fab" class="fixed bottom-20 right-4 bg-gradient-to-br from-orange-500 to-rose-500 text-white w-14 h-14 rounded-full text-2xl font-bold shadow-lg shadow-orange-500/40 z-40 btn" style="display:none">+</button>
+
+  <!-- 하단시트 -->
+  <div id="sheetMask" class="fixed inset-0 bg-black/60 z-40" style="display:none"></div>
+  <div id="sheet" class="sheet fixed bottom-0 inset-x-0 max-w-md mx-auto bg-slate-800 rounded-t-3xl border-t-2 border-orange-500/50 z-50 max-h-[88vh] overflow-y-auto">
+    <div class="sticky top-0 bg-slate-800 px-4 pt-3 pb-2 flex items-center justify-between border-b border-slate-700">
+      <span id="sheetTitle" class="font-extrabold text-slate-200"></span>
+      <button id="sheetClose" class="btn text-slate-400 text-2xl leading-none">✕</button>
+    </div>
+    <div id="sheetBody" class="p-4"></div>
+  </div>
+
+  <!-- 토스트 -->
+  <div id="toast" class="hidden fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] bg-slate-700/95 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-xl border border-slate-600 text-center max-w-[90vw]"></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
