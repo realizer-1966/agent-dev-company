@@ -1,0 +1,33 @@
+# 야!동하자 sync 서버 — Cloudflare Workers 배포 설정
+# 패키지 레퍼런스: syncular-analysis/packages/server-workers/wrangler.toml.example
+
+name = "yadonghaja-sync"
+main = "src/worker.ts"
+compatibility_date = "2024-09-23"
+
+# --- D1: 서버 저장소 (D1ServerStorage) --------------------------------------
+# 생성:  wrangler d1 create yadonghaja-sync  → 출력된 database_id 기입
+# 스키마: wrangler d1 migrations apply yadonghaja-sync --remote
+[[d1_databases]]
+binding = "DB"
+database_name = "yadonghaja-sync"
+database_id = "00000000-0000-0000-0000-000000000000"   # ⚠️ d1 create 후 실제 id로 교체
+
+# --- R2: 세그먼트·Blob(인증 사진) 바이트 저장 --------------------------------
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "yadonghaja-blobs"    # wrangler r2 bucket create yadonghaja-blobs
+
+# --- 시크릿 (wrangler secret put 으로 설정, 이 파일에 쓰지 않음) -------------
+# R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
+# SYNC_HMAC_KEY
+
+# --- Realtime + 쓰기 직렬화: Durable Object (파티션당 1개) ---------------------
+# POST /sync는 파티션(여기선 앱 전체='main')별 DO로 포워드되어 직렬화된다.
+[[durable_objects.bindings]]
+name = "SYNC_COORDINATOR"
+class_name = "SyncularRealtimeDO"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["SyncularRealtimeDO"]
