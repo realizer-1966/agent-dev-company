@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>야!동하자</title>
+  <link rel="manifest" href="site.webmanifest">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif; }
@@ -36,7 +37,6 @@
     @keyframes flame { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
     .bar-anim { transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
   </style>
-  <link rel="manifest" href="manifest.webmanifest">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="야!동하자">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -113,6 +113,21 @@
    ============================================================ */
 
 /* ---------- 유틸 ---------- */
+/* PWA 라벨 수정: OnDev 호스팅이 manifest 링크를 자체 manifest.webmanifest(short_name=앱아이디)로
+   치환함 → Android 홈 라벨이 'yadonghaja'로 표시됨. 런타임에 우리 매니페스트(site.webmanifest,
+   name/short_name=야!동하자)로 되돌려 설치 라벨을 한국어로 유지한다. */
+(function fixManifestLink() {
+  try {
+    const ours = document.querySelector('link[rel="manifest"][href*="site.webmanifest"]');
+    if (ours) return; // 이미 우리 링크면 통과
+    document.querySelectorAll('link[rel="manifest"]').forEach(l => l.remove());
+    const l = document.createElement('link');
+    l.rel = 'manifest';
+    l.href = 'site.webmanifest';
+    document.head.appendChild(l);
+  } catch (e) { /* manifest 교체 실패는 앱 동작에 영향 없음 */ }
+})();
+
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pad = n => String(n).padStart(2,'0');

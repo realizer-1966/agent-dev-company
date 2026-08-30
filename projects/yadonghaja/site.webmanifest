@@ -1,0 +1,26 @@
+{
+  "name": "야!동하자",
+  "short_name": "야!동하자",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0F172A",
+  "background_color": "#0F172A",
+  "description": "운동 메이트를 모집하고, 서로 격려하고, 미션을 수행하면 보상을 주는 운동 동기부여 웹앱",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
