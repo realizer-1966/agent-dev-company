@@ -1592,19 +1592,22 @@
       }
     }
 
-    // 기록 이미지를 1024x768(가로형) 이내로 비율 유지 리사이즈 후 JPEG 압축 저장 (용량 절감)
-    function resizeNoteImage(dataUrl, done) {
+    // 이미지 리사이즈: 가로가 크면 1024x768, 세로가 크면 768x1024로 비율 유지 후 JPEG 저장
+    function resizeImage(dataUrl, done) {
       const img = new Image();
       img.onload = () => {
         try {
-          const MAX_W = 1024, MAX_H = 768;
           let w = img.naturalWidth, h = img.naturalHeight;
-          // 원본이 이미 768x1024 이내면 리사이즈 생략 (화질 보존)
+          // 가로세로 비율에 따라 타겟 크기 결정
+          const isLandscape = w >= h;
+          const MAX_W = isLandscape ? 1024 : 768;
+          const MAX_H = isLandscape ? 768 : 1024;
+          // 원본이 이미 타겟 이내면 리사이즈 생략 (화질 보존)
           if (w <= MAX_W && h <= MAX_H) {
             done(dataUrl);
             return;
           }
-          // 긴 변이 1024, 짧은 변이 최대 768이 되도록 비율 유지 리사이즈
+          // 비율 유지 리사이즈
           const scale = Math.min(MAX_W / w, MAX_H / h);
           w = Math.round(w * scale);
           h = Math.round(h * scale);
@@ -1618,7 +1621,6 @@
           ctx.drawImage(img, 0, 0, w, h);
           done(canvas.toDataURL('image/jpeg', 0.8));
         } catch (e) {
-          // 리사이즈 실패 시 원본 그대로 저장 (폴백)
           done(dataUrl);
         }
       };
@@ -1626,39 +1628,9 @@
       img.src = dataUrl;
     }
 
-    // 공용 비용 이미지 리사이즈: 1024x768(가로형) 이내로 비율 유지 후 JPG 저장
-    function resizeCommonCostImage(dataUrl, done) {
-      const img = new Image();
-      img.onload = () => {
-        try {
-          const MAX_W = 1024, MAX_H = 768;
-          let w = img.naturalWidth, h = img.naturalHeight;
-          // 원본이 이미 1024x768 이내면 리사이즈 생략 (화질 보존)
-          if (w <= MAX_W && h <= MAX_H) {
-            done(dataUrl);
-            return;
-          }
-          // 가로형 기준: 긴 변이 1024, 짧은 변이 최대 768이 되도록 비율 유지 리사이즈
-          const scale = Math.min(MAX_W / w, MAX_H / h);
-          w = Math.round(w * scale);
-          h = Math.round(h * scale);
-          const canvas = document.createElement('canvas');
-          canvas.width = w;
-          canvas.height = h;
-          const ctx = canvas.getContext('2d');
-          // 투명 PNG는 흰 배경으로 합성
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, w, h);
-          ctx.drawImage(img, 0, 0, w, h);
-          done(canvas.toDataURL('image/jpeg', 0.8));
-        } catch (e) {
-          // 리사이즈 실패 시 원본 그대로 저장 (폴백)
-          done(dataUrl);
-        }
-      };
-      img.onerror = () => { done(dataUrl); };
-      img.src = dataUrl;
-    }
+    // 기존 함수명 호환용 (resizeNoteImage, resizeCommonCostImage → resizeImage로 통일)
+    function resizeNoteImage(dataUrl, done) { resizeImage(dataUrl, done); }
+    function resizeCommonCostImage(dataUrl, done) { resizeImage(dataUrl, done); }
 
     let notePreviewUrl = null;
     function showImgPreview(src) {
