@@ -1195,14 +1195,25 @@
         hideCommonCostImgPreview();
       };
       if (imgFile) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          resizeCommonCostImage(reader.result, (resized) => {
-            commonCost.image = resized;
+        // 파일이 이미지인 경우에만 리사이즈 적용
+        if (imgFile.type.startsWith('image/')) {
+          const reader = new FileReader();
+          reader.onload = () => {
+            resizeCommonCostImage(reader.result, (resized) => {
+              commonCost.image = resized;
+              commit();
+            });
+          };
+          reader.readAsDataURL(imgFile);
+        } else {
+          // 이미지가 아닌 파일은 원본 data URL로 저장
+          const reader = new FileReader();
+          reader.onload = () => {
+            commonCost.image = reader.result;
             commit();
-          });
-        };
-        reader.readAsDataURL(imgFile);
+          };
+          reader.readAsDataURL(imgFile);
+        }
       } else {
         commit();
       }
@@ -1377,7 +1388,6 @@
       // 퇴거일이 입력되었거나 중도/만기 퇴거인 경우 납부완료 자동 체크
       if (t.moveOut) {
         autoFillPaidRecords(t);
-        addMidtermRefund(t, b);
       }
       saveBuildings();
       renderTenants();
@@ -1416,50 +1426,6 @@
       });
     }
 
-    // 중도퇴실 시 월세환급 계산 및 공용비용에 자동 추가
-    // 환급액 = (월세 + 관리비) * 남은일수 / 30 (원 단위)
-    // 남은일수:
-    //   - 조건 1: 퇴거일이 납입일 이후 → 다음달 납입일 - 퇴거일
-    //   - 조건 2: 퇴거일이 납입일 이전 → 납입일 - 퇴거일
-    function addMidtermRefund(t, b) {
-      if (!t.moveOut || !t.contractEnd || !t.moveIn) return;
-      if (t.moveOut >= t.contractEnd) return; // 만기퇴거는 환급 없음
-      if ((b.commonCosts || []).some(c => c.refundTenantId === t.id)) return; // 중복 방지
-
-      const moveInDay = parseInt(t.moveIn.split('-')[2], 10);
-      const outDay = parseInt(t.moveOut.split('-')[2], 10);
-      const [oy, om] = t.moveOut.split('-').map(Number);
-
-      let remainDays;
-      if (outDay > moveInDay) {
-        // 조건 1: 다음달 납입일 - 퇴거일
-        const nextPayDate = new Date(oy, om, moveInDay);
-        const outDate = new Date(oy, om - 1, outDay);
-        remainDays = Math.round((nextPayDate - outDate) / (1000 * 60 * 60 * 24));
-      } else {
-        // 조건 2: 납입일 - 퇴거일
-        const payDateThisMonth = new Date(oy, om - 1, moveInDay);
-        const outDate = new Date(oy, om - 1, outDay);
-        remainDays = Math.round((payDateThisMonth - outDate) / (1000 * 60 * 60 * 24));
-      }
-      if (remainDays <= 0) return;
-
-      const refundAmount = Math.round(((Number(t.rent) || 0) + (Number(t.mgmt) || 0)) * 10000 * remainDays / 30);
-      if (refundAmount <= 0) return;
-
-      if (!b.commonCosts) b.commonCosts = [];
-      b.commonCosts.unshift({
-        id: genId(),
-        type: `월세환급 (${t.room || ''}호 ${t.name || ''})`,
-        cost: refundAmount,
-        date: t.moveOut,
-        createdAt: Date.now(),
-        image: null,
-        refundTenantId: t.id,
-        isRefund: true,
-      });
-    }
-
     function addTenant() {
       const b = buildings.find(x => x.id === currentBuildingId);
       if (!b) return;
@@ -1493,7 +1459,6 @@
           if (t.id !== tenant.id && t.room === tenant.room && getTenantStatus(t) === 'active' && t.moveOut === '') {
             t.moveOut = prevMoveOut;
             autoFillPaidRecords(t);
-            addMidtermRefund(t, b);
           }
         });
       }
@@ -1579,14 +1544,25 @@
         hideImgPreview();
       };
       if (imgFile) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          resizeNoteImage(reader.result, (resized) => {
-            note.image = resized;
+        // 파일이 이미지인 경우에만 리사이즈 적용
+        if (imgFile.type.startsWith('image/')) {
+          const reader = new FileReader();
+          reader.onload = () => {
+            resizeNoteImage(reader.result, (resized) => {
+              note.image = resized;
+              commit();
+            });
+          };
+          reader.readAsDataURL(imgFile);
+        } else {
+          // 이미지가 아닌 파일은 원본 data URL로 저장
+          const reader = new FileReader();
+          reader.onload = () => {
+            note.image = reader.result;
             commit();
-          });
-        };
-        reader.readAsDataURL(imgFile);
+          };
+          reader.readAsDataURL(imgFile);
+        }
       } else {
         commit();
       }
