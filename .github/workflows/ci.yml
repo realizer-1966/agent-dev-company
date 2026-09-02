@@ -27,3 +27,20 @@ jobs:
         cd projects/${{ matrix.project }}
         pip install -e '.[dev]' pytest pytest-cov pytest-mock mutmut || pip install '.[dev]' pytest pytest-cov pytest-mock mutmut
         pytest -q --cov --cov-report=xml
+
+  # rental-web: 계산 로직 QA 파이프라인 (Node 기반)
+  # 데이터 주입 → 연산 → 손계산 기대값(골든 마스터) 비교. 실패 시 CI가 빨간불.
+  test-rental-web-qa:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: "22"
+
+    - name: Run rental-web QA pipeline
+      run: |
+        cd projects/rental-web
+        node qa/run-qa.js
