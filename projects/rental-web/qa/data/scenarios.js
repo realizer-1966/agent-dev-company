@@ -50,6 +50,10 @@ const scenarios = [
         commonCostTotal: 10,  // 100000/10000
         profitAmount: 51,     // 61-10
       },
+      // 입주기념일(각 10일, 1일) 경과 + 이번 달 기록 유무:
+      // 김철수: 월세·관리비 9월 기록 모두 있음 → 제외
+      // 이영희: 관리비 9월 기록 있지만 월세 9월 기록(paid=false) 있음 → 기록 존재 → 제외
+      unpaidList: { names: [] },
     },
   },
 
@@ -388,6 +392,10 @@ const scenarios = [
         commonCostTotal: 0,
         profitAmount: 133,
       },
+      // 모두 입주일 1일(기념일 경과). 이번 달 기록이 하나라도 없는 세입자만:
+      // 월세만납부(관리비 기록 없음) → 포함, 관리비만납부(월세 기록 없음) → 포함,
+      // 둘다납부(둘 다 있음) → 제외, 미납(둘 다 기록 존재, paid=false) → 제외
+      unpaidList: { names: ['월세만납부', '관리비만납부'] },
       yearlyProfit: {
         // 카드 납부액과 같은 some() 규칙으로 월별 통계에도 동일하게 반영
         '2026-09': { income: 133, cost: 0, profit: 133 },
@@ -441,7 +449,7 @@ const scenarios = [
   // ============ S12: 공용비용 집계 범위 (카드 vs 월별 통계) ============
   {
     id: 'S12-common-cost-scope',
-    desc: '공용비용 범위: 건물 카드는 날짜 무관 전체 합산, 월별 통계는 해당 월·연도만',
+    desc: '공용비용 범위: 카드는 이번 달 것만 차감, 월별 통계는 해당 월·연도만',
     now: NOW,
     buildings: [
       {
@@ -465,8 +473,8 @@ const scenarios = [
         totalAmount: 55,
         paidAmount: 55,
         unpaidAmount: 0,
-        commonCostTotal: 55,  // 10 + 20 + 30(2025년!) - 5 — 날짜·연도 무관 전체 합산
-        profitAmount: 0,      // 55 - 55
+        commonCostTotal: 15,  // 이번 달(9월)만: 20 - 환급 5 (5월·2025년 12월은 제외)
+        profitAmount: 40,    // 55 - 15
       },
       yearlyProfit: {
         // 5월: 비용 10만원만 (수입 없음)
@@ -483,7 +491,7 @@ const scenarios = [
   // ============ S13: 퇴거자 납부 이력 ============
   {
     id: 'S13-movedout-payment-history',
-    desc: '퇴거자 납부 이력: 상태는 현재 시점 기준이라 퇴거자의 과거 납부는 통계에서 제외됨',
+    desc: '퇴거자 납부 이력: 월 시점 판정으로 퇴거자의 과거 납부도 통계에 포함됨',
     now: NOW,
     buildings: [
       {
@@ -510,12 +518,21 @@ const scenarios = [
         profitAmount: 44,
       },
       yearlyProfit: {
-        // 퇴거자의 6월 납부(55)도 현재 full 상태라 제외 — 0
-        '2026-06': { income: 0, cost: 0, profit: 0 },
+        // A1 수정 반영: 퇴거자의 1~6월 실납부(월 55)가 이제 통계에 포함된다
+        // 1~5월: 퇴거자 55
+        '2026-01': { income: 55, cost: 0, profit: 55 },
+        '2026-02': { income: 55, cost: 0, profit: 55 },
+        '2026-03': { income: 55, cost: 0, profit: 55 },
+        '2026-04': { income: 55, cost: 0, profit: 55 },
+        '2026-05': { income: 55, cost: 0, profit: 55 },
+        // 6월: 퇴거자 55 (6월에 퇴거 — 해당 월 포함) + 입주중은 9월부터 기록
+        '2026-06': { income: 55, cost: 0, profit: 55 },
+        // 9월: 입주중 44 (퇴거자는 6월 퇴거 후 제외)
         '2026-09': { income: 44, cost: 0, profit: 44 },
-        totalIncome: 44,
+        // 합계: 55*6 + 44 = 374
+        totalIncome: 374,
         totalCost: 0,
-        totalProfit: 44,
+        totalProfit: 374,
       },
     },
   },

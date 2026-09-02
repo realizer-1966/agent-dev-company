@@ -36,6 +36,12 @@ function runScenario(s) {
     check('buildingCard', results.buildingCard, s.expected.buildingCard, s.id);
   }
 
+  // '이번 달 입금내역 없음' 목록 (카드 하단 영역)
+  if (s.expected.unpaidList) {
+    const list = calc.unpaidThisMonthTenants(b[0], now);
+    check('unpaidList.names', list.map(t => t.name), s.expected.unpaidList.names, s.id);
+  }
+
   // S3: 상태 판정
   if (s.expected.statuses) {
     const statuses = {};
@@ -113,7 +119,6 @@ console.log(`골든마스터 시나리오: ${targets.length}개 / 경계값 시�
 console.log('==============================================\n');
 
 targets.forEach(s => {
-  const before = passCount + failCount;
   runScenario(s);
   const sFails = failures.filter(f => f.scenario === s.id).length;
   console.log(`${sFails === 0 ? '✅' : '❌'} [${s.id}] ${s.desc}`);

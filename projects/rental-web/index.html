@@ -497,6 +497,13 @@
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     }
 
+    // 오늘 날짜 (현지 기준, YYYY-MM-DD)
+    // toISOString(UTC)는 시간대(한국 자정~오전 9시)에 따라 실제 오늘과 하루 어긋날 수 있어 현지 기준 사용
+    function todayStr() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
     // 특정 세입자의 특정 월 입금 여부 (rentPaid에서 조회)
     function isRentPaidFor(t, month) {
       const rec = (t.rentPaid || []).find(r => r.month === month);
@@ -570,8 +577,11 @@
           + ((t.rentPaid || []).some(r => r.month === cardMonth && r.paid) ? (Number(t.rent)||0) : 0)
           + ((t.mgmtPaid || []).some(r => r.month === cardMonth && r.paid) ? (Number(t.mgmt)||0) : 0), 0);
         const unpaidAmount = totalAmount - paidAmount;
-        // 공용비용 합계 (만원) — 환급 항목은 차감
+        // 공용비용 합계 (만원) — 이번 달 기준 (카드의 '이번 달' 라벨과 총액/납부액 범위에 맞춤)
+        // 날짜 없는 기록은 createdAt 날짜로 대체 (월별 통계와 동일 규칙). 환급 항목은 차감.
         const commonCostTotal = (b.commonCosts || []).reduce((s, c) => {
+          const dateStr = c.date || (c.createdAt ? new Date(c.createdAt).toISOString().slice(0, 10) : '');
+          if (!dateStr || dateStr.slice(0, 7) !== cardMonth) return s;
           if (c.isRefund) return s - (Number(c.cost) || 0) / 10000; // 환급은 차감
           return s + (Number(c.cost) || 0) / 10000;
         }, 0);
@@ -1326,7 +1336,7 @@
     // - midterm  : 퇴거일이 만기일보다 이전 (중도 퇴거, 퇴거일 미래 포함)
     // - full     : 계약만료일에 맞춰 퇴거 (계약만료 퇴거)
     function getTenantStatus(t) {
-      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const today = todayStr(); // YYYY-MM-DD (현지 기준)
       // 입주 예정: 입주일이 미래면 최우선 판정 (아직 입주 전)
       if (t.moveIn && t.moveIn > today) return 'upcoming';
       if (!t.moveOut) return 'active';               // 퇴거일 미정 → 입주 중
@@ -1336,6 +1346,16 @@
       if (t.moveOut >= today) return 'active';
       // 과거에 퇴거, 만기일 이후 → 만기 퇴거
       return 'full';
+    }
+
+    // 해당 월(YYYY-MM) 시점에 입주해 있었는지 판정 (연간 통계 소급 집계용).
+    // 입주월 ≤ 해당 월 && (퇴거 안 함 || 퇴거월 ≥ 해당 월) — 해당 월에 퇴거한 경우도 포함.
+    // getTenantStatus는 '현재 시점' 판정이라 퇴거자의 과거 수입이 통계에서 사라지는 것을 방지한다.
+    function wasActiveInMonth(t, ym) {
+      if (!t.moveIn || !ym) return false;
+      if (String(t.moveIn).slice(0, 7) > ym) return false;
+      if (t.moveOut && String(t.moveOut).slice(0, 7) < ym) return false;
+      return true;
     }
 
     // ============ 세입자 수정 ============
@@ -2057,11 +2077,12 @@
       let totalIncome = 0, totalCost = 0;
       for (let m = 1; m <= 12; m++) {
         const ym = `${year}-${String(m).padStart(2, '0')}`;
-        // 수입: 전 건물 입주중 세입자의 해당 월 납부(paid:true) 월세 + 관리비 (만원)
+        // 수입: 전 건물에서 '해당 월 시점'에 입주해 있던 세입자의 해당 월 납부(paid:true) 월세 + 관리비 (만원)
+        // 현재 상태가 아니라 해당 월 기준으로 판정 — 퇴거한 세입자의 과거 수입도 통계에 남는다
         let income = 0;
         buildings.forEach(b => {
           (b.tenants || []).forEach(t => {
-            if (getTenantStatus(t) === 'active') {
+            if (wasActiveInMonth(t, ym)) {
               if ((t.rentPaid || []).some(r => r.month === ym && r.paid)) income += Number(t.rent) || 0;
               if ((t.mgmtPaid || []).some(r => r.month === ym && r.paid)) income += Number(t.mgmt) || 0;
             }
@@ -2107,7 +2128,7 @@
           <div class="grid grid-cols-4 gap-2 ${isCurrent ? 'bg-indigo-600/20 border border-indigo-500/40' : 'bg-slate-900 border border-slate-700'} rounded-xl px-3 py-2 text-xs">
             <span class="font-bold ${isCurrent ? 'text-indigo-300' : 'text-slate-300'}">${mo.m}월${isCurrent ? ' (현재)' : ''}</span>
             <span class="text-right font-bold text-emerald-400">${mo.income > 0 ? fmtMoney(mo.income) : '-'}</span>
-            <span class="text-right font-bold text-rose-400">${mo.cost > 0 ? fmtMoney(mo.cost) : '-'}</span>
+            <span class="text-right font-bold text-rose-400">${mo.cost !== 0 ? fmtMoney(mo.cost) : '-'}</span>
             <span class="text-right font-bold ${mo.profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${mo.profit !== 0 ? fmtMoney(mo.profit) : '-'}</span>
           </div>`;
       });

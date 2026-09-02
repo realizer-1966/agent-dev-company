@@ -53,15 +53,31 @@ function isMgmtPaidFor(t, month) {
   return !!(rec && rec.paid);
 }
 
-// ---- 상태 판정 (index.html 1328~1339 대응) ----
+// ---- 상태 판정 (index.html getTenantStatus 대응) ----
 // 입주중(active) / 입주예정(upcoming) / 중도퇴거(midterm) / 만기퇴거(full)
+// 오늘 날짜는 현지(local) 기준 — toISOString(UTC)은 한국 자정~오전 9시에
+// 하루 어긋나므로 index.html의 todayStr()와 동일하게 현지 날짜로 판정한다.
+function localDateStr(d) {
+  const dt = d || new Date();
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+}
 function getTenantStatus(t, now) {
-  const today = (now || new Date()).toISOString().slice(0, 10); // YYYY-MM-DD
+  const today = localDateStr(now); // YYYY-MM-DD (현지 기준)
   if (t.moveIn && t.moveIn > today) return 'upcoming';
   if (!t.moveOut) return 'active';
   if (t.contractEnd && t.moveOut < t.contractEnd) return 'midterm';
   if (t.moveOut >= today) return 'active';
   return 'full';
+}
+
+// 해당 월(YYYY-MM) 시점에 입주해 있었는지 판정 (연간 통계 소급 집계용).
+// 입주월 ≤ 해당 월 && (퇴거 안 함 || 퇴거월 ≥ 해당 월) — 해당 월에 퇴거한 경우도 포함.
+// getTenantStatus는 '현재 시점' 판정이라 퇴거자의 과거 수입이 통계에서 사라지는 것을 방지한다.
+function wasActiveInMonth(t, ym) {
+  if (!t.moveIn || !ym) return false;
+  if (String(t.moveIn).slice(0, 7) > ym) return false;
+  if (t.moveOut && String(t.moveOut).slice(0, 7) < ym) return false;
+  return true;
 }
 
 // ---- 30명 제한 (index.html 338, 1432 대응) ----
@@ -73,6 +89,35 @@ function canAddTenant(b, now) {
 }
 function activeTenantCount(b, now) {
   return (b.tenants || []).filter(t => getTenantStatus(t, now) === 'active').length;
+}
+
+// ---- '🎂 이번 달 입금내역 없음' 목록 (index.html getRecentMoveInTenants + renderBuildings 대응) ----
+// 입주일(moveIn)의 일(day-of-month)이 매달 1일~오늘의 일 사이(입주기념일 경과)인 세입자.
+// 상태·납부와 무관하게 입주기념일만으로 선별하고, active를 앞에 정렬한다.
+function recentMoveInTenants(b, now) {
+  const todayDay = (now || new Date()).getDate();
+  return (b.tenants || []).filter(t => {
+    if (!t.moveIn || typeof t.moveIn !== 'string') return false;
+    const [y, m, d] = t.moveIn.split('-').map(Number);
+    if (!y || !m || !d) return false;
+    const moveDate = new Date(y, m - 1, d);
+    if (isNaN(moveDate.getTime())) return false;
+    return d <= todayDay;
+  }).sort((a, c) => {
+    const sa = getTenantStatus(a, now) === 'active' ? 0 : 1;
+    const sc = getTenantStatus(c, now) === 'active' ? 0 : 1;
+    return sa - sc;
+  });
+}
+
+// '이번 달 입금내역 없음' 카드 영역: active 중 이번 달 월세 또는 관리비
+// '기록'이 하나라도 없는 세입자 (paid 여부는 무관 — 기록 유무로만 판정)
+function unpaidThisMonthTenants(b, now) {
+  const cardMonth = todayMonth(now);
+  return recentMoveInTenants(b, now).filter(t =>
+    getTenantStatus(t, now) === 'active'
+    && (!(t.rentPaid || []).some(r => r.month === cardMonth)
+     || !(t.mgmtPaid || []).some(r => r.month === cardMonth)));
 }
 
 // ---- 건물 카드 금액 (index.html 544~579 대응) ----
@@ -96,8 +141,11 @@ function buildingCard(b, now) {
     + ((t.rentPaid || []).some(r => r.month === cardMonth && r.paid) ? (Number(t.rent) || 0) : 0)
     + ((t.mgmtPaid || []).some(r => r.month === cardMonth && r.paid) ? (Number(t.mgmt) || 0) : 0), 0);
   const unpaidAmount = totalAmount - paidAmount;
-  // 공용비용 합계 (만원) — 환급 항목은 차감
+  // 공용비용 합계 (만원) — 이번 달(cardMonth) 기준, 환급 항목은 차감.
+  // 날짜 없는 기록은 createdAt 날짜로 대체 (index.html 월별 통계와 동일 규칙).
   const commonCostTotal = (b.commonCosts || []).reduce((s, c) => {
+    const dateStr = c.date || (c.createdAt ? new Date(c.createdAt).toISOString().slice(0, 10) : '');
+    if (!dateStr || dateStr.slice(0, 7) !== cardMonth) return s;
     if (c.isRefund) return s - (Number(c.cost) || 0) / 10000;
     return s + (Number(c.cost) || 0) / 10000;
   }, 0);
@@ -106,8 +154,9 @@ function buildingCard(b, now) {
   return { cardMonth, totalDeposit, roomCount, tenantCount, totalAmount, paidAmount, unpaidAmount, commonCostTotal, profitAmount };
 }
 
-// ---- 월별 수입/비용/순이익 (index.html 2048~2124 대응) ----
+// ---- 월별 수입/비용/순이익 (index.html renderYearlyProfit 대응) ----
 // year: 조회 연도. 전 건물 집계.
+// 수입은 '해당 월 시점' 판정(wasActiveInMonth) — 퇴거한 세입자의 과거 수입도 통계에 남는다.
 function yearlyProfit(buildings, year, now) {
   const months = [];
   let totalIncome = 0, totalCost = 0;
@@ -116,7 +165,7 @@ function yearlyProfit(buildings, year, now) {
     let income = 0;
     (buildings || []).forEach(b => {
       (b.tenants || []).forEach(t => {
-        if (getTenantStatus(t, now) === 'active') {
+        if (wasActiveInMonth(t, ym)) {
           if ((t.rentPaid || []).some(r => r.month === ym && r.paid)) income += Number(t.rent) || 0;
           if ((t.mgmtPaid || []).some(r => r.month === ym && r.paid)) income += Number(t.mgmt) || 0;
         }
@@ -252,8 +301,8 @@ function contractChangesAll(buildings, now) {
 
 module.exports = {
   fmtMoney, calcContractEnd, dayBefore, todayMonth,
-  isRentPaidFor, isMgmtPaidFor, getTenantStatus,
-  MAX_TENANTS, canAddTenant, activeTenantCount,
+  isRentPaidFor, isMgmtPaidFor, getTenantStatus, wasActiveInMonth, localDateStr,
+  MAX_TENANTS, canAddTenant, activeTenantCount, recentMoveInTenants, unpaidThisMonthTenants,
   buildingCard, yearlyProfit, next3MonthsYM, computeNext3MonthsAll,
   highDepositTenants, newTenantsAll, contractChangesAll,
 };

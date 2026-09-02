@@ -63,7 +63,7 @@ function runPureFunctionSync(app) {
     });
   });
 
-  // getTenantStatus: 전 상태 조합
+  // getTenantStatus: 전 상태 조합 (현지 날짜 기준 — index.html todayStr와 동일)
   const now = new Date('2026-09-15T12:00:00');
   const statusTenants = [
     { name: 'upcoming', moveIn: '2026-10-01' },
@@ -78,6 +78,27 @@ function runPureFunctionSync(app) {
       label: `getTenantStatus(${t.name})`,
       appFn: () => app.eval(`getTenantStatus(${tJson})`),
       calcFn: () => calc.getTenantStatus(t, now),
+    });
+  });
+
+  // wasActiveInMonth: 해당 월 시점 입주 여부 (소급 집계용)
+  const wamCases = [
+    [{ moveIn: '2026-01-01' }, '2026-09', true],                        // 퇴거 없음
+    [{ moveIn: '2026-01-01' }, '2025-12', false],                       // 입주 전
+    [{ moveIn: '2026-01-01', moveOut: '2026-06-10' }, '2026-06', true],  // 해당 월에 퇴거 → 포함
+    [{ moveIn: '2026-01-01', moveOut: '2026-06-10' }, '2026-07', false],// 퇴거 이후
+    [{ moveIn: '2026-01-15', moveOut: '' }, '2026-01', true],           // 입주월 → 포함
+    [{ moveIn: '', moveOut: '' }, '2026-01', false],                    // moveIn 없음
+    [{ moveIn: '2026-03-01' }, '2026-03', true],                         // 정확히 입주월
+    // (주의: t=null 케이스는 없음 — 앱·calc 모두 t.moveIn 접근에서 throw하며,
+    //  실제 buildings.tenants는 항상 객체 배열이라 불가능한 입력이다)
+  ];
+  wamCases.forEach(([t, ym, _exp], i) => {
+    const tJson = JSON.stringify(t);
+    cases.push({
+      label: `wasActiveInMonth(#${i}, ${ym})`,
+      appFn: () => app.eval(`wasActiveInMonth(${tJson}, '${ym}')`),
+      calcFn: () => calc.wasActiveInMonth(t, ym),
     });
   });
 
@@ -153,6 +174,12 @@ function runRenderSync(app, s) {
     const pf = html.match(/수익\s*<span[^>]*>([\d,]+)만원/);
     check('render.buildingCard profitAmount',
       pf ? Number(pf[1].replace(/,/g, '')) : null, exp.profitAmount, s.id);
+    // '🎂 이번 달 입금내역 없음' 영역: 표시된 세입자 이름 목록
+    // ("N호" 배지 뒤 이름만 추출)
+    if (s.expected.unpaidList) {
+      const rowNames = [...html.matchAll(/<span class="text-slate-400">[^<]*호<\/span>\s*([^<]+?)\s*<\/span>/g)].map(m => m[1].trim());
+      check('render.unpaidList.names', rowNames, s.expected.unpaidList.names, s.id);
+    }
   }
 
   // (b) 상태 판정: 앱 getTenantStatus 결과를 calc.js와 비교 (렌더 전 데이터 주입 상태)
@@ -180,10 +207,10 @@ function runRenderSync(app, s) {
       const e = exp[ym];
       if (!e) return;
       const parse = x => { const v = parseManwon(x); return v; };
-      // 앱 렌더 규칙: income > 0 / cost > 0 / profit !== 0 일 때만 표시, 아니면 '-'
-      // (음수 비용(환급 초과)은 '-'로 표시됨 — 발견 사항 참조)
+      // 앱 렌더 규칙: income > 0 / cost !== 0 / profit !== 0 일 때만 표시, 아니면 '-'
+      // (A3 수정 후 음수 비용도 -N만원으로 표시됨. income 0은 여전히 '-')
       check(`render.yearlyProfit.${ym}.income`, parse(r[2]), e.income > 0 ? e.income : null, s.id);
-      check(`render.yearlyProfit.${ym}.cost`, parse(r[3]), e.cost > 0 ? e.cost : null, s.id);
+      check(`render.yearlyProfit.${ym}.cost`, parse(r[3]), e.cost !== 0 ? e.cost : null, s.id);
       check(`render.yearlyProfit.${ym}.profit`, parse(r[4]), e.profit !== 0 ? e.profit : null, s.id);
     });
     // 합계 행: "합계" 뒤 3개
@@ -288,16 +315,21 @@ console.log('==============================================\n');
 // 1) 순수 함수 직접 비교 — 앱 VM 하나로 전 케이스 실행
 const appVM = createAppVM(APP_HTML);
 console.log('--- 1) 순수 계산 함수 직접 비교 ---');
-const before1 = passCount + failCount;
+const before1 = passCount;
+const failBefore1 = failCount;
 runPureFunctionSync(appVM);
-const fails1 = failCount; // 이 시점까지 누적 실패
-console.log(`순수 함수 비교: ${passCount - before1} 통과 / ${fails1} 실패 (누적 실패 기준)\n`);
+console.log(`순수 함수 비교: ${passCount - before1} 통과 / ${failCount - failBefore1} 실패`);
+failures.filter(f => f.scenario === 'pure-sync').forEach(f => {
+  console.log(`   ✗ ${f.label}`);
+  console.log(`     기대: ${f.expected}`);
+  console.log(`     실제: ${f.actual}`);
+});
+console.log('');
 
 // 2) 렌더링 동기화 — 시나리오별 앱 VM 생성 (상태 오염 방지: 시나리오마다 새 VM)
 console.log('--- 2) 렌더링 동기화 (시나리오별) ---');
 targets.forEach(s => {
   const app = createAppVM(APP_HTML);
-  const before = passCount + failCount;
   try {
     runRenderSync(app, s);
   } catch (e) {
