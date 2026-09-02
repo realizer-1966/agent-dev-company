@@ -64,6 +64,17 @@ function getTenantStatus(t, now) {
   return 'full';
 }
 
+// ---- 30명 제한 (index.html 338, 1432 대응) ----
+// 입주중(active) 세입자가 MAX_TENANTS 미만이면 등록 가능
+const MAX_TENANTS = 30;
+function canAddTenant(b, now) {
+  const activeCount = (b.tenants || []).filter(t => getTenantStatus(t, now) === 'active').length;
+  return activeCount < MAX_TENANTS;
+}
+function activeTenantCount(b, now) {
+  return (b.tenants || []).filter(t => getTenantStatus(t, now) === 'active').length;
+}
+
 // ---- 건물 카드 금액 (index.html 544~579 대응) ----
 // now: Date (기본 오늘). cardMonth: 이번 달 YYYY-MM
 function buildingCard(b, now) {
@@ -240,6 +251,7 @@ function contractChangesAll(buildings, now) {
 module.exports = {
   fmtMoney, calcContractEnd, dayBefore, todayMonth,
   isRentPaidFor, isMgmtPaidFor, getTenantStatus,
+  MAX_TENANTS, canAddTenant, activeTenantCount,
   buildingCard, yearlyProfit, next3MonthsYM, computeNext3MonthsAll,
   highDepositTenants, newTenantsAll, contractChangesAll,
 };

@@ -8,6 +8,7 @@
 
 const calc = require('./lib/calc.js');
 const { scenarios } = require('./data/scenarios.js');
+const { boundaryScenarios } = require('./lib/gen-boundary.js');
 
 let passCount = 0, failCount = 0;
 const failures = [];
@@ -102,19 +103,19 @@ function runScenario(s) {
 // ---- 메인 ----
 const filter = process.argv.slice(2);
 const targets = filter.length ? scenarios.filter(s => filter.includes(s.id)) : scenarios;
+const boundaryTargets = filter.length
+  ? boundaryScenarios.filter(s => filter.includes(s.id))
+  : boundaryScenarios;
 
 console.log('==============================================');
 console.log('rental-web 계산 로직 QA 파이프라인');
-console.log(`시나리오: ${targets.length}개 (${filter.length ? '필터: ' + filter.join(', ') : '전체'})`);
+console.log(`골든마스터 시나리오: ${targets.length}개 / 경계값 시나리오: ${boundaryTargets.length}개`);
 console.log('==============================================\n');
 
 targets.forEach(s => {
   const before = passCount + failCount;
   runScenario(s);
-  const ok = (passCount + failCount) === before + 1 || true; // 시나리오 단위 결과는 아래에서
-  // 시나리오별 통과 여부: 이 시나리오에서 실패가 추가됐는지
   const sFails = failures.filter(f => f.scenario === s.id).length;
-  const sPasses = (passCount + failCount) - before - sFails;
   console.log(`${sFails === 0 ? '✅' : '❌'} [${s.id}] ${s.desc}`);
   if (sFails > 0) {
     failures.filter(f => f.scenario === s.id).forEach(f => {
@@ -123,6 +124,23 @@ targets.forEach(s => {
       console.log(`     실제: ${f.actual}`);
     });
   }
+});
+
+// 경계값 시나리오 실행
+boundaryTargets.forEach(s => {
+  const before = passCount + failCount;
+  const checks = s.run(new Date('2026-09-15T12:00:00'));
+  const sFails = checks.filter(c => !c.pass).length;
+  console.log(`${sFails === 0 ? '✅' : '❌'} [${s.id}] ${s.desc}`);
+  checks.forEach(c => {
+    if (c.pass) { passCount++; }
+    else {
+      failCount++;
+      failures.push({ scenario: s.id, label: c.label, expected: 'pass', actual: c.detail });
+      console.log(`   ✗ ${c.label}`);
+      console.log(`     ${c.detail}`);
+    }
+  });
 });
 
 console.log('\n==============================================');
