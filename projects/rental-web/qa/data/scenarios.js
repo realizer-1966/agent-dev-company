@@ -288,6 +288,237 @@ const scenarios = [
       },
     },
   },
+  // ============ S9: 다중 건물 집계 ============
+  {
+    id: 'S9-multi-building-aggregation',
+    desc: '3개 건물: 월별 수입/비용, 3개월 준비금, 보증금 초과, 신규 입주 전 건물 합산',
+    now: NOW,
+    buildings: [
+      {
+        id: 'bA', name: '서울빌딩', addr: '서울', tenants: [
+          tenant({ name: '김철수', room: '101', deposit: 2000, rent: 50, mgmt: 5, moveIn: '2026-01-10', contractEnd: '2028-01-10', rentPaid: [paid('2026-09')], mgmtPaid: [paid('2026-09')] }),
+          tenant({ name: '이영희', room: '102', deposit: 3000, rent: 60, mgmt: 6, moveIn: '2026-03-01', contractEnd: '2028-03-01', rentPaid: [paid('2026-09')], mgmtPaid: [paid('2026-09')] }),
+          tenant({ name: '입주예정', room: '103', deposit: 1000, rent: 30, mgmt: 3, moveIn: '2026-10-01', contractEnd: '2028-10-01' }),
+          tenant({ name: '만기퇴거', room: '104', deposit: 1000, rent: 30, mgmt: 3, moveIn: '2025-01-01', contractEnd: '2026-01-01', moveOut: '2026-01-15' }),
+        ],
+        commonCosts: [cost(200000, '2026-09-05')],
+      },
+      {
+        id: 'bB', name: '부산빌딩', addr: '부산', tenants: [
+          tenant({ name: '박민수', room: '201', deposit: 1000, rent: 40, mgmt: 4, moveIn: '2026-02-01', contractEnd: '2028-02-01', rentPaid: [paid('2026-09')], mgmtPaid: [paid('2026-09')] }),
+          tenant({ name: '11월퇴거', room: '202', deposit: 2000, rent: 50, mgmt: 5, moveIn: '2026-01-05', contractEnd: '2026-12-01', moveOut: '2026-11-15' }),
+        ],
+        commonCosts: [cost(100000, '2026-09-01', true)],
+      },
+      {
+        id: 'bC', name: '대구빌딩', addr: '대구', tenants: [
+          tenant({ name: '최수민', room: '301', deposit: 5000, rent: 70, mgmt: 7, moveIn: '2026-06-01', contractEnd: '2028-06-01' }),
+          tenant({ name: '정퇴거', room: '302', deposit: 3000, rent: 50, mgmt: 5, moveIn: '2026-01-02', contractEnd: '2027-01-01', moveOut: '2026-10-20' }),
+        ],
+        commonCosts: [cost(50000, '2026-08-15')],
+      },
+    ],
+    expected: {
+      // 첫 건물(서울빌딩) 카드 — run-qa/run-sync 모두 b[0] 기준
+      buildingCard: {
+        cardMonth: '2026-09',
+        totalDeposit: 5000,   // 김철수 2000 + 이영희 3000 (active만)
+        roomCount: 4,         // 101~104 전체 고유 호실
+        tenantCount: 2,       // active만
+        totalAmount: 121,     // 55 + 66
+        paidAmount: 121,      // 둘 다 9월 납부
+        unpaidAmount: 0,
+        commonCostTotal: 20,  // 9월 20만원
+        profitAmount: 101,
+      },
+      yearlyProfit: {
+        // 8월: 대구빌딩 공용비용 5만원만 존재 (수입 없음)
+        '2026-08': { income: 0, cost: 5, profit: -5 },
+        // 9월: 수입 = 김철수 55 + 이영희 66 + 박민수 44 = 165 (최수민 미납)
+        //      비용 = 서울 20 - 부산 환급 10 = 10 (대구 8월 비용은 제외)
+        '2026-09': { income: 165, cost: 10, profit: 155 },
+        totalIncome: 165,
+        totalCost: 15,
+        totalProfit: 150,
+      },
+      next3Months: {
+        '2026-09': { total: 0, count: 0 },
+        '2026-10': { total: 3000, count: 1 }, // 정퇴거 (midterm)
+        '2026-11': { total: 2000, count: 1 }, // 11월퇴거 (midterm)
+      },
+      highDeposit: {
+        threshold: 2000,
+        // active만: 김철수(2000, 기준과 같아 제외) · 이영희 3000 · 최수민 5000
+        names: ['최수민', '이영희'],
+        deposits: [5000, 3000],
+      },
+      newTenants: {
+        // 2026년 입주 전 건물, 입주일 오름차순 (만기퇴거 2025 입주는 제외)
+        names: ['정퇴거', '11월퇴거', '김철수', '박민수', '이영희', '최수민', '입주예정'],
+        moveIns: ['2026-01-02', '2026-01-05', '2026-01-10', '2026-02-01', '2026-03-01', '2026-06-01', '2026-10-01'],
+      },
+    },
+  },
+
+  // ============ S10: 부분 납부 ============
+  {
+    id: 'S10-partial-payment',
+    desc: '부분 납부: 월세만/관리비만/둘다/미납 조합의 카드·통계 집계',
+    now: NOW,
+    buildings: [
+      {
+        id: 'b10', name: 'J빌딩', addr: '제주', tenants: [
+          tenant({ name: '월세만납부', room: '101', deposit: 1000, rent: 50, mgmt: 5, moveIn: '2026-01-01', contractEnd: '2028-01-01', rentPaid: [paid('2026-09')], mgmtPaid: [] }),
+          tenant({ name: '관리비만납부', room: '102', deposit: 1000, rent: 60, mgmt: 6, moveIn: '2026-01-01', contractEnd: '2028-01-01', rentPaid: [], mgmtPaid: [paid('2026-09')] }),
+          tenant({ name: '둘다납부', room: '103', deposit: 1000, rent: 70, mgmt: 7, moveIn: '2026-01-01', contractEnd: '2028-01-01', rentPaid: [paid('2026-09')], mgmtPaid: [paid('2026-09')] }),
+          tenant({ name: '미납', room: '104', deposit: 1000, rent: 40, mgmt: 4, moveIn: '2026-01-01', contractEnd: '2028-01-01', rentPaid: [paid('2026-09', false)], mgmtPaid: [paid('2026-09', false)] }),
+        ],
+        commonCosts: [],
+      },
+    ],
+    expected: {
+      buildingCard: {
+        cardMonth: '2026-09',
+        totalDeposit: 4000,
+        roomCount: 4,
+        tenantCount: 4,
+        totalAmount: 242,     // 55+66+77+44
+        paidAmount: 133,      // 월세 50 + 관리비 6 + 둘다 77 + 미납 0
+        unpaidAmount: 109,
+        commonCostTotal: 0,
+        profitAmount: 133,
+      },
+      yearlyProfit: {
+        // 카드 납부액과 같은 some() 규칙으로 월별 통계에도 동일하게 반영
+        '2026-09': { income: 133, cost: 0, profit: 133 },
+        totalIncome: 133,
+        totalCost: 0,
+        totalProfit: 133,
+      },
+    },
+  },
+
+  // ============ S11: 중복 납부 기록 ============
+  {
+    id: 'S11-duplicate-payment-records',
+    desc: '중복 납부 기록: 같은 월에 기록이 여러 개일 때 some() 판정 (카드·통계 일관성)',
+    now: NOW,
+    buildings: [
+      {
+        id: 'b11', name: 'K빌딩', addr: '강릉', tenants: [
+          // 첫 기록 paid:false, 둘째 기록 paid:true → some()은 납부로 판정
+          tenant({ name: '중복역순', room: '101', deposit: 1000, rent: 50, mgmt: 5, moveIn: '2026-01-01', contractEnd: '2028-01-01', rentPaid: [paid('2026-09', false), paid('2026-09', true)], mgmtPaid: [] }),
+          // 첫 기록 paid:true → some() 납부
+          tenant({ name: '중복정순', room: '102', deposit: 1000, rent: 60, mgmt: 6, moveIn: '2026-01-01', contractEnd: '2028-01-01', rentPaid: [paid('2026-09', true), paid('2026-09', false)], mgmtPaid: [] }),
+          // 관리비 중복 기록 역순
+          tenant({ name: '관리중복', room: '103', deposit: 1000, rent: 70, mgmt: 7, moveIn: '2026-01-01', contractEnd: '2028-01-01', rentPaid: [], mgmtPaid: [paid('2026-09', false), paid('2026-09', true)] }),
+        ],
+        commonCosts: [],
+      },
+    ],
+    expected: {
+      buildingCard: {
+        cardMonth: '2026-09',
+        totalDeposit: 3000,
+        roomCount: 3,
+        tenantCount: 3,
+        totalAmount: 198,     // 55+66+77
+        paidAmount: 117,      // 중복역순 50 + 중복정순 60 + 관리중복 7
+        unpaidAmount: 81,
+        commonCostTotal: 0,
+        profitAmount: 117,
+      },
+      yearlyProfit: {
+        // 월별 통계도 동일한 some() 규칙 — 중복 기록이 있어도 한 번만 집계
+        '2026-09': { income: 117, cost: 0, profit: 117 },
+        totalIncome: 117,
+        totalCost: 0,
+        totalProfit: 117,
+      },
+    },
+  },
+
+  // ============ S12: 공용비용 집계 범위 (카드 vs 월별 통계) ============
+  {
+    id: 'S12-common-cost-scope',
+    desc: '공용비용 범위: 건물 카드는 날짜 무관 전체 합산, 월별 통계는 해당 월·연도만',
+    now: NOW,
+    buildings: [
+      {
+        id: 'b12', name: 'L빌딩', addr: '춘천', tenants: [
+          tenant({ name: '하나', room: '101', deposit: 1000, rent: 50, mgmt: 5, moveIn: '2026-01-01', contractEnd: '2028-01-01', rentPaid: [paid('2026-09')], mgmtPaid: [paid('2026-09')] }),
+        ],
+        commonCosts: [
+          cost(100000, '2026-05-10'),      // 5월 10만원
+          cost(200000, '2026-09-01'),      // 9월 20만원
+          cost(300000, '2025-12-15'),      // 2025년 12월 30만원 — 카드에는 포함, 2026 통계에는 제외
+          cost(50000, '2026-09-20', true), // 9월 환급 5만원
+        ],
+      },
+    ],
+    expected: {
+      buildingCard: {
+        cardMonth: '2026-09',
+        totalDeposit: 1000,
+        roomCount: 1,
+        tenantCount: 1,
+        totalAmount: 55,
+        paidAmount: 55,
+        unpaidAmount: 0,
+        commonCostTotal: 55,  // 10 + 20 + 30(2025년!) - 5 — 날짜·연도 무관 전체 합산
+        profitAmount: 0,      // 55 - 55
+      },
+      yearlyProfit: {
+        // 5월: 비용 10만원만 (수입 없음)
+        '2026-05': { income: 0, cost: 10, profit: -10 },
+        // 9월: 비용 20 - 환급 5 = 15. 2025년 12월 비용은 2026 통계에 미포함
+        '2026-09': { income: 55, cost: 15, profit: 40 },
+        totalIncome: 55,
+        totalCost: 25,
+        totalProfit: 30,
+      },
+    },
+  },
+
+  // ============ S13: 퇴거자 납부 이력 ============
+  {
+    id: 'S13-movedout-payment-history',
+    desc: '퇴거자 납부 이력: 상태는 현재 시점 기준이라 퇴거자의 과거 납부는 통계에서 제외됨',
+    now: NOW,
+    buildings: [
+      {
+        id: 'b13', name: 'M빌딩', addr: '전주', tenants: [
+          // 2026년 1~6월 실납부(월 55)가 있지만 full 상태 → 월별 통계에서 제외
+          tenant({ name: '퇴거자', room: '101', deposit: 1000, rent: 50, mgmt: 5, moveIn: '2025-06-01', contractEnd: '2026-06-01', moveOut: '2026-06-10',
+            rentPaid: ['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06'].map(m => paid(m)),
+            mgmtPaid: ['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06'].map(m => paid(m)) }),
+          tenant({ name: '입주중', room: '102', deposit: 1000, rent: 40, mgmt: 4, moveIn: '2026-01-01', contractEnd: '2028-01-01', rentPaid: [paid('2026-09')], mgmtPaid: [paid('2026-09')] }),
+        ],
+        commonCosts: [],
+      },
+    ],
+    expected: {
+      buildingCard: {
+        cardMonth: '2026-09',
+        totalDeposit: 1000,  // 입주중만
+        roomCount: 2,
+        tenantCount: 1,
+        totalAmount: 44,
+        paidAmount: 44,
+        unpaidAmount: 0,
+        commonCostTotal: 0,
+        profitAmount: 44,
+      },
+      yearlyProfit: {
+        // 퇴거자의 6월 납부(55)도 현재 full 상태라 제외 — 0
+        '2026-06': { income: 0, cost: 0, profit: 0 },
+        '2026-09': { income: 44, cost: 0, profit: 44 },
+        totalIncome: 44,
+        totalCost: 0,
+        totalProfit: 44,
+      },
+    },
+  },
 ];
 
 module.exports = { scenarios, NOW };

@@ -89,10 +89,12 @@ function buildingCard(b, now) {
   // 총액 = 입주중 (rent + mgmt) 합계 (만원)
   const totalAmount = active.reduce((s, t) => s + (Number(t.rent) || 0) + (Number(t.mgmt) || 0), 0);
   // 납부액 = 이번 달 입주중 세입자가 실제 납부(paid=true)한 금액 합계
+  // (index.html 568-571: 해당 월 기록 중 "하나라도 paid"면 납부로 간주 — some()).
+  // 중복 기록 시 첫 기록만 보는 isRentPaidFor(find)와 판정이 다를 수 있음 — S11 시나리오 참조.
   const paidAmount = active.reduce((s, t) =>
     s
-    + (isRentPaidFor(t, cardMonth) ? (Number(t.rent) || 0) : 0)
-    + (isMgmtPaidFor(t, cardMonth) ? (Number(t.mgmt) || 0) : 0), 0);
+    + ((t.rentPaid || []).some(r => r.month === cardMonth && r.paid) ? (Number(t.rent) || 0) : 0)
+    + ((t.mgmtPaid || []).some(r => r.month === cardMonth && r.paid) ? (Number(t.mgmt) || 0) : 0), 0);
   const unpaidAmount = totalAmount - paidAmount;
   // 공용비용 합계 (만원) — 환급 항목은 차감
   const commonCostTotal = (b.commonCosts || []).reduce((s, c) => {
