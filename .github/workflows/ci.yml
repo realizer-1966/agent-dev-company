@@ -44,3 +44,8 @@ jobs:
       run: |
         cd projects/rental-web
         node qa/run-qa.js
+
+    - name: Run rental-web sync verification (app vs calc.js)
+      run: |
+        cd projects/rental-web
+        node qa/run-sync.js
