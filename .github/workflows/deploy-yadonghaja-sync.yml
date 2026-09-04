@@ -25,6 +25,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # esbuild 로 worker 번들 (bun:sqlite 스텁 대체) — dist/worker.mjs 생성
+      - name: Build worker bundle
+        run: npm run build
+
       # D1 데이터베이스는 이미 생성됨 (wrangler.toml에 database_id 고정: f1c5ff79-...)
       # R2 버킷이 없으면 생성
       - name: Ensure R2 bucket exists
