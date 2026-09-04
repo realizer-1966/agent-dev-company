@@ -2,7 +2,8 @@
 # 패키지 레퍼런스: syncular-analysis/packages/server-workers/wrangler.toml.example
 
 name = "yadonghaja-sync"
-main = "src/worker.ts"
+main = "dist/worker.mjs"        # esbuild 번들 결과 — build.mjs 를 먼저 실행
+no_bundle = true                # wrangler 자체 번들 대신 esbuild 결과물 사용
 compatibility_date = "2024-09-23"
 
 # --- D1: 서버 저장소 (D1ServerStorage) --------------------------------------
