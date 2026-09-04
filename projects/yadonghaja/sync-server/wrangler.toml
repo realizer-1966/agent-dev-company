@@ -31,4 +31,4 @@ class_name = "SyncularRealtimeDO"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["SyncularRealtimeDO"]
+new_sqlite_classes = ["SyncularRealtimeDO"]
