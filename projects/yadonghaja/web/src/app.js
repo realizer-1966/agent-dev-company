@@ -1,21 +1,15 @@
 /**
- * yadonghaja v2.1 — 인메모리 스토어 (Syncular 준비됨)
+ * yadonghaja v2.1 — Syncular 동기화 (OPFS + 서버)
  * - 사진 인증 + 포인트/배지/랭킹 시스템 완성
- * - Syncular 는 optional (연결 실패 시 인메모리로 fallback)
+ * - Syncular 어댑터(sync.js) 사용 — 연결 실패 시 인메모리로 fallback
  */
+import { createSyncAdapter } from './sync.js';
 
 // ============ 상태 ============
 let sync = null;
 let currentUser = null;
 let currentTab = 'home';
 let selectedAvatar = '💪';
-
-// ============ 인메모리 스토어 ============
-const store = {
-  posts: [], feed_items: [], cheers: [], user_profiles: [],
-  applications: [], verifications: [], missions: [], badges: [],
-  streaks: [], point_ledger: [], rankings: [],
-};
 
 // ============ DOM ============
 const $ = (sel) => document.querySelector(sel);
@@ -55,34 +49,6 @@ function openSheet(title, html) {
 function closeSheet() {
   sheet.classList.remove('open');
   setTimeout(() => { sheetMask.style.display = 'none'; sheetBody.innerHTML = ''; }, 280);
-}
-
-// ============ Sync 어댑터 (인메모리 + Syncular 준비) ============
-async function createSyncAdapter(actorId, baseUrl) {
-  return {
-    async mutate(table, row) {
-      if (!store[table]) store[table] = [];
-      const idx = store[table].findIndex(r => r.id === row.id);
-      if (idx >= 0) store[table][idx] = row; else store[table].push(row);
-    },
-    async query(sql, params = []) {
-      const match = sql.match(/FROM\s+(\w+)(?:\s+WHERE\s+(.+))?/i);
-      if (!match) return [];
-      const table = match[1];
-      let rows = store[table] || [];
-      if (match[2] && params.length > 0) {
-        const cond = match[2].match(/(\w+)\s*=\s*\?(\d+)/i);
-        if (cond) {
-          const col = cond[1], idx = parseInt(cond[2]) - 1;
-          rows = rows.filter(r => r[col] === params[idx]);
-        }
-      }
-      return rows;
-    },
-    subscribe() {},
-    async getSyncState() { return { phase: 'connected' }; },
-    onSyncStateChange(cb) { const i = setInterval(() => cb({phase:'connected'}), 5000); return () => clearInterval(i); },
-  };
 }
 
 // ============ 초기화 ============

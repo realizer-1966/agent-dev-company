@@ -5,7 +5,7 @@
 let useInMemory = true;  // Syncular 실패 시 fallback
 let inMemoryStore = null;
 
-export async function createSyncAdapter(actorId, baseUrl = 'http://127.0.0.1:8788') {
+export async function createSyncAdapter(actorId, baseUrl = 'https://yadonghaja-sync.dydtnsp.workers.dev') {
   // 인메모리 스토어 초기화
   inMemoryStore = {
     posts: [], feed_items: [], cheers: [], user_profiles: [],
