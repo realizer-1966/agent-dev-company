@@ -110,35 +110,14 @@ const validators = {
 } as const;
 
 /* ============================================================
-   익명 auth — Authorization: Bearer <HMAC 서명 토큰>
-   v2.0: HMAC 토큰 (v2.5에서 소셜 auth로 교체)
+   익명 auth — x-user 헤더 (개발/프로토타입 단계)
+   v2.0: x-user 헤더 기반 (local-test.mjs·프론트 worker.js와 일치)
+   v2.5에서 HMAC Bearer 토큰 또는 소셜 auth로 교체
    ============================================================ */
 async function authenticate(request: Request, env: Env) {
-  const auth = request.headers.get('authorization') ?? '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  if (!token) return null;                          // → 401
-  const dot = token.indexOf('.');
-  if (dot <= 0) return null;
-  const payloadB64 = token.slice(0, dot), sigB64 = token.slice(dot + 1);
-  const key = await crypto.subtle.importKey(
-    'raw', new TextEncoder().encode(env.SYNC_HMAC_KEY),
-    { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
-  const ok = await crypto.subtle.verify(
-    'HMAC', key, b64urlDecode(sigB64),
-    new TextEncoder().encode(payloadB64));
-  if (!ok) return null;
-  const payload = JSON.parse(new TextDecoder().decode(b64urlDecode(payloadB64)));
-  if (typeof payload.uid !== 'string') return null;
-  return { actorId: payload.uid, partition: 'main' };   // 앱 전체 단일 파티션
-}
-
-function b64urlDecode(s: string): Uint8Array {
-  const b64 = s.replace(/-/g, '+').replace(/_/g, '/').padEnd(
-    Math.ceil(s.length / 4) * 4, '=');
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
+  const actorId = request.headers.get('x-user');
+  if (!actorId) return null;                          // → 401
+  return { actorId, partition: 'main' };               // 앱 전체 단일 파티션
 }
 
 /* ============================================================
