@@ -25,39 +25,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # D1 데이터베이스가 없으면 생성하고, 생성된 database_id를 wrangler.toml에 반영
-      - name: Ensure D1 database exists
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          set -e
-          # 이미 database_id가 설정되어 있으면 스킵
-          if grep -q "00000000-0000-0000-0000-000000000000" wrangler.toml; then
-            echo "D1 database_id가 placeholder입니다. 생성 시도..."
-            # 기존 DB 확인
-            EXISTING=$(npx wrangler d1 list --json 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(next((x['database_id'] for x in d if x['name']=='yadonghaja-sync'), ''))" 2>/dev/null || echo "")
-            if [ -n "$EXISTING" ]; then
-              echo "기존 D1 발견: $EXISTING"
-              sed -i "s/00000000-0000-0000-0000-000000000000/$EXISTING/" wrangler.toml
-            else
-              echo "새 D1 생성..."
-              CREATE_OUT=$(npx wrangler d1 create yadonghaja-sync 2>&1)
-              echo "$CREATE_OUT"
-              NEW_ID=$(echo "$CREATE_OUT" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1)
-              if [ -z "$NEW_ID" ]; then
-                echo "❌ D1 database_id를 파싱하지 못했습니다."
-                exit 1
-              fi
-              echo "새 D1 생성됨: $NEW_ID"
-              sed -i "s/00000000-0000-0000-0000-000000000000/$NEW_ID/" wrangler.toml
-            fi
-          else
-            echo "D1 database_id 이미 설정됨"
-          fi
-          echo "--- wrangler.toml의 database_id ---"
-          grep "database_id" wrangler.toml
-
+      # D1 데이터베이스는 이미 생성됨 (wrangler.toml에 database_id 고정: f1c5ff79-...)
       # R2 버킷이 없으면 생성
       - name: Ensure R2 bucket exists
         env:

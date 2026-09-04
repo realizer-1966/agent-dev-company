@@ -11,7 +11,7 @@ compatibility_date = "2024-09-23"
 [[d1_databases]]
 binding = "DB"
 database_name = "yadonghaja-sync"
-database_id = "00000000-0000-0000-0000-000000000000"   # ⚠️ d1 create 후 실제 id로 교체
+database_id = "f1c5ff79-2e54-4f34-93eb-60ae0ca47b0c"   # wrangler d1 create 로 생성됨 (2026-09-04)
 
 # --- R2: 세그먼트·Blob(인증 사진) 바이트 저장 --------------------------------
 [[r2_buckets]]
