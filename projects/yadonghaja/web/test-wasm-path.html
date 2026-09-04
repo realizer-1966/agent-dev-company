@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>WASM 경로 테스트</title>
+  <style>
+    body { background: #0f172a; color: #fff; font-family: monospace; padding: 20px; }
+    .log { background: #1e293b; padding: 10px; margin: 10px 0; border-radius: 8px; white-space: pre-wrap; }
+    .success { color: #22c55e; }
+    .error { color: #ef4444; }
+  </style>
+</head>
+<body>
+  <h1>🧪 WASM 로드 경로 테스트</h1>
+  <div id="log" class="log"></div>
+  
+  <script type="module">
+    const log = document.getElementById('log');
+    function addLog(msg, type='info') {
+      const div = document.createElement('div');
+      div.className = type === 'error' ? 'error' : type === 'success' ? 'success' : '';
+      div.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+      log.appendChild(div);
+      log.scrollTop = log.scrollHeight;
+    }
+    
+    async function testWasmLoad() {
+      addLog('WASM 로드 테스트 시작...');
+      
+      // 1. dist/sqlite3.wasm 존재 확인
+      try {
+        const resp1 = await fetch('/sqlite3.wasm', { method: 'HEAD' });
+        addLog(`/sqlite3.wasm → ${resp1.status} (${resp1.headers.get('content-length')} bytes)`, resp1.ok ? 'success' : 'error');
+      } catch (e) {
+        addLog(`/sqlite3.wasm → 오류: ${e.message}`, 'error');
+      }
+      
+      // 2. dist/vendor/sqlite-wasm/sqlite3.wasm 존재 확인
+      try {
+        const resp2 = await fetch('/vendor/sqlite-wasm/sqlite3.wasm', { method: 'HEAD' });
+        addLog(`/vendor/sqlite-wasm/sqlite3.wasm → ${resp2.status} (${resp2.headers.get('content-length')} bytes)`, resp2.ok ? 'success' : 'error');
+      } catch (e) {
+        addLog(`/vendor/sqlite-wasm/sqlite3.wasm → 오류: ${e.message}`, 'error');
+      }
+      
+      // 3. Worker 생성 및 메시지 전송
+      addLog('Worker 생성 중...');
+      const worker = new Worker('/worker.js', { type: 'module' });
+      
+      worker.onmessage = (e) => {
+        addLog(`Worker 메시지: ${JSON.stringify(e.data)}`, e.data.type === 'error' ? 'error' : 'success');
+      };
+      
+      worker.onerror = (e) => {
+        addLog(`Worker 오류: ${e.message} @ ${e.filename}:${e.lineno}`, 'error');
+      };
+      
+      // 4. sqlite3InitModule 테스트
+      addLog('sqlite3InitModule 테스트...');
+      try {
+        const module = await import('/vendor/sqlite-wasm/index.mjs');
+        addLog('index.mjs 로드 성공');
+        
+        // wasm 경로 확인
+        const testPath = new URL('sqlite3.wasm', import.meta.url).href;
+        addLog(`index.mjs 기준 sqlite3.wasm 경로: ${testPath}`, 'success');
+      } catch (e) {
+        addLog(`index.mjs 로드 실패: ${e.message}`, 'error');
+      }
+      
+      // 5. sqlite3-worker1.mjs 직접 로드 테스트
+      addLog('sqlite3-worker1.mjs 직접 로드 테스트...');
+      try {
+        const workerModule = await import('/sqlite3-worker1.mjs');
+        addLog('sqlite3-worker1.mjs 로드 성공', 'success');
+        
+        // wasm 경로 확인
+        const testPath2 = new URL('sqlite3.wasm', import.meta.url).href;
+        addLog(`sqlite3-worker1.mjs 기준 sqlite3.wasm 경로: ${testPath2}`, 'success');
+      } catch (e) {
+        addLog(`sqlite3-worker1.mjs 로드 실패: ${e.message}`, 'error');
+      }
+    }
+    
+    testWasmLoad();
+  </script>
+</body>
+</html>

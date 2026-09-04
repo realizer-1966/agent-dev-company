@@ -15,6 +15,23 @@ async function main() {
 
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
+  
+  // 콘솔 로그 출력
+  page.on('console', msg => {
+    const type = msg.type();
+    const text = msg.text();
+    if (type === 'error') console.error('CONSOLE ERROR:', text);
+    else if (type === 'warn') console.warn('CONSOLE WARN:', text);
+    else console.log('CONSOLE:', text);
+  });
+  
+  page.on('pageerror', err => {
+    console.error('PAGE ERROR:', err.message);
+  });
+  const errors = [];
+  const logs = [];
+  page.on('pageerror', e => errors.push('PAGE_ERROR: ' + e.message));
+  page.on('console', m => { if (m.type() === 'error') errors.push('CONSOLE: ' + m.text()); logs.push(m.text()); });
 
   try {
     // ===== 온보딩 =====
@@ -33,6 +50,8 @@ async function main() {
     await sleep(1000);
     const homeText = await page.textContent('main');
     if (!homeText.includes('오늘의 미션')) {
+      console.log('⚠️ 홈 탭 내용:', homeText.slice(0, 200));
+      console.log('⚠️ 콘솔 에러:', errors.length ? errors.join('\n') : '(없음)');
       throw new Error('홈 탭에 미션이 없음');
     }
     console.log('✅ 홈 탭 렌더링됨');
@@ -72,6 +91,15 @@ async function main() {
       throw new Error('프로필에 이름이 없음');
     }
     console.log('✅ 프로필 탭 렌더링됨');
+
+    // ===== Syncular 사용 여부 확인 =====
+    const syncLogs = logs.filter(l => l.includes('[sync]') || l.includes('[worker]'));
+    console.log('📡 Sync 로그:', syncLogs.length ? syncLogs.join(' | ') : '(없음)');
+    if (syncLogs.some(l => l.includes('인메모리'))) {
+      console.log('⚠️ 인메모리 fallback 사용됨 — Syncular 미연결');
+    } else if (syncLogs.some(l => l.includes('Syncular 연결됨'))) {
+      console.log('✅ Syncular(OPFS) 연결 확인');
+    }
 
     console.log('\n🎉 E2E 통과 — 모든 탭 정상!');
     return true;

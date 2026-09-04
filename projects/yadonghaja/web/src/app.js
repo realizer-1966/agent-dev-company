@@ -93,16 +93,17 @@ function showOnboarding() {
 
 async function seedUserProfile() {
   const { actorId, name, avatar } = currentUser;
-  await sync.mutate('user_profiles', { id: actorId, public_id: 'main', display_name: name, avatar, interests: '["홈트"]', created_at_ms: ms(), updated_at_ms: ms() });
-  await sync.mutate('streaks', { id: actorId, user_id: actorId, current: 0, best: 0, last_date: null, updated_at_ms: ms() });
-  await sync.mutate('missions', { id: `${actorId}:${todayStr()}:0`, user_id: actorId, kind: 'daily', date: todayStr(), title: '첫 운동 인증!', goal: 1, status: 'pending', updated_at_ms: ms() });
+  const now = ms();
+  await sync.mutate('user_profiles', { id: actorId, public_id: 'main', display_name: name, avatar, interests: '["홈트"]', created_at_ms: now, updated_at_ms: now });
+  await sync.mutate('streaks', { id: actorId, user_id: actorId, current: 0, best: 0, last_date: null, updated_at_ms: now });
+  await sync.mutate('missions', { id: `${actorId}:${todayStr()}:0`, user_id: actorId, kind: 'daily', date: todayStr(), title: '첫 운동 인증!', goal: 1, status: 'pending', updated_at_ms: now });
 }
 
 // ============ 보상 시스템 ============
 async function awardPoints(amount, reason) {
   const cur = await getPoints();
   const newBalance = cur + amount;
-  await sync.mutate('point_ledger', { id: 'pt_'+crypto.randomUUID().slice(0,8), user_id: currentUser.actorId, amount, reason, balance_after: newBalance, created_at_ms: ms() });
+  await sync.mutate('point_ledger', { id: 'pt_'+crypto.randomUUID().slice(0,8), user_id: currentUser.actorId, amount, reason, balance_after: newBalance, updated_at_ms: ms() });
   await checkBadges(newBalance);
   return newBalance;
 }
@@ -117,7 +118,7 @@ async function checkBadges(points) {
   ];
   for (const b of candidates) {
     if (b.condition(points)) {
-      await sync.mutate('badges', { id: `${currentUser.actorId}:${b.id}`, user_id: currentUser.actorId, badge_id: b.id, badge_name: b.name, earned_at_ms: ms() });
+      const now = ms(); await sync.mutate('badges', { id: `${currentUser.actorId}:${b.id}`, user_id: currentUser.actorId, badge_id: b.id, badge_name: b.name, earned_at_ms: now, updated_at_ms: now });
       showToast(`🏆 새로운 배지: ${b.name}!`);
     }
   }
@@ -151,7 +152,7 @@ async function getRank() {
 }
 async function updateRanking() {
   const pts = await getPoints();
-  await sync.mutate('rankings', { id: currentUser.actorId, group_id: 'main', user_id: currentUser.actorId, total_points: pts, updated_at_ms: ms() });
+  const now = ms(); await sync.mutate('rankings', { id: currentUser.actorId, group_id: 'main', user_id: currentUser.actorId, total_points: pts, created_at_ms: now, updated_at_ms: now });
 }
 
 // ============ 렌더 ============
@@ -194,7 +195,7 @@ async function renderTab(tab) {
 
 // ============ 탭: 홈 ============
 async function renderHome() {
-  const posts = await sync.query("SELECT * FROM posts WHERE public_id = 'main' ORDER BY created_at_ms DESC LIMIT 10");
+  const posts = await sync.query("SELECT * FROM posts WHERE public_id = 'main' ORDER BY updated_at_ms DESC LIMIT 10");
   const st = await getStreak();
   const pts = await getPoints();
   main.innerHTML = `
@@ -222,7 +223,7 @@ async function renderHome() {
 
 // ============ 탭: 모집 ============
 async function renderRecruit() {
-  const posts = await sync.query("SELECT * FROM posts WHERE public_id = 'main' ORDER BY created_at_ms DESC LIMIT 20");
+  const posts = await sync.query("SELECT * FROM posts WHERE public_id = 'main' ORDER BY updated_at_ms DESC LIMIT 20");
   main.innerHTML = posts.length ? posts.map(p => cardRecruit(p)).join('') : `
     <div class="text-center py-16">
       <div class="text-6xl mb-4">👋</div>
@@ -239,7 +240,7 @@ function cardRecruit(p) {
       <div class="flex items-center gap-2 mb-2">
         <span class="text-xl">${p.author_avatar}</span>
         <span class="font-bold text-slate-200 text-sm">${p.author_name}</span>
-        <span class="text-[10px] text-slate-500 ml-auto">${new Date(p.created_at_ms).toLocaleDateString()}</span>
+        <span class="text-[10px] text-slate-500 ml-auto">${new Date(p.updated_at_ms).toLocaleDateString()}</span>
       </div>
       <div class="flex flex-wrap gap-1.5 mb-2">
         ${types.map(t => `<span class="chip bg-slate-900 border border-slate-600 text-[10px]">${t}</span>`).join('')}
@@ -265,7 +266,7 @@ async function openApply(postId) {
   $('#applyForm').onsubmit = async (e) => {
     e.preventDefault();
     const msg = $('#applyMsg').value.trim();
-    await sync.mutate('applications', { id: `${postId}:${currentUser.actorId}`, post_id: postId, applicant_id: currentUser.actorId, applicant_name: currentUser.name, applicant_avatar: currentUser.avatar, message: msg, status: 'pending', created_at_ms: ms() });
+    await sync.mutate('applications', { id: `${postId}:${currentUser.actorId}`, post_id: postId, applicant_id: currentUser.actorId, applicant_name: currentUser.name, applicant_avatar: currentUser.avatar, message: msg, status: 'pending', updated_at_ms: ms() });
     closeSheet();
     showToast('신청 완료!');
   };
@@ -337,8 +338,8 @@ async function verifyMission(missionId, title) {
     const memo = $('#vMemo').value.trim() || '';
     const date = todayStr();
     await sync.mutate('missions', { id: missionId, status: 'done', verified_at_ms: ms(), updated_at_ms: ms() });
-    await sync.mutate('verifications', { id: `${currentUser.actorId}:${missionId}`, verify_scope: 'live', group_id: 'main', user_id: currentUser.actorId, mission_id, mission_title: title, mission_kind: 'daily', date, memo, photo: photoDataUrl, created_at_ms: ms() });
-    await sync.mutate('feed_items', { id: `feed_${missionId}`, public_id: 'main', user_id: currentUser.actorId, user_name: currentUser.name, avatar: currentUser.avatar, mission_title: title, memo, photo: photoDataUrl, created_at_ms: ms() });
+    await sync.mutate('verifications', { id: `${currentUser.actorId}:${missionId}`, verify_scope: 'live', group_id: 'main', user_id: currentUser.actorId, mission_id, mission_title: title, mission_kind: 'daily', date, memo, photo: photoDataUrl, updated_at_ms: ms() });
+    await sync.mutate('feed_items', { id: `feed_${missionId}`, public_id: 'main', user_id: currentUser.actorId, user_name: currentUser.name, avatar: currentUser.avatar, mission_title: title, memo, photo: photoDataUrl, updated_at_ms: ms() });
     const newPts = await awardPoints(10, 'daily_mission');
     const st = await updateStreak();
     await updateRanking();
@@ -352,7 +353,7 @@ async function verifyMission(missionId, title) {
 
 // ============ 탭: 피드 ============
 async function renderFeed() {
-  const feed = await sync.query("SELECT * FROM feed_items ORDER BY created_at_ms DESC LIMIT 30");
+  const feed = await sync.query("SELECT * FROM feed_items ORDER BY updated_at_ms DESC LIMIT 30");
   main.innerHTML = feed.length ? feed.map(f => cardFeed(f)).join('') : '<p class="text-slate-400 text-sm mt-8 text-center">아직 피드가 없어요</p>';
 }
 
@@ -362,7 +363,7 @@ function cardFeed(f) {
       <div class="flex items-center gap-2 mb-2">
         <span class="text-xl">${f.avatar}</span>
         <span class="font-bold text-slate-200 text-sm">${f.user_name}</span>
-        <span class="text-[10px] text-slate-500 ml-auto">${new Date(f.created_at_ms).toLocaleDateString()}</span>
+        <span class="text-[10px] text-slate-500 ml-auto">${new Date(f.updated_at_ms).toLocaleDateString()}</span>
       </div>
       <div class="font-extrabold text-slate-100 mb-1">${f.mission_title}</div>
       ${f.memo ? `<p class="text-sm text-slate-300 mb-2">${f.memo}</p>` : ''}
@@ -380,7 +381,7 @@ async function sendCheer(feedId, type) {
   const id = `${feedId}:${currentUser.actorId}:${type}`;
   const exists = await sync.query("SELECT 1 FROM cheers WHERE id = ?1", [id]);
   if (exists.length > 0) return showToast('이미 응원했어요');
-  await sync.mutate('cheers', { id, public_id: 'main', feed_id: feedId, user_id: currentUser.actorId, cheer_type: type, created_at_ms: ms() });
+  await sync.mutate('cheers', { id, public_id: 'main', feed_id: feedId, user_id: currentUser.actorId, cheer_type: type, updated_at_ms: ms() });
   await awardPoints(1, 'cheer');
   await updateHeader();
   showToast('응원 완료! +1 P');
@@ -476,8 +477,8 @@ async function openRecruitSheet() {
     if (!days.length) return showToast('요일을 선택해줘요');
     const region = $('#region').value.trim(), timeSlot = $('#timeSlot').value.trim(), capacity = parseInt($('#capacity').value), intro = $('#intro').value.trim(), deadline = $('#deadline').value, mode = $('#mode').value;
     const postId = 'post_'+crypto.randomUUID().slice(0,8);
-    await sync.mutate('posts', { id: postId, public_id: 'main', author_id: currentUser.actorId, author_name: currentUser.name, author_avatar: currentUser.avatar, types: JSON.stringify(types), mode, region, days: JSON.stringify(days), time_slot: timeSlot, capacity, intro, deadline, created_at_ms: ms() });
-    await sync.mutate('feed_items', { id: 'feed_'+postId, public_id: 'main', user_id: currentUser.actorId, user_name: currentUser.name, avatar: currentUser.avatar, mission_title: `메이트 모집: ${types.join(', ')}`, memo: intro, photo: null, created_at_ms: ms() });
+    await sync.mutate('posts', { id: postId, public_id: 'main', author_id: currentUser.actorId, author_name: currentUser.name, author_avatar: currentUser.avatar, types: JSON.stringify(types), mode, region, days: JSON.stringify(days), time_slot: timeSlot, capacity, intro, deadline, updated_at_ms: ms() });
+    await sync.mutate('feed_items', { id: 'feed_'+postId, public_id: 'main', user_id: currentUser.actorId, user_name: currentUser.name, avatar: currentUser.avatar, mission_title: `메이트 모집: ${types.join(', ')}`, memo: intro, photo: null, updated_at_ms: ms() });
     closeSheet(); showToast('모집글 등록 완료!'); await renderRecruit();
   };
 }

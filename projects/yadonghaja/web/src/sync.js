@@ -1,87 +1,74 @@
 /**
- * yadonghaja Syncular 어댑터 — Syncular 클라이언트 + 인메모리 fallback
+ * yadonghaja Syncular 어댑터 — 표준 createSyncClientHandle API 사용
  */
+import { createSyncClientHandle } from '@syncular/client';
+import { schema } from './schema.ts';
 
-let useInMemory = true;  // Syncular 실패 시 fallback
 let inMemoryStore = null;
 
-export async function createSyncAdapter(actorId, baseUrl = 'https://yadonghaja-sync.dydtnsp.workers.dev') {
-  // 인메모리 스토어 초기화
+export async function createSyncAdapter(actorId, baseUrl = 'http://127.0.0.1:8788') {
+  // 인메모리 스토어 초기화 (fallback 용)
   inMemoryStore = {
     posts: [], feed_items: [], cheers: [], user_profiles: [],
     applications: [], verifications: [], missions: [], badges: [],
     streaks: [], point_ledger: [], rankings: [],
   };
-  
-  // Syncular 시도 (실패하면 인메모리로)
+
+  console.log('[sync] Syncular 연결 시도...', { actorId, baseUrl });
+
   try {
-    const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
-    let handle = null;
-    let messageId = 0;
-    const pending = new Map();
-    
-    await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('Syncular timeout')), 5000);
-      
-      worker.onmessage = (event) => {
-        const { type, id, rows, state } = event.data;
-        if (type === 'worker-ready') {
-          handle = { worker, pending, nextId: () => `m_${++messageId}` };
-          clearTimeout(timeout);
-          resolve();
-        }
-      };
-      
-      worker.postMessage({
-        type: 'worker-init',
-        config: { actorId, baseUrl },
-      });
+    const handle = await createSyncClientHandle({
+      worker: () => new Worker(new URL('./worker.js', import.meta.url), { type: 'module' }),
+      schema,
+      database: { mode: 'persistent', name: 'yadonghaja' },
+      clientId: actorId,
+      endpoints: {
+        syncUrl: `${baseUrl}/sync`,
+        segmentsUrl: `${baseUrl}/segments`,
+        blobsUrl: `${baseUrl}/blobs`,
+      },
+      multiTab: false,
+      autoSync: true,
     });
-    
-    console.log('[sync] Syncular 연결됨');
-    useInMemory = false;
-    
+
+    console.log('[sync] handle 생성됨:', {
+      hasHandle: !!handle,
+      role: handle?.role,
+      clientId: handle?.clientId,
+      methods: Object.keys(handle || {}),
+    });
+
+    if (!handle || typeof handle.mutate !== 'function') {
+      throw new Error('handle 이 유효하지 않음');
+    }
+
+    console.log('[sync] Syncular 연결 성공 (leader:', handle.role + ')');
+
     return {
       async mutate(table, row) {
-        const id = handle.nextId();
-        return new Promise((resolve, reject) => {
-          handle.pending.set(id, resolve);
-          handle.worker.postMessage({ type: 'mutate', id, config: { table, row } });
-          setTimeout(() => { handle.pending.delete(id); reject(new Error('timeout')); }, 5000);
-        });
+        console.log('[sync] mutate:', table, row.id);
+        // Syncular 는 { table, values } 형식을 사용
+        await handle.mutate([{ table, values: row }]);
       },
       async query(sql, params = []) {
-        const id = handle.nextId();
-        return new Promise((resolve, reject) => {
-          handle.pending.set(id, resolve);
-          handle.worker.postMessage({ type: 'query', id, config: { sql, params } });
-          setTimeout(() => { handle.pending.delete(id); reject(new Error('timeout')); }, 5000);
-        });
+        console.log('[sync] query:', sql, params);
+        const result = await handle.query(sql, params);
+        console.log('[sync] query result:', result?.length, 'rows');
+        return result;
       },
-      subscribe(subscriptionId, spec) {
-        handle.worker.postMessage({ type: 'subscribe', config: { subscriptionId, spec } });
+      subscribe() {},
+      async getSyncState() { 
+        const state = await handle.syncState?.() || { phase: 'connected' };
+        return state; 
       },
-      async getSyncState() {
-        const id = handle.nextId();
-        return new Promise((resolve, reject) => {
-          handle.pending.set(id, resolve);
-          handle.worker.postMessage({ type: 'get-sync-state', id });
-          setTimeout(() => { handle.pending.delete(id); resolve({ phase: 'connected' }); }, 5000);
-        });
-      },
-      onSyncStateChange(callback) {
-        const interval = setInterval(async () => {
-          try { callback(await this.getSyncState()); } catch (e) {}
-        }, 5000);
-        return () => clearInterval(interval);
-      },
+      onSyncStateChange() { return () => {}; },
     };
   } catch (e) {
-    console.warn('[sync] Syncular 실패 — 인메모리 모드:', e.message);
+    console.error('[sync] Syncular 실패:', e.message, e.stack);
+    console.warn('[sync] 인메모리 모드로 fallback');
   }
-  
+
   // 인메모리 fallback
-  console.log('[sync] 인메모리 스토어 사용');
   return {
     async mutate(table, row) {
       if (!inMemoryStore[table]) inMemoryStore[table] = [];
@@ -90,23 +77,17 @@ export async function createSyncAdapter(actorId, baseUrl = 'https://yadonghaja-s
       else inMemoryStore[table].push(row);
     },
     async query(sql, params = []) {
-      // 간단한 SELECT * FROM table WHERE ... 처리
       const match = sql.match(/FROM\s+(\w+)(?:\s+WHERE\s+(.+))?/i);
       if (!match) return [];
       const table = match[1];
-      const where = match[2];
       let rows = inMemoryStore[table] || [];
-      
-      if (where) {
-        const cond = where.match(/(\w+)\s*=\s*\?(\d+)/i);
+      if (match[2] && params.length > 0) {
+        const cond = match[2].match(/(\w+)\s*=\s*\?(\d+)/i);
         if (cond) {
-          const col = cond[1];
-          const idx = parseInt(cond[2]) - 1;
-          const val = params[idx];
-          rows = rows.filter(r => r[col] === val);
+          const col = cond[1], idx = parseInt(cond[2]) - 1;
+          rows = rows.filter(r => r[col] === params[idx]);
         }
       }
-      
       return rows;
     },
     subscribe() {},

@@ -1,13 +1,5 @@
 /**
  * yadonghaja-web 빌드 — esbuild 번들 + sqlite-wasm 벤더 복사
- *
- * 산출물 (전부 dist/ 로 정적 호스팅 가능 — OnDev에 그대로 ZIP):
- *   dist/index.html   — 페이지 셸
- *   dist/app.js       — 메인 번들 (UI + sync 어댑터)
- *   dist/worker.js    — sync 워커 번들 (sqlite-wasm + OPFS)
- *   dist/vendor/sqlite-wasm/sqlite3.wasm — wasm 바이너리 (경로 치환됨)
- *
- * 실행: node build.mjs   (esbuild 필요: npm install)
  */
 import { build } from 'esbuild';
 import fs from 'node:fs';
@@ -22,26 +14,45 @@ const require = createRequire(import.meta.url);
 fs.rmSync(dist, { recursive: true, force: true });
 fs.mkdirSync(path.join(dist, 'vendor', 'sqlite-wasm'), { recursive: true });
 
-// sqlite-wasm 벤더: index.mjs + wasm + OPFS 프록시
+// sqlite-wasm 벤더 복사
 const sqlitePkg = require.resolve('@sqlite.org/sqlite-wasm/package.json');
 const sqliteDir = path.dirname(sqlitePkg);
-for (const f of ['dist/index.mjs', 'dist/sqlite3.wasm', 'dist/sqlite3-opfs-async-proxy.js']) {
+for (const f of ['dist/index.mjs', 'dist/sqlite3.wasm', 'dist/sqlite3-opfs-async-proxy.js', 'dist/sqlite3-worker1.mjs']) {
   fs.copyFileSync(path.join(sqliteDir, f), path.join(dist, 'vendor', 'sqlite-wasm', path.basename(f)));
 }
+fs.copyFileSync(path.join(sqliteDir, 'dist', 'sqlite3-worker1.mjs'), path.join(dist, 'sqlite3-worker1.mjs'));
+fs.copyFileSync(path.join(sqliteDir, 'dist', 'sqlite3.wasm'), path.join(dist, 'sqlite3.wasm'));
 
-// esbuild: sqlite-wasm의 import.meta.url 참조를 벤더 경로로 치환하는 플러그인
-// (create-app 템플릿의 vendor 재작성 패턴 — Module workers는 import map을 안 물려받는다)
+// esbuild 플러그인: wasm 경로 치환
 const vendorRewrite = {
   name: 'vendor-rewrite',
   setup(b) {
-    // dist에서 wasm을 찾도록 sqlite-wasm의 URL 해석을 고정
+    // index.mjs: new URL("sqlite3.wasm", import.meta.url) → new URL("/vendor/sqlite-wasm/sqlite3.wasm", import.meta.url)
     b.onLoad({ filter: /sqlite-wasm[\\/]dist[\\/]index\.mjs$/ }, async (args) => {
       let code = fs.readFileSync(args.path, 'utf8');
-      // 번들 안에서 'sqlite3.wasm' 상대 URL이 node_modules 깊이를 가리키지 않게
-      // 절대 벤더 경로로 바꾼다. import.meta.url은 esbuild 번들에서 유지된다.
       code = code.replace(
-        /new URL\((['"`])sqlite3\.wasm\1,\s*import\.meta\.url\)/g,
-        '"/vendor/sqlite-wasm/sqlite3.wasm"',
+        /new URL\(["']sqlite3\.wasm["'],\s*import\.meta\.url\)/g,
+        'new URL("/vendor/sqlite-wasm/sqlite3.wasm", import.meta.url)'
+      );
+      return { contents: code, loader: 'js' };
+    });
+    
+    // sqlite3-worker1.mjs: new URL("sqlite3.wasm", import.meta.url) → new URL("/sqlite3.wasm", import.meta.url)
+    b.onLoad({ filter: /sqlite3-worker1\.mjs$/ }, async (args) => {
+      let code = fs.readFileSync(args.path, 'utf8');
+      code = code.replace(
+        /new URL\(["']sqlite3\.wasm["'],\s*import\.meta\.url\)/g,
+        'new URL("/sqlite3.wasm", import.meta.url)'
+      );
+      return { contents: code, loader: 'js' };
+    });
+    
+    // wasm-database.js: same as index.mjs
+    b.onLoad({ filter: /syncular[\\/]client[\\/]dist[\\/]wasm-database\.js$/ }, async (args) => {
+      let code = fs.readFileSync(args.path, 'utf8');
+      code = code.replace(
+        /new URL\(["']sqlite3\.wasm["'],\s*import\.meta\.url\)/g,
+        'new URL("/vendor/sqlite-wasm/sqlite3.wasm", import.meta.url)'
       );
       return { contents: code, loader: 'js' };
     });
@@ -58,7 +69,6 @@ await build({
   plugins: [vendorRewrite],
   minify: true,
   legalComments: 'none',
-  external: ['@syncular/client/wasm-database'],
 });
 
 // 앱 번들
@@ -74,7 +84,6 @@ await build({
 
 // index.html 복사
 fs.copyFileSync(path.join(root, 'index.html'), path.join(dist, 'index.html'));
-// PWA 에셋 유지 (아이콘·매니페스트)
 for (const f of ['icon.png', 'site.webmanifest']) {
   const src = path.join(path.dirname(root), f);
   if (fs.existsSync(src)) fs.copyFileSync(src, path.join(dist, f));

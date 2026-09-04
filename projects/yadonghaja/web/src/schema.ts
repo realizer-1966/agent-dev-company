@@ -1,0 +1,207 @@
+// Syncular 스키마 — 야!동하자 v2.1
+// 모든 테이블에 created_at_ms, updated_at_ms 일관되게 추가
+
+export interface SyncTable<Row, Insert, Update, Id> {
+  readonly name: string;
+  readonly primaryKey: keyof Row & string;
+  readonly physicalPrimaryKey: string;
+  readonly __row?: Row;
+  readonly __insert?: Insert;
+  readonly __update?: Update;
+  readonly __id?: Id;
+}
+
+export const schema = {
+  version: 1,
+  tables: [
+    {
+      name: 'posts',
+      columns: [
+        { name: 'id', type: 'string', nullable: false },
+        { name: 'public_id', type: 'string', nullable: false },
+        { name: 'author_id', type: 'string', nullable: false },
+        { name: 'author_name', type: 'string', nullable: false },
+        { name: 'author_avatar', type: 'string', nullable: false },
+        { name: 'types', type: 'json', nullable: false },
+        { name: 'mode', type: 'string', nullable: false },
+        { name: 'region', type: 'string', nullable: false },
+        { name: 'days', type: 'json', nullable: false },
+        { name: 'time_slot', type: 'string', nullable: false },
+        { name: 'capacity', type: 'integer', nullable: false },
+        { name: 'intro', type: 'string', nullable: false },
+        { name: 'deadline', type: 'string', nullable: false },
+        { name: 'status', type: 'string', nullable: false },
+        { name: 'created_at_ms', type: 'integer', nullable: true },
+        { name: 'updated_at_ms', type: 'integer', nullable: false },
+      ],
+      primaryKey: 'id',
+      scopes: [{ pattern: 'public:{public_id}', column: 'public_id' }],
+    },
+    {
+      name: 'feed_items',
+      columns: [
+        { name: 'id', type: 'string', nullable: false },
+        { name: 'public_id', type: 'string', nullable: false },
+        { name: 'user_id', type: 'string', nullable: false },
+        { name: 'user_name', type: 'string', nullable: false },
+        { name: 'avatar', type: 'string', nullable: false },
+        { name: 'mission_title', type: 'string', nullable: false },
+        { name: 'memo', type: 'string', nullable: false },
+        { name: 'photo', type: 'blob_ref', nullable: true },
+        { name: 'created_at_ms', type: 'integer', nullable: true },
+        { name: 'updated_at_ms', type: 'integer', nullable: false },
+      ],
+      primaryKey: 'id',
+      scopes: [{ pattern: 'public:{public_id}', column: 'public_id' }],
+    },
+    {
+      name: 'cheers',
+      columns: [
+        { name: 'id', type: 'string', nullable: false },
+        { name: 'public_id', type: 'string', nullable: false },
+        { name: 'feed_id', type: 'string', nullable: false },
+        { name: 'user_id', type: 'string', nullable: false },
+        { name: 'cheer_type', type: 'string', nullable: false },
+        { name: 'created_at_ms', type: 'integer', nullable: true },
+      ],
+      primaryKey: 'id',
+      scopes: [{ pattern: 'public:{public_id}', column: 'public_id' }],
+    },
+    {
+      name: 'user_profiles',
+      columns: [
+        { name: 'id', type: 'string', nullable: false },
+        { name: 'public_id', type: 'string', nullable: false },
+        { name: 'display_name', type: 'string', nullable: false },
+        { name: 'avatar', type: 'string', nullable: false },
+        { name: 'interests', type: 'json', nullable: false },
+        { name: 'created_at_ms', type: 'integer', nullable: true },
+        { name: 'updated_at_ms', type: 'integer', nullable: false },
+      ],
+      primaryKey: 'id',
+      scopes: [{ pattern: 'public:{public_id}', column: 'public_id' }],
+    },
+    {
+      name: 'applications',
+      columns: [
+        { name: 'id', type: 'string', nullable: false },
+        { name: 'apply_scope', type: 'string', nullable: false },
+        { name: 'post_id', type: 'string', nullable: false },
+        { name: 'group_id', type: 'string', nullable: false },
+        { name: 'applicant_id', type: 'string', nullable: false },
+        { name: 'applicant_name', type: 'string', nullable: false },
+        { name: 'applicant_avatar', type: 'string', nullable: false },
+        { name: 'status', type: 'string', nullable: false },
+        { name: 'message', type: 'string', nullable: false },
+        { name: 'created_at_ms', type: 'integer', nullable: true },
+        { name: 'updated_at_ms', type: 'integer', nullable: false },
+      ],
+      primaryKey: 'id',
+      scopes: [{ pattern: 'apply:{apply_scope}', column: 'apply_scope' }],
+    },
+    {
+      name: 'group_members',
+      columns: [
+        { name: 'id', type: 'string', nullable: false },
+        { name: 'group_id', type: 'string', nullable: false },
+        { name: 'post_id', type: 'string', nullable: false },
+        { name: 'user_id', type: 'string', nullable: false },
+        { name: 'role', type: 'string', nullable: false },
+        { name: 'joined_at_ms', type: 'integer', nullable: false },
+        { name: 'updated_at_ms', type: 'integer', nullable: false },
+      ],
+      primaryKey: 'id',
+      scopes: [{ pattern: 'group:{group_id}', column: 'group_id' }],
+    },
+    {
+      name: 'verifications',
+      columns: [
+        { name: 'id', type: 'string', nullable: false },
+        { name: 'verify_scope', type: 'string', nullable: false },
+        { name: 'group_id', type: 'string', nullable: false },
+        { name: 'user_id', type: 'string', nullable: false },
+        { name: 'mission_id', type: 'string', nullable: false },
+        { name: 'mission_title', type: 'string', nullable: false },
+        { name: 'mission_kind', type: 'string', nullable: false },
+        { name: 'date', type: 'string', nullable: false },
+        { name: 'memo', type: 'string', nullable: false },
+        { name: 'photo', type: 'blob_ref', nullable: true },
+        { name: 'created_at_ms', type: 'integer', nullable: true },
+        { name: 'updated_at_ms', type: 'integer', nullable: false },
+      ],
+      primaryKey: 'id',
+      scopes: [{ pattern: 'verify:{verify_scope}', column: 'verify_scope' }],
+    },
+    {
+      name: 'missions',
+      columns: [
+        { name: 'id', type: 'string', nullable: false },
+        { name: 'user_id', type: 'string', nullable: false },
+        { name: 'kind', type: 'string', nullable: false },
+        { name: 'date', type: 'string', nullable: true },
+        { name: 'week_key', type: 'string', nullable: true },
+        { name: 'title', type: 'string', nullable: false },
+        { name: 'goal', type: 'integer', nullable: false },
+        { name: 'status', type: 'string', nullable: false },
+        { name: 'verified_at_ms', type: 'integer', nullable: true },
+        { name: 'created_at_ms', type: 'integer', nullable: true },
+        { name: 'updated_at_ms', type: 'integer', nullable: false },
+      ],
+      primaryKey: 'id',
+      scopes: [{ pattern: 'user:{user_id}', column: 'user_id' }],
+    },
+    {
+      name: 'point_ledger',
+      columns: [
+        { name: 'id', type: 'string', nullable: false },
+        { name: 'user_id', type: 'string', nullable: false },
+        { name: 'amount', type: 'integer', nullable: false },
+        { name: 'reason', type: 'string', nullable: false },
+        { name: 'balance_after', type: 'integer', nullable: false },
+        { name: 'created_at_ms', type: 'integer', nullable: true },
+      ],
+      primaryKey: 'id',
+      scopes: [{ pattern: 'user:{user_id}', column: 'user_id' }],
+    },
+    {
+      name: 'streaks',
+      columns: [
+        { name: 'id', type: 'string', nullable: false },
+        { name: 'user_id', type: 'string', nullable: false },
+        { name: 'current', type: 'integer', nullable: false },
+        { name: 'best', type: 'integer', nullable: false },
+        { name: 'last_date', type: 'string', nullable: true },
+        { name: 'created_at_ms', type: 'integer', nullable: true },
+        { name: 'updated_at_ms', type: 'integer', nullable: false },
+      ],
+      primaryKey: 'id',
+      scopes: [{ pattern: 'user:{user_id}', column: 'user_id' }],
+    },
+    {
+      name: 'badges',
+      columns: [
+        { name: 'id', type: 'string', nullable: false },
+        { name: 'user_id', type: 'string', nullable: false },
+        { name: 'badge_id', type: 'string', nullable: false },
+        { name: 'badge_name', type: 'string', nullable: false },
+        { name: 'earned_at_ms', type: 'integer', nullable: false },
+        { name: 'updated_at_ms', type: 'integer', nullable: false },
+      ],
+      primaryKey: 'id',
+      scopes: [{ pattern: 'user:{user_id}', column: 'user_id' }],
+    },
+    {
+      name: 'rankings',
+      columns: [
+        { name: 'id', type: 'string', nullable: false },
+        { name: 'group_id', type: 'string', nullable: false },
+        { name: 'user_id', type: 'string', nullable: false },
+        { name: 'total_points', type: 'integer', nullable: false },
+        { name: 'created_at_ms', type: 'integer', nullable: true },
+        { name: 'updated_at_ms', type: 'integer', nullable: false },
+      ],
+      primaryKey: 'id',
+      scopes: [{ pattern: 'group:{group_id}', column: 'group_id' }],
+    },
+  ],
+} as const;

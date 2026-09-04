@@ -1,11 +1,11 @@
 /**
  * yadonghaja sync 워커 — Syncular 클라이언트 (OPFS + 아웃박스)
+ * startSyncWorker()가 표준 {t:'init'}/{t:'call'} 프로토콜로 초기화·RPC 처리.
+ * 이 파일은 startSyncWorker()를 호출하기만 하면 된다.
  */
 import { startSyncWorker } from '@syncular/client/worker';
-// wasm-database 는 external — dist 에서 직접 로드
-let sqlite3InitModule = null;
 
-// HTTP transport 인라인 구현
+// HTTP transport 인라인 구현 (x-user 헤더로 actor 식별)
 function httpSyncTransport(url, { headers } = {}) {
   return {
     url,
@@ -50,61 +50,24 @@ function httpBlobStore(url, { headers } = {}) {
   };
 }
 
-let handle = null;
-
-self.onmessage = async (event) => {
-  const { type, config } = event.data;
-  
-  if (type === 'worker-init') {
-    const { actorId, baseUrl } = config;
-    
-    // sqlite-wasm 초기화
-    await sqlite3InitModule({ print: console.log, printErr: console.error });
-    
-    // Syncular 클라이언트 핸들 생성
-    handle = await startSyncWorker({
-      sqlite3js: '/vendor/sqlite-wasm/index.mjs',
-      sqlite3Wasm: '/vendor/sqlite-wasm/sqlite3.wasm',
-      sqlite3WasmAsyncProxy: '/vendor/sqlite-wasm/sqlite3-opfs-async-proxy.js',
-      createTransport: (syncUrl) => httpSyncTransport(syncUrl, {
-        headers: { 'x-user': actorId },
-      }),
-      createSegmentDownloader: () => httpSegmentDownloader({
-        headers: { 'x-user': actorId },
-      }),
-      createBlobStore: (blobsUrl) => httpBlobStore(blobsUrl, {
-        headers: { 'x-user': actorId },
-      }),
+// startSyncWorker()가 표준 프로토콜로 초기화·RPC 처리
+startSyncWorker({
+  createTransport: (config) => {
+    const actorId = config.clientId;
+    return httpSyncTransport(config.endpoints.syncUrl, {
+      headers: { 'x-user': actorId },
     });
-    
-    // Sync 시작
-    await handle.startSync({
-      syncUrl: `${baseUrl}/sync`,
-      segmentsUrl: `${baseUrl}/segments`,
-      blobsUrl: `${baseUrl}/blobs`,
-      scopes: {
-        public_id: ['main'],
-        group_id: [],
-        user_id: [actorId],
-        apply_scope: ['open'],
-        verify_scope: ['live'],
-      },
+  },
+  createSegments: (config) => {
+    const actorId = config.clientId;
+    return httpSegmentDownloader({
+      headers: { 'x-user': actorId },
     });
-    
-    console.log('[worker] Sync started for', actorId);
-  } else if (type === 'mutate' && handle) {
-    const { table, row } = config;
-    await handle.mutate(table, row);
-    event.source.postMessage({ type: 'mutate-ok' });
-  } else if (type === 'query' && handle) {
-    const { sql, params } = config;
-    const rows = await handle.query(sql, params);
-    event.source.postMessage({ type: 'query-result', rows });
-  } else if (type === 'subscribe' && handle) {
-    const { subscriptionId, spec } = config;
-    handle.subscribe(subscriptionId, spec);
-  } else if (type === 'get-sync-state' && handle) {
-    const state = await handle.getSyncState();
-    event.source.postMessage({ type: 'sync-state', state });
-  }
-};
+  },
+  createBlobStore: (config) => {
+    const actorId = config.clientId;
+    return httpBlobStore(config.endpoints.blobsUrl, {
+      headers: { 'x-user': actorId },
+    });
+  },
+});
