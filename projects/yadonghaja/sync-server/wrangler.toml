@@ -1,8 +1,8 @@
 # 야!동하자 sync 서버 — Cloudflare Workers 배포 설정
 # 패키지 레퍼런스: syncular-analysis/packages/server-workers/wrangler.toml.example
 
-name = "yadonghaja-sync-v2"  # v2.5 — 새 이름 (DO 문제 회피)
-main = "src/worker-v2.4.js"  # v2.4 — health/sync/segments/blobs
+name = "yadonghaja-sync-v2"
+main = "src/worker-v2.5.js"  # v2.5 — public 액세스 허용
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 

@@ -56,8 +56,8 @@ async function init() {
   const saved = localStorage.getItem('yadong_actor');
   if (saved) {
     currentUser = JSON.parse(saved);
-    // 본계정 Workers 연동 (v2.5)
-    sync = await createSyncAdapter(currentUser.actorId, 'https://yadonghaja-sync-v2.dydtnsp.workers.dev');
+    // 로컬 인메모리 테스트 (Workers 403 문제)
+    sync = await createSyncAdapter(currentUser.actorId, 'http://127.0.0.1:8788');
     renderApp();
   } else {
     showOnboarding();
@@ -86,8 +86,8 @@ function showOnboarding() {
     currentUser = { actorId, name, avatar: selectedAvatar };
     localStorage.setItem('yadong_actor', JSON.stringify(currentUser));
     $('#onboard').style.display = 'none';
-    // 본계정 Workers 연동 (v2.5)
-    sync = await createSyncAdapter(actorId, 'https://yadonghaja-sync-v2.dydtnsp.workers.dev');
+    // 로컬 인메모리 테스트 (Workers 403 문제)
+    sync = await createSyncAdapter(actorId, 'http://127.0.0.1:8788');
     await seedUserProfile();
     renderApp();
   };
