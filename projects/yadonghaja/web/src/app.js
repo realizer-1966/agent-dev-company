@@ -56,8 +56,8 @@ async function init() {
   const saved = localStorage.getItem('yadong_actor');
   if (saved) {
     currentUser = JSON.parse(saved);
-    // Cloudflare Workers 연동
-    sync = await createSyncAdapter(currentUser.actorId, 'https://yadonghaja-sync.salt-hero.workers.dev');
+    // 본계정 Workers 연동 (v2.5)
+    sync = await createSyncAdapter(currentUser.actorId, 'https://yadonghaja-sync-v2.dydtnsp.workers.dev');
     renderApp();
   } else {
     showOnboarding();
@@ -86,8 +86,8 @@ function showOnboarding() {
     currentUser = { actorId, name, avatar: selectedAvatar };
     localStorage.setItem('yadong_actor', JSON.stringify(currentUser));
     $('#onboard').style.display = 'none';
-    // Cloudflare Workers 연동
-    sync = await createSyncAdapter(actorId, 'https://yadonghaja-sync.salt-hero.workers.dev');
+    // 본계정 Workers 연동 (v2.5)
+    sync = await createSyncAdapter(actorId, 'https://yadonghaja-sync-v2.dydtnsp.workers.dev');
     await seedUserProfile();
     renderApp();
   };
