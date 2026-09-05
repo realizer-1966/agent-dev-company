@@ -1,23 +1,22 @@
 # 야!동하자 sync 서버 — Cloudflare Workers 배포 설정
 # 패키지 레퍼런스: syncular-analysis/packages/server-workers/wrangler.toml.example
 
-name = "yadonghaja-sync"
+name = "yadonghaja-sync-v2"  # v2.5 — 새 이름 (DO 문제 회피)
 main = "src/worker-v2.4.js"  # v2.4 — health/sync/segments/blobs
-# main = "src/worker-simple.ts"  # 구버전
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
 # --- D1: 서버 저장소 (D1ServerStorage) --------------------------------------
-# 임시 계정용 (v2.3 테스트)
+# 본계정 (v2.5 prod)
 [[d1_databases]]
 binding = "DB"
-database_name = "yadonghaja-sync-temp"
-database_id = "9d854708-7db1-417d-9ec9-7e8fa1e60ce2"
+database_name = "yadonghaja-sync-prod"
+database_id = "c8ac479a-2cd5-4064-a2a5-7cc6171e1cc6"
 
-# --- R2: 세그먼트·Blob(인증 사진) 바이트 저장 (v2.4 에서 추가) -----------------
-# [[r2_buckets]]
-# binding = "BUCKET"
-# bucket_name = "yadonghaja-blobs"
+# --- R2: 세그먼트·Blob(인증 사진) 바이트 저장 --------------------------------
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "yadonghaja-blobs-prod"
 
 # --- 시크릿 (개발용: 직접 기입, 프로덕션에서는 wrangler secret 사용) --------
 vars = { SYNC_HMAC_KEY = "2ad4e9489b888d4af76d3588fd9f4d58" }
@@ -25,7 +24,7 @@ vars = { SYNC_HMAC_KEY = "2ad4e9489b888d4af76d3588fd9f4d58" }
 # R2_ACCESS_KEY_ID = "..."
 # R2_SECRET_ACCESS_KEY = "..."
 
-# --- Durable Objects 는 v2.4 에서 추가 (실시간 동기화) ---------------------
+# --- Durable Objects 는 v2.6 에서 추가 (실시간 동기화) ---------------------
 # [[durable_objects.bindings]]
 # name = "SYNC_COORDINATOR"
 # class_name = "SyncularRealtimeDO"
