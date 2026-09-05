@@ -20,3 +20,4 @@ target/
 
 # 로컬 테스트용 시드 파일 (OnDev 배포·git 추적 대상 아님)
 projects/rental-web/seed.html
+node_modules/
