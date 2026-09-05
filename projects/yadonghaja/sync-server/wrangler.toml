@@ -9,17 +9,16 @@ compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
 # --- D1: 서버 저장소 (D1ServerStorage) --------------------------------------
-# 생성:  wrangler d1 create yadonghaja-sync  → 출력된 database_id 기입
-# 스키마: wrangler d1 migrations apply yadonghaja-sync --remote
+# 임시 계정용 (v2.3 테스트)
 [[d1_databases]]
 binding = "DB"
-database_name = "yadonghaja-sync"
-database_id = "f1c5ff79-2e54-4f34-93eb-60ae0ca47b0c"   # wrangler d1 create 로 생성됨 (2026-09-04)
+database_name = "yadonghaja-sync-temp"
+database_id = "9d854708-7db1-417d-9ec9-7e8fa1e60ce2"
 
-# --- R2: 세그먼트·Blob(인증 사진) 바이트 저장 --------------------------------
-[[r2_buckets]]
-binding = "BUCKET"
-bucket_name = "yadonghaja-blobs"    # wrangler r2 bucket create yadonghaja-blobs
+# --- R2: 세그먼트·Blob(인증 사진) 바이트 저장 (v2.4 에서 추가) -----------------
+# [[r2_buckets]]
+# binding = "BUCKET"
+# bucket_name = "yadonghaja-blobs"
 
 # --- 시크릿 (개발용: 직접 기입, 프로덕션에서는 wrangler secret 사용) --------
 vars = { SYNC_HMAC_KEY = "2ad4e9489b888d4af76d3588fd9f4d58" }
