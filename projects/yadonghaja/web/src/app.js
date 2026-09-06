@@ -57,7 +57,7 @@ async function init() {
   if (saved) {
     currentUser = JSON.parse(saved);
     // 로컬 인메모리 테스트 (Workers 403 문제)
-    sync = await createSyncAdapter(currentUser.actorId, 'http://127.0.0.1:8788');
+    sync = await createSyncAdapter(currentUser.actorId, 'https://yadonghaja-sync-v2.dydtnsp.workers.dev');
     renderApp();
   } else {
     showOnboarding();
@@ -87,7 +87,7 @@ function showOnboarding() {
     localStorage.setItem('yadong_actor', JSON.stringify(currentUser));
     $('#onboard').style.display = 'none';
     // 로컬 인메모리 테스트 (Workers 403 문제)
-    sync = await createSyncAdapter(actorId, 'http://127.0.0.1:8788');
+    sync = await createSyncAdapter(actorId, 'https://yadonghaja-sync-v2.dydtnsp.workers.dev');
     await seedUserProfile();
     renderApp();
   };
