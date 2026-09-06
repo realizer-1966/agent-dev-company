@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS feed_items (
   avatar        TEXT NOT NULL,
   mission_title TEXT NOT NULL,
   memo          TEXT NOT NULL DEFAULT '',
-  photo        BLOB_REF,
+  photo        TEXT,              -- blob_id (R2 참조)
   created_at_ms INTEGER NOT NULL
 );
 
@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS verifications (
   mission_kind  TEXT NOT NULL CHECK (mission_kind IN ('daily','weekly','group')),
   date          TEXT NOT NULL,
   memo          TEXT NOT NULL DEFAULT '',
-  photo        BLOB_REF,
+  photo        TEXT,              -- blob_id (R2 참조)
   created_at_ms INTEGER NOT NULL,
   UNIQUE (user_id, mission_id)
 );
