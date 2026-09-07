@@ -14,6 +14,9 @@ export async function createSyncAdapter(actorId, baseUrl = 'http://127.0.0.1:878
     return createInMemoryAdapter(actorId);
   }
 
+  // §5.9.7 로컬 blob 캐시 — putBlob 한 바이트는 네트워크 없이 즉시 재사용
+  const localBlobCache = new Map();  // blobId → {bytes, mediaType}
+
   try {
     const handle = await createSyncClientHandle({
       worker: () => new Worker(new URL('./worker.js', import.meta.url), { type: 'module' }),
@@ -69,9 +72,21 @@ export async function createSyncAdapter(actorId, baseUrl = 'http://127.0.0.1:878
         // §5.9.1 canonical: {"blobId","byteLength","mediaType"} 키 순서 고정
         const ref = { blobId, byteLength: bytes.length };
         if (mediaType) ref.mediaType = mediaType;
+        localBlobCache.set(blobId, { bytes, mediaType: mediaType || 'image/jpeg' });
         return JSON.stringify(ref);
       },
       async fetchBlob(blobIdOrRef) {
+        // 로컬 캐시 우선 (§5.9.7 B1) — 방금 업로드한 사진은 네트워크 없이 즉시 반환
+        try {
+          let id = blobIdOrRef;
+          if (typeof id === 'string' && id.startsWith('{')) {
+            id = JSON.parse(id).blobId ?? id;
+          }
+          if (localBlobCache.has(id)) {
+            const c = localBlobCache.get(id);
+            return { blobId: id, bytes: c.bytes, byteLength: c.bytes.length, mediaType: c.mediaType };
+          }
+        } catch (p) { /* 파싱 실패 시 SDK 경로로 */ }
         return await handle.fetchBlob(blobIdOrRef);
       },
       async getSyncState() {
@@ -82,7 +97,9 @@ export async function createSyncAdapter(actorId, baseUrl = 'http://127.0.0.1:878
       },
     };
   } catch (e) {
-    console.warn('[sync] Syncular 실패 — 인메모리 모드:', e.message);
+    console.warn('[sync] Syncular 실패 — 인메모리 모드:', e);
+    // 화면에 실패 원인 표시 — 사용자/개발자가 즉시 인지하게
+    try { (globalThis.showToast?.() ?? globalThis.alert?.('동기화 서버 연결 실패: ' + (e.message || e))); } catch {}
     return createInMemoryAdapter(actorId);
   }
 }

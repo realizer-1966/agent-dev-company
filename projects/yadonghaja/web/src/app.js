@@ -429,7 +429,11 @@ async function resolveFeedPhotos() {
       }
     } catch (e) {
       console.warn('[feed] 사진 로드 실패:', e.message);
-      img.remove();
+      img.alt = '📷 ' + (e.message || '사진 로드 실패');
+      img.style.minHeight = '40px';
+      img.style.background = '#1e293b';
+      img.removeAttribute('data-blob');
+      img.classList.remove('feed-photo');
     }
   }
 }
