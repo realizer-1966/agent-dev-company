@@ -139,7 +139,7 @@ async function checkBadges(points) {
 }
 
 async function updateStreak() {
-  const st = await getStreak();
+  const st = await getStreak() || { current: 0, best: 0, last_date: null };
   const last = st?.last_date;
   const today = todayStr();
   const diff = last ? (new Date(today) - new Date(last)) / 86400000 : 999;
@@ -157,7 +157,7 @@ async function getPoints() {
 }
 async function getStreak() {
   const rows = await sync.query('SELECT * FROM streaks WHERE user_id = ?1', [currentUser.actorId]);
-  return rows[0] || null;
+  return rows[0] || { current: 0, best: 0, last_date: null };  // null 금지 — 기본값
 }
 async function getRank() {
   const rows = await sync.query('SELECT user_id, total_points, RANK() OVER (ORDER BY total_points DESC) as rank FROM rankings WHERE group_id = ?1', ['main']);
