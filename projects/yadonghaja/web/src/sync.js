@@ -14,8 +14,39 @@ export async function createSyncAdapter(actorId, baseUrl = 'http://127.0.0.1:878
     return createInMemoryAdapter(actorId);
   }
 
-  // §5.9.7 로컬 blob 캐시 — putBlob 한 바이트는 네트워크 없이 즉시 재사용
-  const localBlobCache = new Map();  // blobId → {bytes, mediaType}
+  // §5.9.7 로컬 blob 캐시 — IndexedDB 영속 (새로고침 후에도 사진 유지)
+  const BLOB_DB = 'yadonghaja-blobs';
+  const BLOB_STORE = 'blobs';
+  function openBlobDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(BLOB_DB, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore(BLOB_STORE);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function blobCacheGet(blobId) {
+    try {
+      const db = await openBlobDB();
+      return await new Promise((resolve, reject) => {
+        const tx = db.transaction(BLOB_STORE, 'readonly');
+        const rq = tx.objectStore(BLOB_STORE).get(blobId);
+        rq.onsuccess = () => resolve(rq.result || null);
+        rq.onerror = () => reject(rq.error);
+      });
+    } catch (e) { return null; }
+  }
+  async function blobCacheSet(blobId, entry) {
+    try {
+      const db = await openBlobDB();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction(BLOB_STORE, 'readwrite');
+        tx.objectStore(BLOB_STORE).put(entry, blobId);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch (e) { console.warn('[sync] blob 캐시 저장 실패:', e.message); }
+  }
 
   try {
     const handle = await createSyncClientHandle({
@@ -72,7 +103,7 @@ export async function createSyncAdapter(actorId, baseUrl = 'http://127.0.0.1:878
         // §5.9.1 canonical: {"blobId","byteLength","mediaType"} 키 순서 고정
         const ref = { blobId, byteLength: bytes.length };
         if (mediaType) ref.mediaType = mediaType;
-        localBlobCache.set(blobId, { bytes, mediaType: mediaType || 'image/jpeg' });
+        await blobCacheSet(blobId, { bytes, mediaType: mediaType || 'image/jpeg' });
         return JSON.stringify(ref);
       },
       async fetchBlob(blobIdOrRef) {
@@ -82,9 +113,9 @@ export async function createSyncAdapter(actorId, baseUrl = 'http://127.0.0.1:878
           if (typeof id === 'string' && id.startsWith('{')) {
             id = JSON.parse(id).blobId ?? id;
           }
-          if (localBlobCache.has(id)) {
-            const c = localBlobCache.get(id);
-            return { blobId: id, bytes: c.bytes, byteLength: c.bytes.length, mediaType: c.mediaType };
+          const cached = await blobCacheGet(id);
+          if (cached) {
+            return { blobId: id, bytes: cached.bytes, byteLength: cached.bytes.length, mediaType: cached.mediaType };
           }
         } catch (p) { /* 파싱 실패 시 SDK 경로로 */ }
         return await handle.fetchBlob(blobIdOrRef);
