@@ -59,6 +59,16 @@ async function init() {
     // 로컬 인메모리 테스트 (Workers 403 문제)
     sync = await createSyncAdapter(currentUser.actorId, 'https://yadonghaja-sync-v2.dydtnsp.workers.dev');
     await setupSubscriptions(currentUser.actorId);
+    console.log('[sync] 어댑터 타입:', sync.constructor?.name, '| putBlob:', typeof sync.putBlob, '| subscribe:', typeof sync.subscribe);
+    // 첫 라운드 후 로컬 DB 행 수 로그 (피드 디버깅)
+    setTimeout(async () => {
+      try {
+        const n = await sync.query('SELECT COUNT(*) as n FROM feed_items');
+        console.log('[sync] 로컬 feed_items:', n);
+        const st = await sync.getSyncState();
+        console.log('[sync] 상태:', JSON.stringify(st));
+      } catch (e) { console.warn('[sync] 상태 조회 실패:', e.message); }
+    }, 4000);
     renderApp();
   } else {
     showOnboarding();
@@ -107,7 +117,7 @@ async function seedUserProfile() {
 async function awardPoints(amount, reason) {
   const cur = await getPoints();
   const newBalance = cur + amount;
-  await sync.mutate('point_ledger', { id: 'pt_'+crypto.randomUUID().slice(0,8), user_id: currentUser.actorId, amount, reason, balance_after: newBalance, updated_at_ms: ms() });
+  await sync.mutate('point_ledger', { id: 'pt_'+crypto.randomUUID().slice(0,8), user_id: currentUser.actorId, amount, reason, balance_after: newBalance, created_at_ms: ms() });
   await checkBadges(newBalance);
   return newBalance;
 }
@@ -361,9 +371,11 @@ async function verifyMission(missionId, title) {
         photoRef = photoDataUrl;  // 인메모리 fallback
       }
     } catch (e) {
-      console.warn('[verify] blob 업로드 실패 — dataURL 폴백:', e.message);
-      photoRef = photoDataUrl;
+      console.warn('[verify] blob 업로드 실패:', e.message);
+      showToast('📷 사진 업로드 실패: ' + e.message);
+      photoRef = null;  // dataURL 은 blob_ref 검증 위반 — null 로 저장
     }
+    try {
     await sync.mutate('missions', { id: missionId, status: 'done', verified_at_ms: ms(), updated_at_ms: ms() });
     await sync.mutate('verifications', { id: `${currentUser.actorId}:${missionId}`, verify_scope: 'live', group_id: 'main', user_id: currentUser.actorId, mission_id, mission_title: title, mission_kind: 'daily', date, memo, photo: photoRef, updated_at_ms: ms() });
     await sync.mutate('feed_items', { id: `feed_${missionId}`, public_id: 'main', user_id: currentUser.actorId, user_name: currentUser.name, avatar: currentUser.avatar, mission_title: title, memo, photo: photoRef, updated_at_ms: ms() });
@@ -375,6 +387,10 @@ async function verifyMission(missionId, title) {
     showToast(`인증 완료! ${newPts} P (스트릭: ${st.current}일)`);
     await renderMission();
     await updateHeader();
+    } catch (e) {
+      console.error('[verify] 인증 실패:', e);
+      showToast('❌ 인증 저장 실패: ' + (e.message || e));
+    }
   };
 }
 
@@ -438,7 +454,7 @@ async function sendCheer(feedId, type) {
   const id = `${feedId}:${currentUser.actorId}:${type}`;
   const exists = await sync.query("SELECT 1 FROM cheers WHERE id = ?1", [id]);
   if (exists.length > 0) return showToast('이미 응원했어요');
-  await sync.mutate('cheers', { id, public_id: 'main', feed_id: feedId, user_id: currentUser.actorId, cheer_type: type, updated_at_ms: ms() });
+  await sync.mutate('cheers', { id, public_id: 'main', feed_id: feedId, user_id: currentUser.actorId, cheer_type: type, created_at_ms: ms() });
   await awardPoints(1, 'cheer');
   await updateHeader();
   showToast('응원 완료! +1 P');

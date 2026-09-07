@@ -18,7 +18,7 @@ export async function createSyncAdapter(actorId, baseUrl = 'http://127.0.0.1:878
     const handle = await createSyncClientHandle({
       worker: () => new Worker(new URL('./worker.js', import.meta.url), { type: 'module' }),
       schema,
-      database: { mode: 'persistent', name: 'yadonghaja' },
+      database: { mode: 'persistent', name: 'yadonghaja-v2' },  // 구 스키마 DB 회피 — 신규 이름
       clientId: actorId,
       endpoints: {
         syncUrl: `${baseUrl}/sync`,
