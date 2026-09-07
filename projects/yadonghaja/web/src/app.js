@@ -58,6 +58,7 @@ async function init() {
     currentUser = JSON.parse(saved);
     // 로컬 인메모리 테스트 (Workers 403 문제)
     sync = await createSyncAdapter(currentUser.actorId, 'https://yadonghaja-sync-v2.dydtnsp.workers.dev');
+    await setupSubscriptions(currentUser.actorId);
     renderApp();
   } else {
     showOnboarding();
@@ -88,6 +89,7 @@ function showOnboarding() {
     $('#onboard').style.display = 'none';
     // 로컬 인메모리 테스트 (Workers 403 문제)
     sync = await createSyncAdapter(actorId, 'https://yadonghaja-sync-v2.dydtnsp.workers.dev');
+    await setupSubscriptions(actorId);
     await seedUserProfile();
     renderApp();
   };
@@ -314,7 +316,8 @@ async function verifyMission(missionId, title) {
     </div>
   `);
 
-  let photoDataUrl = null;
+  let photoDataUrl = null;   // 미리보기 전용
+  let photoBytes = null;     // 업로드용 JPEG bytes (R2 blob)
   // 📷 사진 찍기: 폰 기본 카메라 앱 호출 (input capture 방식 — 안정적)
   $('#takePhoto').onclick = () => $('#cameraInput').click();
   $('#cameraInput').onchange = (e) => {
@@ -324,17 +327,20 @@ async function verifyMission(missionId, title) {
     reader.onload = () => {
       const img = new Image();
       img.onload = () => {
-        // 640px 폭으로 축소해 JPEG 저장 (dataURL)
+        // 640px 폭 JPEG 축소 — bytes 보관 (R2 blob 업로드용) + dataURL 미리보기
         const canvas = document.createElement('canvas');
         canvas.width = 640;
         canvas.height = Math.max(1, Math.round((img.height / img.width) * 640));
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        photoDataUrl = canvas.toDataURL('image/jpeg', 0.8);
-        $('#previewImg').src = photoDataUrl;
-        $('#photoPreview').classList.remove('hidden');
-        $('#takePhoto').textContent = '🔄 다시 찍기';
-        showToast('사진 등록 완료!');
+        canvas.toBlob(async (blob) => {
+          photoBytes = new Uint8Array(await blob.arrayBuffer());
+          photoDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+          $('#previewImg').src = photoDataUrl;
+          $('#photoPreview').classList.remove('hidden');
+          $('#takePhoto').textContent = '🔄 다시 찍기';
+          showToast('사진 등록 완료!');
+        }, 'image/jpeg', 0.8);
       };
       img.src = reader.result;
     };
@@ -343,12 +349,24 @@ async function verifyMission(missionId, title) {
   };
   $('#vSubmit').onclick = async () => {
     // ✅ 사진 필수 검증 — 없으면 인증 진행 불가
-    if (!photoDataUrl) { showToast('📷 운동 인증에는 사진이 필요해요!'); return; }
+    if (!photoBytes) { showToast('📷 운동 인증에는 사진이 필요해요!'); return; }
     const memo = $('#vMemo').value.trim() || '';
     const date = todayStr();
+    // 사진 → R2 blob 업로드 → blob_ref (스키마 photo 컬럼 = blob_ref 타입)
+    let photoRef = null;
+    try {
+      if (sync.putBlob) {
+        photoRef = await sync.putBlob(photoBytes, 'image/jpeg');
+      } else {
+        photoRef = photoDataUrl;  // 인메모리 fallback
+      }
+    } catch (e) {
+      console.warn('[verify] blob 업로드 실패 — dataURL 폴백:', e.message);
+      photoRef = photoDataUrl;
+    }
     await sync.mutate('missions', { id: missionId, status: 'done', verified_at_ms: ms(), updated_at_ms: ms() });
-    await sync.mutate('verifications', { id: `${currentUser.actorId}:${missionId}`, verify_scope: 'live', group_id: 'main', user_id: currentUser.actorId, mission_id, mission_title: title, mission_kind: 'daily', date, memo, photo: photoDataUrl, updated_at_ms: ms() });
-    await sync.mutate('feed_items', { id: `feed_${missionId}`, public_id: 'main', user_id: currentUser.actorId, user_name: currentUser.name, avatar: currentUser.avatar, mission_title: title, memo, photo: photoDataUrl, updated_at_ms: ms() });
+    await sync.mutate('verifications', { id: `${currentUser.actorId}:${missionId}`, verify_scope: 'live', group_id: 'main', user_id: currentUser.actorId, mission_id, mission_title: title, mission_kind: 'daily', date, memo, photo: photoRef, updated_at_ms: ms() });
+    await sync.mutate('feed_items', { id: `feed_${missionId}`, public_id: 'main', user_id: currentUser.actorId, user_name: currentUser.name, avatar: currentUser.avatar, mission_title: title, memo, photo: photoRef, updated_at_ms: ms() });
     const newPts = await awardPoints(10, 'daily_mission');
     const st = await updateStreak();
     await updateRanking();
@@ -364,6 +382,34 @@ async function verifyMission(missionId, title) {
 async function renderFeed() {
   const feed = await sync.query("SELECT * FROM feed_items ORDER BY updated_at_ms DESC LIMIT 30");
   main.innerHTML = feed.length ? feed.map(f => cardFeed(f)).join('') : '<p class="text-slate-400 text-sm mt-8 text-center">아직 피드가 없어요</p>';
+  await resolveFeedPhotos();
+}
+
+// blob_ref 사진 → 실제 bytes fetch → img.src 주입 (R2 사진 표시)
+async function resolveFeedPhotos() {
+  const imgs = document.querySelectorAll('img.feed-photo[data-blob]');
+  for (const img of imgs) {
+    try {
+      const ref = decodeURIComponent(img.dataset.blob);
+      let blobId = ref;
+      if (ref.startsWith('{')) {
+        // blob_ref JSON 형태
+        const parsed = JSON.parse(ref);
+        blobId = parsed.blobId ?? parsed.id ?? ref;
+      }
+      if (sync.fetchBlob) {
+        const cached = await sync.fetchBlob(blobId);
+        img.src = URL.createObjectURL(new Blob([cached.bytes], { type: cached.mediaType || 'image/jpeg' }));
+        img.removeAttribute('data-blob');
+        img.classList.remove('feed-photo');
+      } else {
+        img.remove();  // fallback 환경 — 사진 표시 생략
+      }
+    } catch (e) {
+      console.warn('[feed] 사진 로드 실패:', e.message);
+      img.remove();
+    }
+  }
 }
 
 function cardFeed(f) {
@@ -376,7 +422,9 @@ function cardFeed(f) {
       </div>
       <div class="font-extrabold text-slate-100 mb-1">${f.mission_title}</div>
       ${f.memo ? `<p class="text-sm text-slate-300 mb-2">${f.memo}</p>` : ''}
-      ${f.photo ? `<img src="${f.photo}" class="w-full rounded-xl mb-2 border border-slate-600" />` : ''}
+      ${f.photo ? (f.photo.startsWith('sha256:') || f.photo.startsWith('{')
+        ? `<img data-blob="${encodeURIComponent(f.photo)}" class="feed-photo w-full rounded-xl mb-2 border border-slate-600" />`
+        : `<img src="${f.photo}" class="w-full rounded-xl mb-2 border border-slate-600" />`) : ''}
       <div class="flex items-center gap-2 mt-2">
         <button class="cheer-btn text-lg" onclick="sendCheer('${f.id}', 'fire')">🔥</button>
         <button class="cheer-btn text-lg" onclick="sendCheer('${f.id}', 'thumb')">👍</button>
@@ -526,3 +574,25 @@ init();
 window.openApply = openApply;
 window.sendCheer = sendCheer;
 window.verifyMission = verifyMission;
+
+
+// ============ Syncular 구독 — 서버 데이터를 로컬 DB 로 유입 ============
+async function setupSubscriptions(actorId) {
+  if (!sync || !sync.subscribe) return;
+  try {
+    // 공개 영역 (피드·모집글·프로필)
+    await sync.subscribe({ id: 'pub-posts', table: 'posts', scopes: { public_id: ['main'] } });
+    await sync.subscribe({ id: 'pub-feed', table: 'feed_items', scopes: { public_id: ['main'] } });
+    await sync.subscribe({ id: 'pub-cheers', table: 'cheers', scopes: { public_id: ['main'] } });
+    await sync.subscribe({ id: 'pub-profiles', table: 'user_profiles', scopes: { public_id: ['main'] } });
+    // 개인 영역 (내 미션·포인트·배지·스트릭)
+    await sync.subscribe({ id: 'my-missions', table: 'missions', scopes: { user_id: [actorId] } });
+    await sync.subscribe({ id: 'my-ledger', table: 'point_ledger', scopes: { user_id: [actorId] } });
+    await sync.subscribe({ id: 'my-badges', table: 'badges', scopes: { user_id: [actorId] } });
+    await sync.subscribe({ id: 'my-streaks', table: 'streaks', scopes: { user_id: [actorId] } });
+    await sync.subscribe({ id: 'my-verify', table: 'verifications', scopes: { user_id: [actorId] } });
+    console.log('[sync] 구독 등록 완료 (9 스코프)');
+  } catch (e) {
+    console.warn('[sync] 구독 실패:', e.message);
+  }
+}

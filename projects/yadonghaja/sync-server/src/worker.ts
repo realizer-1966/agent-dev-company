@@ -18,6 +18,9 @@ import {
   s3PresignedBlobUrls,
   s3PresignedUrls,
   ValidationRejection,
+  handleBlobUpload,
+  handleBlobDownload,
+  handleSegmentDownload,
   type SyncServerConfig,
 } from '@syncular/server';
 import {
@@ -34,6 +37,64 @@ export interface Env {
   R2_ACCESS_KEY_ID: string;
   R2_SECRET_ACCESS_KEY: string;
   SYNC_HMAC_KEY: string;
+}
+
+
+/* ============================================================
+   R2BlobStore — Workers R2 바인딩 기반 BlobStore (§5.9.2)
+   env.BUCKET 을 직접 사용 — S3 자격증명 불필요
+   ============================================================ */
+class R2BlobStore {
+  constructor(bucket, prefix = 'blobs/') {
+    this.bucket = bucket;
+    this.prefix = prefix;
+  }
+  key(partition, blobId) {
+    return `${this.prefix}${partition}/${blobId}`;
+  }
+  async put(partition, blobId, bytes, nowMs, mediaType) {
+    await this.bucket.put(this.key(partition, blobId), bytes.slice().buffer, {
+      httpMetadata: mediaType ? { contentType: mediaType } : undefined,
+      customMetadata: { partition, createdAtMs: String(nowMs), ...(mediaType ? { mediaType } : {}) },
+    });
+    return {
+      blobId, partition,
+      byteLength: bytes.length,
+      ...(mediaType ? { mediaType } : {}),
+      createdAtMs: nowMs,
+    };
+  }
+  async has(partition, blobId) {
+    const head = await this.bucket.head(this.key(partition, blobId));
+    return head !== null;
+  }
+  async get(partition, blobId) {
+    const obj = await this.bucket.get(this.key(partition, blobId));
+    if (!obj) return undefined;
+    const bytes = new Uint8Array(await obj.arrayBuffer());
+    return {
+      record: {
+        blobId, partition,
+        byteLength: bytes.length,
+        ...(obj.httpMetadata?.contentType ? { mediaType: obj.httpMetadata.contentType } : {}),
+        createdAtMs: Number(obj.customMetadata?.createdAtMs ?? 0),
+      },
+      bytes,
+    };
+  }
+  async sweepOrphans(partition, olderThanMs, referencedBlobIds) {
+    const deleted = [];
+    const list = await this.bucket.list({ prefix: `${this.prefix}${partition}/` });
+    for (const item of list.objects ?? []) {
+      const blobId = item.key.split('/').pop();
+      if (referencedBlobIds.has(blobId)) continue;
+      if ((item.uploaded?.getTime() ?? 0) < olderThanMs) {
+        await this.bucket.delete(item.key);
+        deleted.push(blobId);
+      }
+    }
+    return deleted;
+  }
 }
 
 /* ============================================================
@@ -131,8 +192,11 @@ function syncConfig(env: Env, storage?: D1ServerStorage): SyncServerConfig {
     accessKeyId: env.R2_ACCESS_KEY_ID,
     secretAccessKey: env.R2_SECRET_ACCESS_KEY,
   };
-  const segments = new S3SegmentStore({ ...r2, bucket: 'yadonghaja-blobs' });
-  const blobs = new S3BlobStore({ ...r2, bucket: 'yadonghaja-blobs' });
+  const segments = new S3SegmentStore({ ...r2, bucket: 'yadonghaja-blobs-prod' });
+  // R2 바인딩 직접 사용 — S3 자격증명 불필요 (사진 바이트 저장)
+  const blobs = env.BUCKET
+    ? new R2BlobStore(env.BUCKET)
+    : new S3BlobStore({ ...r2, bucket: 'yadonghaja-blobs-prod' });
   return {
     schema,
     // DO(coordinator) 안에서는 DO가 만든 coordinated storage 를 그대로 쓴다.
@@ -185,17 +249,110 @@ function healthHandler(request: Request, env: Env): Response | null {
   }), { headers: { ...cors, 'Content-Type': 'application/json' } });
 }
 
+// x-user 인증 helper (HTTP 라우트 공용)
+function httpAuth(request: Request): { actorId: string; partition: string } | null {
+  const actorId = request.headers.get('x-user');
+  return actorId ? { actorId, partition: 'main' } : null;
+}
+
+const HTTP_CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, x-user, Authorization, x-syncular-scopes, if-none-match, accept-encoding',
+};
+
+// GET /segments/{segmentId} — 부트스트랩 세그먼트 다운로드
+async function segmentsHandler(request: Request, env: Env, url: URL): Promise<Response | null> {
+  const m = url.pathname.match(/^\/segments\/([^/]+)$/);
+  if (!m || request.method !== 'GET') return null;
+  const auth = httpAuth(request);
+  if (!auth) return json({ code: 'sync.auth_required' }, 401);
+  try {
+    const result = await handleSegmentDownload(
+      { ...syncConfig(env), ...auth },
+      { segmentId: m[1], scopesHeader: request.headers.get('x-syncular-scopes') ?? '{}' },
+    );
+    if (request.headers.get('if-none-match') === result.headers.ETag) {
+      return new Response(null, { status: 304, headers: { ...HTTP_CORS, ...result.headers } });
+    }
+    return new Response(result.bytes.slice().buffer, {
+      status: 200, headers: { ...HTTP_CORS, ...result.headers },
+    });
+  } catch (e: any) {
+    return json({ code: e?.code ?? 'sync.error', message: e?.message }, e?.status ?? 500);
+  }
+}
+
+// PUT/GET /blobs/{blobId} — 사진 업로드(R2 저장)·다운로드 (§5.9)
+async function blobsHandler(request: Request, env: Env, url: URL): Promise<Response | null> {
+  const m = url.pathname.match(/^\/blobs\/([^/]+)$/);
+  if (!m) return null;
+  const auth = httpAuth(request);
+  if (!auth) return json({ code: 'sync.auth_required' }, 401);
+  const ctxCfg = { ...syncConfig(env), ...auth };
+
+  try {
+    if (request.method === 'PUT') {
+      const bytes = new Uint8Array(await request.arrayBuffer());
+      const contentType = request.headers.get('content-type')?.split(';')[0]?.trim();
+      await handleBlobUpload(ctxCfg, {
+        blobId: m[1],
+        bytes,
+        ...(contentType && contentType !== 'application/octet-stream' ? { mediaType: contentType } : {}),
+      });
+      return new Response(null, { status: 200, headers: HTTP_CORS });
+    }
+    if (request.method === 'GET') {
+      const result = await handleBlobDownload(ctxCfg, m[1]);
+      if (result.url !== undefined) {
+        return json({ url: result.url, urlExpiresAtMs: result.urlExpiresAtMs }, 200, HTTP_CORS);
+      }
+      if (request.headers.get('if-none-match') === result.headers.ETag) {
+        return new Response(null, { status: 304, headers: { ...HTTP_CORS, ...result.headers } });
+      }
+      return new Response((result.bytes ?? new Uint8Array(0)).slice().buffer, {
+        status: 200, headers: { ...HTTP_CORS, ...result.headers },
+      });
+    }
+  } catch (e: any) {
+    return json({ code: e?.code ?? 'sync.error', message: e?.message }, e?.status ?? 500);
+  }
+  return null;
+}
+
+function json(data: unknown, status = 200, extra: Record<string, string> = {}) {
+  return new Response(JSON.stringify(data), {
+    status, headers: { 'Content-Type': 'application/json', ...HTTP_CORS, ...extra },
+  });
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers: HTTP_CORS });
+    }
+    const url = new URL(request.url);
     const health = healthHandler(request, env);
     if (health) return health;
+    const segments = await segmentsHandler(request, env, url);
+    if (segments) return segments;
+    const blobs = await blobsHandler(request, env, url);
+    if (blobs) return blobs;
     return createWorkersFetchHandler<Env>({
     config: (env) => ({
       config: syncConfig(env),
       authenticate: (request) => authenticate(request, env),
     }),
-    // HTTP-only: /sync를 파티션 DO로 포워드해 쓰기 직렬화 (WebSocket은 v2.5)
-    coordinator: (env2) => ({ namespace: env2.SYNC_COORDINATOR }),
+    // v2.7: realtime — /realtime WebSocket 업그레이드 + 같은 namespace 로 쓰기 직렬화
+    realtime: (env2) => ({
+      namespace: env2.SYNC_COORDINATOR,
+      authenticate: async (req) => {
+        // WebSocket 업그레이드는 커스텀 헤더를 못 싣는다 — 쿼리 파라미터로 actor 전달
+        const url = new URL(req.url);
+        const actorId = req.headers.get('x-user') ?? url.searchParams.get('user') ?? undefined;
+        return actorId ? { actorId, partition: 'main' } : undefined;
+      },
+    }),
   })(request, env, ctx);
   },
 };

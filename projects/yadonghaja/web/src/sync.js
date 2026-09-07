@@ -24,6 +24,7 @@ export async function createSyncAdapter(actorId, baseUrl = 'http://127.0.0.1:878
         syncUrl: `${baseUrl}/sync`,
         segmentsUrl: `${baseUrl}/segments`,
         blobsUrl: `${baseUrl}/blobs`,
+        realtimeUrl: `${baseUrl.replace(/^http/, 'ws')}/realtime`,
       },
       multiTab: false,
       autoSync: true,
@@ -31,14 +32,52 @@ export async function createSyncAdapter(actorId, baseUrl = 'http://127.0.0.1:878
 
     console.log('[sync] Syncular 연결 성공 (role:', handle.role + ')');
 
+    // 구독 상태 — 테이블별 스코프 (앱 전체에서 사용)
+    let onChangeCb = null;
+
     return {
+      handle,  // 원격 blob 업로드 등 직접 접근용
       async mutate(table, row) {
         await handle.mutate([{ table, values: row }]);
       },
       async query(sql, params = []) {
         return await handle.query(sql, params);
       },
-      subscribe() {},
+      async subscribe(input) {
+        await handle.subscribe(input);
+      },
+      async unsubscribe(id) {
+        await handle.unsubscribe(id);
+      },
+      // 로컬 DB 변경 통지 (실시간 델타 → UI 갱신)
+      onLocalChange(cb) {
+        onChangeCb = cb;
+        handle.onChange?.((batch) => cb(batch));
+      },
+      // blob_ref 문자열 생성 (사진 업로드용)
+      blobRefString(ref) {
+        return handle.blobRefString ? handle.blobRefString(ref) : null;
+      },
+      // blob 바이트 업로드 → blob_ref 와 함께 mutate
+      async putBlob(bytes, mediaType) {
+        // sha256 blobId 계산
+        const digest = await crypto.subtle.digest('SHA-256', bytes);
+        const hex = [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
+        const blobId = `sha256:${hex}`;
+        const url = `${baseUrl}/blobs/${encodeURIComponent(blobId)}`;
+        const resp = await fetch(url, {
+          method: 'PUT',
+          headers: { 'Content-Type': mediaType || 'image/jpeg', 'x-user': actorId },
+          body: bytes,
+        });
+        if (!resp.ok) throw new Error(`blob upload 실패: HTTP ${resp.status}`);
+        return handle.blobRefString
+          ? handle.blobRefString({ blobId, ...(mediaType ? { mediaType } : {}) })
+          : blobId;
+      },
+      async fetchBlob(blobIdOrRef) {
+        return await handle.fetchBlob(blobIdOrRef);
+      },
       async getSyncState() {
         return await handle.syncState?.() || { phase: 'connected' };
       },

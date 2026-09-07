@@ -1,73 +1,38 @@
 /**
- * yadonghaja sync 워커 — Syncular 클라이언트 (OPFS + 아웃박스)
+ * yadonghaja sync 워커 — Syncular 클라이언트 (OPFS + 아웃박스 + 실시간)
  * startSyncWorker()가 표준 {t:'init'}/{t:'call'} 프로토콜로 초기화·RPC 처리.
- * 이 파일은 startSyncWorker()를 호출하기만 하면 된다.
  */
 import { startSyncWorker } from '@syncular/client/worker';
+import {
+  httpSyncTransport,
+  httpSegmentDownloader,
+  httpBlobTransport,
+  webSocketRealtimeConnector,
+} from '@syncular/client';
 
-// HTTP transport 인라인 구현 (x-user 헤더로 actor 식별)
-function httpSyncTransport(url, { headers } = {}) {
-  return {
-    url,
-    async execute(body) {
-      const resp = await fetch(url, {
-        method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/vnd.syncular.sync.v2' },
-        body,
-      });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      return new Uint8Array(await resp.arrayBuffer());
-    },
-  };
-}
-
-function httpSegmentDownloader({ headers } = {}) {
-  return async (url) => {
-    const resp = await fetch(url, { headers });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    return new Uint8Array(await resp.arrayBuffer());
-  };
-}
-
-function httpBlobStore(url, { headers } = {}) {
-  return {
-    async put(key, data) {
-      const fullUrl = `${url}/${key}`;
-      const resp = await fetch(fullUrl, {
-        method: 'PUT',
-        headers,
-        body: data,
-      });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      return fullUrl;
-    },
-    async get(key) {
-      const fullUrl = `${url}/${key}`;
-      const resp = await fetch(fullUrl, { headers });
-      if (!resp.ok) return null;
-      return new Uint8Array(await resp.arrayBuffer());
-    },
-  };
-}
-
-// startSyncWorker()가 표준 프로토콜로 초기화·RPC 처리
 startSyncWorker({
-  createTransport: (config) => {
-    const actorId = config.clientId;
-    return httpSyncTransport(config.endpoints.syncUrl, {
-      headers: { 'x-user': actorId },
-    });
-  },
-  createSegments: (config) => {
-    const actorId = config.clientId;
-    return httpSegmentDownloader({
-      headers: { 'x-user': actorId },
-    });
-  },
-  createBlobStore: (config) => {
-    const actorId = config.clientId;
-    return httpBlobStore(config.endpoints.blobsUrl, {
-      headers: { 'x-user': actorId },
-    });
+  // SSP2 HTTP 전송 (x-user 헤더로 actor 식별)
+  createTransport: (config) =>
+    httpSyncTransport(config.endpoints.syncUrl, {
+      headers: { 'x-user': config.clientId },
+    }),
+  createSegments: (config) =>
+    httpSegmentDownloader(config.endpoints.segmentsUrl, {
+      headers: { 'x-user': config.clientId },
+    }),
+  // §5.9 blob — PUT/GET {blobsUrl}/{blobId} (서버가 R2 로 저장)
+  createBlobStore: undefined, // 기본 httpBlobTransport 사용 (endpoints.blobsUrl 있으면 자동)
+  // §8 realtime — WebSocket 커넥터 (실시간 델타 수신)
+  createRealtime: (config, clientId) => {
+    let url = config.endpoints.realtimeUrl
+      ? config.endpoints.realtimeUrl.replace('{clientId}', clientId)
+      : null;
+    // WS 업그레이드에 커스텀 헤더를 못 붙이므로 actor(clientId) 를 쿼리로 전달
+    if (url && clientId) {
+      url += (url.includes('?') ? '&' : '?') + 'user=' + encodeURIComponent(clientId);
+    }
+    if (!url) return undefined;
+    // x-user 헤더는 WebSocket 에 못 붙이므로 쿼리로 전달 (서버 authenticate 가 읽음)
+    return webSocketRealtimeConnector(url);
   },
 });
