@@ -280,7 +280,7 @@ async function openApply(postId) {
   $('#applyForm').onsubmit = async (e) => {
     e.preventDefault();
     const msg = $('#applyMsg').value.trim();
-    await sync.mutate('applications', { id: `${postId}:${currentUser.actorId}`, post_id: postId, applicant_id: currentUser.actorId, applicant_name: currentUser.name, applicant_avatar: currentUser.avatar, message: msg, status: 'pending', updated_at_ms: ms() });
+    await sync.mutate('applications', { id: `${postId}:${currentUser.actorId}`, apply_scope: 'open', group_id: 'post:' + postId, post_id: postId, applicant_id: currentUser.actorId, applicant_name: currentUser.name, applicant_avatar: currentUser.avatar, message: msg, status: 'pending', updated_at_ms: ms() });
     closeSheet();
     showToast('신청 완료!');
   };
@@ -376,7 +376,13 @@ async function verifyMission(missionId, title) {
       photoRef = null;  // dataURL 은 blob_ref 검증 위반 — null 로 저장
     }
     try {
-    await sync.mutate('missions', { id: missionId, status: 'done', verified_at_ms: ms(), updated_at_ms: ms() });
+    // §6.1: upsert 는 full-row — 기존 미션 행을 읽어 병합
+    let missionRow = {};
+    try {
+      const found = await sync.query('SELECT * FROM missions WHERE id = ?1', [missionId]);
+      if (found.length) missionRow = found[0];
+    } catch (q) { console.warn('[verify] 미션 기존 행 조회 실패:', q.message); }
+    await sync.mutate('missions', { ...missionRow, id: missionId, user_id: missionRow.user_id || currentUser.actorId, kind: missionRow.kind || 'daily', title: missionRow.title || title, goal: missionRow.goal || 1, date: missionRow.date || date, status: 'done', verified_at_ms: ms(), updated_at_ms: ms() });
     await sync.mutate('verifications', { id: `${currentUser.actorId}:${missionId}`, verify_scope: 'live', group_id: 'main', user_id: currentUser.actorId, mission_id, mission_title: title, mission_kind: 'daily', date, memo, photo: photoRef, updated_at_ms: ms() });
     await sync.mutate('feed_items', { id: `feed_${missionId}`, public_id: 'main', user_id: currentUser.actorId, user_name: currentUser.name, avatar: currentUser.avatar, mission_title: title, memo, photo: photoRef, updated_at_ms: ms() });
     const newPts = await awardPoints(10, 'daily_mission');
@@ -550,7 +556,7 @@ async function openRecruitSheet() {
     if (!days.length) return showToast('요일을 선택해줘요');
     const region = $('#region').value.trim(), timeSlot = $('#timeSlot').value.trim(), capacity = parseInt($('#capacity').value), intro = $('#intro').value.trim(), deadline = $('#deadline').value, mode = $('#mode').value;
     const postId = 'post_'+crypto.randomUUID().slice(0,8);
-    await sync.mutate('posts', { id: postId, public_id: 'main', author_id: currentUser.actorId, author_name: currentUser.name, author_avatar: currentUser.avatar, types: JSON.stringify(types), mode, region, days: JSON.stringify(days), time_slot: timeSlot, capacity, intro, deadline, updated_at_ms: ms() });
+    await sync.mutate('posts', { id: postId, public_id: 'main', author_id: currentUser.actorId, author_name: currentUser.name, author_avatar: currentUser.avatar, types: JSON.stringify(types), mode, region, days: JSON.stringify(days), time_slot: timeSlot, capacity, intro, deadline, status: 'recruiting', updated_at_ms: ms() });
     await sync.mutate('feed_items', { id: 'feed_'+postId, public_id: 'main', user_id: currentUser.actorId, user_name: currentUser.name, avatar: currentUser.avatar, mission_title: `메이트 모집: ${types.join(', ')}`, memo: intro, photo: null, updated_at_ms: ms() });
     closeSheet(); showToast('모집글 등록 완료!'); await renderRecruit();
   };
