@@ -207,7 +207,7 @@ function syncConfig(env: Env, storage?: D1ServerStorage): SyncServerConfig {
     // §5.4 위임 프리사인 — R2가 세그먼트 URL 직접 발급
     signedUrls: s3PresignedUrls(segments, { ttlSeconds: 900 }),
     // §5.9.5 Blob 다운로드 프리사인 (인가 후 발급)
-    blobSignedUrls: s3PresignedBlobUrls(blobs, { ttlSeconds: 900 }),
+// blobSignedUrls: 미사용 — R2BlobStore 가 bytes 를 직접 반환 (§5.9.5 B2)
     resolveScopes: (args: any) => resolveScopes(args, env),
     validators,
   };
@@ -289,6 +289,8 @@ async function blobsHandler(request: Request, env: Env, url: URL): Promise<Respo
   if (!m) return null;
   const auth = httpAuth(request);
   if (!auth) return json({ code: 'sync.auth_required' }, 401);
+  // 클라이언트 httpBlobTransport 가 encodeURIComponent 로 보낸다 — 복호화 필수
+  const blobId = decodeURIComponent(m[1]);
   const ctxCfg = { ...syncConfig(env), ...auth };
 
   try {
@@ -296,14 +298,14 @@ async function blobsHandler(request: Request, env: Env, url: URL): Promise<Respo
       const bytes = new Uint8Array(await request.arrayBuffer());
       const contentType = request.headers.get('content-type')?.split(';')[0]?.trim();
       await handleBlobUpload(ctxCfg, {
-        blobId: m[1],
+        blobId,
         bytes,
         ...(contentType && contentType !== 'application/octet-stream' ? { mediaType: contentType } : {}),
       });
       return new Response(null, { status: 200, headers: HTTP_CORS });
     }
     if (request.method === 'GET') {
-      const result = await handleBlobDownload(ctxCfg, m[1]);
+      const result = await handleBlobDownload(ctxCfg, blobId);
       if (result.url !== undefined) {
         return json({ url: result.url, urlExpiresAtMs: result.urlExpiresAtMs }, 200, HTTP_CORS);
       }

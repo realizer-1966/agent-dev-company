@@ -54,13 +54,8 @@ export async function createSyncAdapter(actorId, baseUrl = 'http://127.0.0.1:878
         onChangeCb = cb;
         handle.onChange?.((batch) => cb(batch));
       },
-      // blob_ref 문자열 생성 (사진 업로드용)
-      blobRefString(ref) {
-        return handle.blobRefString ? handle.blobRefString(ref) : null;
-      },
-      // blob 바이트 업로드 → blob_ref 와 함께 mutate
+      // blob 바이트 업로드 → canonical blob_ref JSON 문자열 (§5.9.1) 반환
       async putBlob(bytes, mediaType) {
-        // sha256 blobId 계산
         const digest = await crypto.subtle.digest('SHA-256', bytes);
         const hex = [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
         const blobId = `sha256:${hex}`;
@@ -71,9 +66,10 @@ export async function createSyncAdapter(actorId, baseUrl = 'http://127.0.0.1:878
           body: bytes,
         });
         if (!resp.ok) throw new Error(`blob upload 실패: HTTP ${resp.status}`);
-        return handle.blobRefString
-          ? handle.blobRefString({ blobId, ...(mediaType ? { mediaType } : {}) })
-          : blobId;
+        // §5.9.1 canonical: {"blobId","byteLength","mediaType"} 키 순서 고정
+        const ref = { blobId, byteLength: bytes.length };
+        if (mediaType) ref.mediaType = mediaType;
+        return JSON.stringify(ref);
       },
       async fetchBlob(blobIdOrRef) {
         return await handle.fetchBlob(blobIdOrRef);
