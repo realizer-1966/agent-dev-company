@@ -1,10 +1,9 @@
-# 야!동하자 sync 서버 — Cloudflare Workers 배포 설정
-# v2.5 — public 액세스 허용 (x-user 헤더 인증, 개발/프로토타입 단계)
+# 야!동하자 sync 서버 — v2.6 (Syncular 실동기화 + Durable Object)
+# 인증: x-user 헤더 (개발/프로토타입 단계)
 
 name = "yadonghaja-sync-v2"
-main = "src/worker-v2.5.js"
+main = "src/worker.ts"
 compatibility_date = "2024-09-23"
-compatibility_flags = ["nodejs_compat"]
 
 # --- D1: 서버 저장소 (prod) ----------------------------------------------
 [[d1_databases]]
@@ -17,8 +16,20 @@ database_id = "09aeb553-184d-46ce-860a-dcab5aadac18"
 binding = "BUCKET"
 bucket_name = "yadonghaja-blobs-prod"
 
-# --- 시크릿 (v2.5는 vars 로 전달) ---------------------------------------
-vars = { SYNC_HMAC_KEY = "***REMOVED_SYNC_HMAC_KEY***" }
-# R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY 는 프로덕션에서 secret 사용
+# --- bun:sqlite (Bun 전용 드라이버) 번들 제외 — Workers 는 D1 사용 ---------
+[alias]
+"bun:sqlite" = "./src/empty-bun-sqlite.ts"
 
-# --- Durable Objects 는 v2.6 에서 추가 (실시간 동기화) -------------------
+# --- Realtime + 쓰기 직렬화: Durable Object (파티션당 1개) -----------------
+[[durable_objects.bindings]]
+name = "SYNC_COORDINATOR"
+class_name = "SyncularRealtimeDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SyncularRealtimeDO"]
+
+# --- 시크릿 --------------------------------------------------------------
+# SYNC_HMAC_KEY (vars), R2_ACCOUNT_ID/R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY 는
+# 프로덕션에서 wrangler secret put 사용
+vars = { SYNC_HMAC_KEY = "***REMOVED_SYNC_HMAC_KEY***", R2_ACCOUNT_ID = "56f2f60bdba5a9bf7f58478a14a4ed90" }

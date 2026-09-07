@@ -12,7 +12,7 @@ function httpSyncTransport(url, { headers } = {}) {
     async execute(body) {
       const resp = await fetch(url, {
         method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/cbor' },
+        headers: { ...headers, 'Content-Type': 'application/vnd.syncular.sync.v2' },
         body,
       });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);

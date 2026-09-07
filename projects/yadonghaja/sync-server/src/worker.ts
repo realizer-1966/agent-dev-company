@@ -123,7 +123,7 @@ async function authenticate(request: Request, env: Env) {
 /* ============================================================
    서버 설정 조립 — 패키지 README "Usage" 구조 그대로
    ============================================================ */
-function syncConfig(env: Env): SyncServerConfig {
+function syncConfig(env: Env, storage?: D1ServerStorage): SyncServerConfig {
   const endpoint = `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
   const r2 = {
     endpoint,
@@ -135,7 +135,9 @@ function syncConfig(env: Env): SyncServerConfig {
   const blobs = new S3BlobStore({ ...r2, bucket: 'yadonghaja-blobs' });
   return {
     schema,
-    storage: new D1ServerStorage(env.DB),
+    // DO(coordinator) 안에서는 DO가 만든 coordinated storage 를 그대로 쓴다.
+    // stateless 실행 시에는 자체 storage 를 만든다.
+    storage: storage ?? new D1ServerStorage(env.DB),
     segments,
     blobs,
     // §5.4 위임 프리사인 — R2가 세그먼트 URL 직접 발급
@@ -153,7 +155,7 @@ function syncConfig(env: Env): SyncServerConfig {
    ============================================================ */
 export class SyncularRealtimeDO extends DurableObject<Env> {
   #host = new SyncularRealtimeHost(this.ctx, this.env.DB, {
-    syncConfig: () => syncConfig(this.env),
+    syncConfig: (storage) => syncConfig(this.env, storage),
   });
   fetch(request: Request) { return this.#host.fetch(request); }
   webSocketMessage(ws: WebSocket, msg: ArrayBuffer | string) {
@@ -163,13 +165,37 @@ export class SyncularRealtimeDO extends DurableObject<Env> {
   webSocketError(ws: WebSocket) { return this.#host.webSocketError(ws); }
 }
 
+// 간단 헬스체크 (v2.5 호환 — 모니터링용)
+function healthHandler(request: Request, env: Env): Response | null {
+  const url = new URL(request.url);
+  if (url.pathname !== '/health') return null;
+  const cors = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, x-user, Authorization',
+  };
+  if (request.method === 'OPTIONS') return new Response(null, { headers: cors });
+  return new Response(JSON.stringify({
+    status: 'ok',
+    timestamp: Date.now(),
+    actorId: request.headers.get('x-user') || 'anonymous',
+    worker: 'yadonghaja-sync v2.6 (Syncular)',
+    d1: env.DB ? 'connected' : 'not-configured',
+    r2: env.BUCKET ? 'connected' : 'not-configured',
+  }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+}
+
 export default {
-  fetch: createWorkersFetchHandler<Env>({
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const health = healthHandler(request, env);
+    if (health) return health;
+    return createWorkersFetchHandler<Env>({
     config: (env) => ({
       config: syncConfig(env),
       authenticate: (request) => authenticate(request, env),
     }),
     // HTTP-only: /sync를 파티션 DO로 포워드해 쓰기 직렬화 (WebSocket은 v2.5)
-    coordinator: (env) => ({ namespace: env.SYNC_COORDINATOR }),
-  }),
+    coordinator: (env2) => ({ namespace: env2.SYNC_COORDINATOR }),
+  })(request, env, ctx);
+  },
 };
