@@ -384,13 +384,22 @@ async function verifyMission(missionId, title) {
     } catch (q) { console.warn('[verify] 미션 기존 행 조회 실패:', q.message); }
     await sync.mutate('missions', { ...missionRow, id: missionId, user_id: missionRow.user_id || currentUser.actorId, kind: missionRow.kind || 'daily', title: missionRow.title || title, goal: missionRow.goal || 1, date: missionRow.date || date, status: 'done', verified_at_ms: ms(), updated_at_ms: ms() });
     await sync.mutate('verifications', { id: `${currentUser.actorId}:${missionId}`, verify_scope: 'live', group_id: 'main', user_id: currentUser.actorId, mission_id: missionId, mission_title: title, mission_kind: 'daily', date, memo, photo: photoRef, updated_at_ms: ms() });
-    await sync.mutate('feed_items', { id: `feed_${missionId}`, public_id: 'main', user_id: currentUser.actorId, user_name: currentUser.name, avatar: currentUser.avatar, mission_title: title, memo, photo: photoRef, updated_at_ms: ms() });
+    await sync.mutate('feed_items', { id: `feed_${missionId}`, public_id: 'main', user_id: currentUser.actorId, user_name: currentUser.name, avatar: currentUser.avatar, mission_title: title, memo, photo: photoRef, created_at_ms: ms(), updated_at_ms: ms() });
     const newPts = await awardPoints(10, 'daily_mission');
     const st = await updateStreak();
     await updateRanking();
     closeSheet();
     showPointsFly(window.innerWidth/2, window.innerHeight/2, `+10 P 🔥`);
     showToast(`인증 완료! ${newPts} P (스트릭: ${st.current}일)`);
+    // ✅ 피드 저장 확인 — 로컬 DB 에 feed_items 행이 생겼는지 즉시 검증
+    try {
+      const check = await sync.query('SELECT id, photo FROM feed_items WHERE id = ?1', [`feed_${missionId}`]);
+      if (check.length) {
+        console.log('[verify] ✅ 피드 저장 확인:', check[0].id, '| photo:', String(check[0].photo).slice(0, 60));
+      } else {
+        console.error('[verify] ❌ 피드 저장 안 됨 — feed_items 행 없음');
+      }
+    } catch (c) { console.warn('[verify] 피드 확인 실패:', c.message); }
     await renderMission();
     await updateHeader();
     } catch (e) {
@@ -440,21 +449,22 @@ async function resolveFeedPhotos() {
 
 function cardFeed(f) {
   return `
-    <div class="card bg-slate-800/80 border border-slate-700 rounded-2xl p-4 mb-3">
+    <div class="card bg-slate-800/80 border border-slate-700 rounded-2xl p-4 mb-3 cursor-pointer active:scale-[0.98] transition-transform" data-feed-card="${f.id}" onclick="openFeedDetail('${f.id}')">
       <div class="flex items-center gap-2 mb-2">
         <span class="text-xl">${f.avatar}</span>
         <span class="font-bold text-slate-200 text-sm">${f.user_name}</span>
         <span class="text-[10px] text-slate-500 ml-auto">${new Date(f.updated_at_ms).toLocaleDateString()}</span>
       </div>
       <div class="font-extrabold text-slate-100 mb-1">${f.mission_title}</div>
-      ${f.memo ? `<p class="text-sm text-slate-300 mb-2">${f.memo}</p>` : ''}
+      ${f.memo ? `<p class="text-sm text-slate-300 mb-2 line-clamp-2">${f.memo}</p>` : ''}
       ${f.photo ? (f.photo.startsWith('sha256:') || f.photo.startsWith('{')
-        ? `<img data-blob="${encodeURIComponent(f.photo)}" class="feed-photo w-full rounded-xl mb-2 border border-slate-600" />`
-        : `<img src="${f.photo}" class="w-full rounded-xl mb-2 border border-slate-600" />`) : ''}
+        ? `<img data-blob="${encodeURIComponent(f.photo)}" class="feed-photo w-full rounded-xl mb-2 border border-slate-600 pointer-events-none" />`
+        : `<img src="${f.photo}" class="w-full rounded-xl mb-2 border border-slate-600 pointer-events-none" />`) : ''}
       <div class="flex items-center gap-2 mt-2">
-        <button class="cheer-btn text-lg" onclick="sendCheer('${f.id}', 'fire')">🔥</button>
-        <button class="cheer-btn text-lg" onclick="sendCheer('${f.id}', 'thumb')">👍</button>
-        <button class="cheer-btn text-lg" onclick="sendCheer('${f.id}', 'muscle')">💪</button>
+        <button class="cheer-btn text-lg" onclick="event.stopPropagation(); sendCheer('${f.id}', 'fire')">🔥</button>
+        <button class="cheer-btn text-lg" onclick="event.stopPropagation(); sendCheer('${f.id}', 'thumb')">👍</button>
+        <button class="cheer-btn text-lg" onclick="event.stopPropagation(); sendCheer('${f.id}', 'muscle')">💪</button>
+        <span class="text-[10px] text-slate-500 ml-auto">탭하여 자세히</span>
       </div>
     </div>
   `;
@@ -622,3 +632,53 @@ async function setupSubscriptions(actorId) {
     console.warn('[sync] 구독 실패:', e.message);
   }
 }
+
+
+// ============ 피드 상세 보기 — 카드 탭 시 전체 사진/메모 ============
+async function openFeedDetail(feedId) {
+  try {
+    const rows = await sync.query('SELECT * FROM feed_items WHERE id = ?1', [feedId]);
+    if (!rows.length) return showToast('피드를 찾을 수 없어요');
+    const f = rows[0];
+    const created = f.created_at_ms || f.updated_at_ms;
+    openSheet('운동 인증', `
+      <div class="space-y-3">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl">${f.avatar}</span>
+          <div>
+            <div class="font-bold text-slate-100">${f.user_name}</div>
+            <div class="text-[10px] text-slate-500">${new Date(created).toLocaleString('ko-KR', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</div>
+          </div>
+        </div>
+        <div class="font-extrabold text-lg text-slate-100">${f.mission_title}</div>
+        ${f.photo ? (String(f.photo).startsWith('sha256:') || String(f.photo).startsWith('{')
+          ? `<img id="detailPhoto" data-blob-detail="${encodeURIComponent(f.photo)}" class="w-full rounded-2xl border border-slate-600 bg-slate-900" style="min-height:200px;object-fit:cover" />`
+          : `<img src="${f.photo}" class="w-full rounded-2xl border border-slate-600" />`) : ''}
+        ${f.memo ? `<p class="text-slate-200 whitespace-pre-wrap bg-slate-900/60 rounded-xl p-3 border border-slate-700">${f.memo}</p>` : '<p class="text-slate-500 text-sm">메모 없음</p>'}
+        <div class="flex items-center gap-2 pt-1">
+          <button class="cheer-btn text-xl" onclick="sendCheer('${f.id}', 'fire')">🔥</button>
+          <button class="cheer-btn text-xl" onclick="sendCheer('${f.id}', 'thumb')">👍</button>
+          <button class="cheer-btn text-xl" onclick="sendCheer('${f.id}', 'muscle')">💪</button>
+        </div>
+      </div>
+    `);
+    const img = document.querySelector('img[data-blob-detail]');
+    if (img) {
+      try {
+        let ref = decodeURIComponent(img.dataset.blobDetail);
+        let blobId = ref;
+        if (ref.startsWith('{')) blobId = JSON.parse(ref).blobId ?? ref;
+        const cached = await sync.fetchBlob(blobId);
+        img.src = URL.createObjectURL(new Blob([cached.bytes], { type: cached.mediaType || 'image/jpeg' }));
+        img.removeAttribute('data-blob-detail');
+      } catch (e) {
+        img.alt = '📷 ' + (e.message || '사진 로드 실패');
+        img.removeAttribute('data-blob-detail');
+      }
+    }
+  } catch (e) {
+    console.error('[feed] 상세 보기 실패:', e);
+    showToast('상세 보기 실패: ' + (e.message || e));
+  }
+}
+window.openFeedDetail = openFeedDetail;
