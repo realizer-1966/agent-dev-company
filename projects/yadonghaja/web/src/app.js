@@ -383,7 +383,7 @@ async function verifyMission(missionId, title) {
       if (found.length) missionRow = found[0];
     } catch (q) { console.warn('[verify] 미션 기존 행 조회 실패:', q.message); }
     await sync.mutate('missions', { ...missionRow, id: missionId, user_id: missionRow.user_id || currentUser.actorId, kind: missionRow.kind || 'daily', title: missionRow.title || title, goal: missionRow.goal || 1, date: missionRow.date || date, status: 'done', verified_at_ms: ms(), updated_at_ms: ms() });
-    await sync.mutate('verifications', { id: `${currentUser.actorId}:${missionId}`, verify_scope: 'live', group_id: 'main', user_id: currentUser.actorId, mission_id, mission_title: title, mission_kind: 'daily', date, memo, photo: photoRef, updated_at_ms: ms() });
+    await sync.mutate('verifications', { id: `${currentUser.actorId}:${missionId}`, verify_scope: 'live', group_id: 'main', user_id: currentUser.actorId, mission_id: missionId, mission_title: title, mission_kind: 'daily', date, memo, photo: photoRef, updated_at_ms: ms() });
     await sync.mutate('feed_items', { id: `feed_${missionId}`, public_id: 'main', user_id: currentUser.actorId, user_name: currentUser.name, avatar: currentUser.avatar, mission_title: title, memo, photo: photoRef, updated_at_ms: ms() });
     const newPts = await awardPoints(10, 'daily_mission');
     const st = await updateStreak();
