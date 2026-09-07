@@ -1,0 +1,7 @@
+# 야!동하자 웹앱 — Cloudflare Workers 정적 에셋 배포
+name = "yadonghaja-web"
+compatibility_date = "2026-09-06"
+
+[assets]
+directory = "./dist"
+not_found_handling = "single-page-application"
