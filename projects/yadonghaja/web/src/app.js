@@ -304,10 +304,8 @@ function cardMission(m) {
 async function verifyMission(missionId, title) {
   openSheet('운동 인증', `
     <div class="space-y-4">
-      <div class="flex gap-2">
-        <button id="takePhoto" class="btn flex-1 bg-slate-700 text-white font-bold py-3 rounded-xl">📷 사진 찍기</button>
-        <button id="skipPhoto" class="btn flex-1 bg-slate-800 text-white font-bold py-3 rounded-xl">건너뛰기</button>
-      </div>
+      <input type="file" accept="image/*" capture="environment" id="cameraInput" class="hidden">
+      <button id="takePhoto" class="btn w-full bg-slate-700 text-white font-bold py-3 rounded-xl">📷 사진 찍기 (필수)</button>
       <div id="photoPreview" class="hidden">
         <img id="previewImg" class="w-full rounded-xl border border-slate-600" />
       </div>
@@ -315,28 +313,37 @@ async function verifyMission(missionId, title) {
       <button id="vSubmit" class="btn w-full bg-gradient-to-r from-orange-500 to-rose-500 text-white font-extrabold py-3.5 rounded-2xl">인증 완료!</button>
     </div>
   `);
-  
+
   let photoDataUrl = null;
-  $('#takePhoto').onclick = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      const video = document.createElement('video');
-      video.srcObject = stream; video.play();
-      const canvas = document.createElement('canvas');
-      canvas.width = 640; canvas.height = 480;
-      setTimeout(() => {
+  // 📷 사진 찍기: 폰 기본 카메라 앱 호출 (input capture 방식 — 안정적)
+  $('#takePhoto').onclick = () => $('#cameraInput').click();
+  $('#cameraInput').onchange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        // 640px 폭으로 축소해 JPEG 저장 (dataURL)
+        const canvas = document.createElement('canvas');
+        canvas.width = 640;
+        canvas.height = Math.max(1, Math.round((img.height / img.width) * 640));
         const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, 640, 480);
-        stream.getTracks().forEach(t => t.stop());
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         photoDataUrl = canvas.toDataURL('image/jpeg', 0.8);
         $('#previewImg').src = photoDataUrl;
         $('#photoPreview').classList.remove('hidden');
-        showToast('사진 촬영 완료!');
-      }, 500);
-    } catch (e) { showToast('카메라 오류: ' + e.message); }
+        $('#takePhoto').textContent = '🔄 다시 찍기';
+        showToast('사진 등록 완료!');
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
   };
-  $('#skipPhoto').onclick = () => { photoDataUrl = null; $('#photoPreview').classList.add('hidden'); };
   $('#vSubmit').onclick = async () => {
+    // ✅ 사진 필수 검증 — 없으면 인증 진행 불가
+    if (!photoDataUrl) { showToast('📷 운동 인증에는 사진이 필요해요!'); return; }
     const memo = $('#vMemo').value.trim() || '';
     const date = todayStr();
     await sync.mutate('missions', { id: missionId, status: 'done', verified_at_ms: ms(), updated_at_ms: ms() });
@@ -514,3 +521,8 @@ window.openMissionSheet = openMissionSheet;
 
 // ============ 시작 ============
 init();
+
+// ============ 전역 노출 (onclick 문자열 호출 — esbuild DCE 방지) ============
+window.openApply = openApply;
+window.sendCheer = sendCheer;
+window.verifyMission = verifyMission;
