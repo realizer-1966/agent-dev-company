@@ -288,7 +288,7 @@ async function openApply(postId) {
 
 // ============ 탭: 미션 ============
 async function renderMission() {
-  const missions = await sync.query("SELECT * FROM missions WHERE user_id = ?1 ORDER BY date DESC LIMIT 10", [currentUser.actorId]);
+  const missions = await sync.query("SELECT * FROM missions WHERE user_id = ?1 ORDER BY updated_at_ms DESC LIMIT 20", [currentUser.actorId]);
   main.innerHTML = missions.length ? missions.map(m => cardMission(m)).join('') : `
     <div class="text-center py-16">
       <div class="text-6xl mb-4">✅</div>
@@ -590,7 +590,7 @@ async function openMissionSheet() {
     e.preventDefault();
     const title = $('#mTitle').value.trim(), goal = parseInt($('#mGoal').value), kind = $('#mKind').value;
     if (!title) return showToast('제목을 입력해줘요');
-    await sync.mutate('missions', { id: `${currentUser.actorId}:${todayStr()}:${kind}`, user_id: currentUser.actorId, kind, date: todayStr(), title, goal, status: 'pending', updated_at_ms: ms() });
+    await sync.mutate('missions', { id: `${currentUser.actorId}:${todayStr()}:${kind}:${crypto.randomUUID().slice(0,8)}`, user_id: currentUser.actorId, kind, date: todayStr(), title, goal, status: 'pending', updated_at_ms: ms() });
     closeSheet(); showToast('미션 추가 완료!'); await renderMission();
   };
 }
