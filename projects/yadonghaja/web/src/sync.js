@@ -105,30 +105,79 @@ export async function createSyncAdapter(actorId, baseUrl = 'http://127.0.0.1:878
 }
 
 function createInMemoryAdapter(actorId) {
-  const store = {
+  // IndexedDB 영속 fallback — Syncular OPFS 실패 시에도 새로고침 후 데이터 유지
+  const DB_NAME = 'yadonghaja-fallback';
+  const STORE = 'state';
+  const EMPTY = {
     posts: [], feed_items: [], cheers: [], user_profiles: [],
     applications: [], verifications: [], missions: [], badges: [],
     streaks: [], point_ledger: [], rankings: [],
   };
 
+  function openDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore(STORE);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function load() {
+    try {
+      const db = await openDB();
+      return await new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readonly');
+        const rq = tx.objectStore(STORE).get('state');
+        rq.onsuccess = () => resolve(rq.result || JSON.parse(JSON.stringify(EMPTY)));
+        rq.onerror = () => reject(rq.error);
+      });
+    } catch (e) {
+      console.warn('[sync] IndexedDB 로드 실패 — 메모리로 폴백:', e.message);
+      return JSON.parse(JSON.stringify(EMPTY));
+    }
+  }
+
+  async function save(store) {
+    try {
+      const db = await openDB();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        tx.objectStore(STORE).put(store, 'state');
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch (e) {
+      console.warn('[sync] IndexedDB 저장 실패:', e.message);
+    }
+  }
+
+  let store = null;
+  const ready = load().then(s => { store = s; return s; });
+
   return {
     async mutate(table, row) {
+      await ready;
       if (!store[table]) store[table] = [];
       const idx = store[table].findIndex(r => r.id === row.id);
       if (idx >= 0) store[table][idx] = row;
       else store[table].push(row);
+      await save(store);
     },
     async query(sql, params = []) {
+      await ready;
       const match = sql.match(/FROM\s+(\w+)(?:\s+WHERE\s+(.+))?(?:\s+ORDER BY.+)?(?:\s+LIMIT.+)?/i);
       if (!match) return [];
       const tableName = match[1];
       let rows = [...(store[tableName] || [])];
 
-      // WHERE 절 처리
+      // WHERE 절 처리 (간단한 ?1 파라미터)
       if (params.length > 0) {
         const param = params[0];
         if (sql.includes('user_id = ?')) rows = rows.filter(r => r.user_id === param);
         if (sql.includes('group_id = ?')) rows = rows.filter(r => r.group_id === param);
+        if (sql.includes('id = ?')) rows = rows.filter(r => r.id === param);
+        if (sql.includes('feed_id = ?')) rows = rows.filter(r => r.feed_id === param);
       }
 
       // ORDER BY 처리
@@ -146,7 +195,7 @@ function createInMemoryAdapter(actorId) {
       return rows;
     },
     subscribe() {},
-    async getSyncState() { return { phase: 'local-only' }; },
+    async getSyncState() { return { phase: 'local-persistent' }; },
     onSyncStateChange() { return () => {}; },
   };
 }
