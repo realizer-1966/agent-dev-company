@@ -24,3 +24,7 @@ node_modules/
 
 # Cloudflare wrangler 로컬 캐시 (계정 정보 포함, 추적 제외)
 .wrangler/
+
+# Cloudflare 로컬 시크릿 (wrangler secret 의 로컬 대응, 추적 제외)
+.dev.vars
+.env
