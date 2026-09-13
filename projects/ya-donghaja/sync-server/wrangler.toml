@@ -1,0 +1,30 @@
+# ya-donghaja sync 서버
+name = "ya-donghaja-sync"
+main = "src/worker.ts"
+compatibility_date = "2024-09-23"
+
+# D1
+[[d1_databases]]
+binding = "DB"
+database_name = "ya-donghaja-db"
+database_id = "c114585f-8e36-4f08-8bdf-41ff8d282d56"
+
+# R2 - Blobs
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "ya-donghaja-blobs"
+
+# R2 - Segments
+[[r2_buckets]]
+binding = "SEGMENTS"
+bucket_name = "ya-donghaja-segments"
+
+# 시크릿
+[vars]
+R2_ACCOUNT_ID = "56f2f60bdba5a9bf7f58478a14a4ed90"
+R2_ACCESS_KEY_ID = "***REMOVED_R2_ACCESS_KEY_ID***"
+R2_SECRET_ACCESS_KEY_MOVED_TO_SECRET = "***REMOVED_R2_SECRET***"
+
+# bun:sqlite alias
+[alias]
+"bun:sqlite" = "./src/empty-bun-sqlite.ts"
