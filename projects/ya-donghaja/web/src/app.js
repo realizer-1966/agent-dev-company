@@ -31,6 +31,45 @@ function todayStr() {
 
 function ms() { return Date.now(); }
 
+// 오늘 00:00 (ms) — 당일 기록 필터용
+// XSS 방지: HTML 내보내기 시 사용자 값을 이스케이프
+function esc(v) {
+  return String(v ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+}
+
+function todayStartMs() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+// 날짜를 ±1일 이동한 YYYY-MM-DD 반환
+function dateOffsetStr(days) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+
+// 스트릭 갱신: 오늘 기록 시 current +1 / 어제 기록이면 유지 / 그 전이면 1로 리셋
+async function updateStreak() {
+  const st = await getStreak();
+  const today = todayStr();
+  const yesterday = dateOffsetStr(-1);
+  if (!st.id) {
+    await sync.mutate("streaks", {
+      id: "st_" + ms() + "_" + Math.random().toString(36).slice(2,6),
+      user_id: actorId, current: 1, best: 1, last_date: today, updated_at_ms: ms(),
+    });
+    return;
+  }
+  let current = st.current || 0, best = st.best || 0, last = st.last_date;
+  if (last === today) { /* 오늘 이미 기록됨 */ }
+  else if (last === yesterday) current += 1;
+  else current = 1;
+  if (current > best) best = current;
+  await sync.mutate("streaks", { ...st, current, best, last_date: today, updated_at_ms: ms() });
+}
+
 // ============ Syncular 연결 ============
 async function init() {
   try {
@@ -123,7 +162,12 @@ async function renderToday() {
   const pts = await getPoints();
   const today = todayStr();
   const workouts = await sync.query("SELECT * FROM workouts WHERE user_id = ? AND date = ?", [actorId, today]);
-  const cheers = await sync.query("SELECT * FROM cheers WHERE target_user_id = ?", [actorId]);
+  const habits = await sync.query("SELECT * FROM habits WHERE user_id = ?", [actorId]);
+  const habitLogs = await sync.query("SELECT * FROM habit_logs WHERE user_id = ? AND date = ?", [actorId, today]);
+  const doneIds = new Set(habitLogs.map(l => l.habit_id));
+  const myHabits = habits.map(h => ({ ...h, _done: doneIds.has(h.id) }));
+  const allCheers = await sync.query("SELECT * FROM cheers WHERE target_user_id = ?", [actorId]);
+  const cheers = allCheers.filter(c => c.created_at_ms >= todayStartMs());
 
   streakBadge.textContent = "🔥 " + (st.current || 0) + "일";
 
@@ -155,13 +199,24 @@ async function renderToday() {
       </div>
 
       <div class="bg-slate-800/80 border border-slate-700 rounded-2xl p-4">
+        <div class="text-sm font-bold mb-2">오늘의 습관</div>
+        ${myHabits.length ? myHabits.map(h => `
+          <button onclick="window.toggleHabit('${h.id}')" class="w-full flex items-center gap-2 py-1.5 border-b border-slate-700/50 last:border-0">
+            <span class="text-lg">${h._done ? "✅" : "⬜"}</span>
+            <span class="text-sm flex-1 text-left ${h._done ? "line-through text-slate-500" : ""}">${h.title}</span>
+            <span class="text-[10px] text-slate-500">주 ${h.target_days}일</span>
+          </button>
+        `).join("") : '<p class="text-slate-500 text-sm">습관을 추가해보세요 (프로필 탭)</p>'}
+      </div>
+
+      <div class="bg-slate-800/80 border border-slate-700 rounded-2xl p-4">
         <div class="text-sm font-bold mb-2">오늘의 운동 기록</div>
         ${workouts.length ? workouts.map(w => `
           <div class="flex items-center gap-2 py-1.5 border-b border-slate-700/50 last:border-0">
             <span class="text-lg">${typeEmoji(w.type)}</span>
-            <span class="text-sm">${w.type}</span>
-            <span class="text-xs text-slate-400">${w.duration_min}분 · ${w.intensity}</span>
-            <button onclick="window.deleteWorkout('${w.id}')" class="ml-auto text-slate-500 text-xs">🗑️</button>
+            <span class="text-sm">${esc(w.type)}</span>
+            <span class="text-xs text-slate-400">${esc(w.duration_min)}분 · ${esc(w.intensity)}</span>
+            <button onclick="window.deleteWorkout('${esc(w.id)}')" class="ml-auto text-slate-500 text-xs">🗑️</button>
           </div>
         `).join("") : '<p class="text-slate-500 text-sm">아직 기록이 없어요</p>'}
       </div>
@@ -197,7 +252,7 @@ async function renderHistory() {
         ${Object.entries(byType).map(([t, c]) => `
           <div class="flex items-center gap-2 py-1.5">
             <span class="text-lg">${typeEmoji(t)}</span>
-            <span class="text-sm flex-1">${t}</span>
+            <span class="text-sm flex-1">${esc(t)}</span>
             <span class="text-sm text-slate-400">${c}회</span>
           </div>
         `).join("") || '<p class="text-slate-500 text-sm">기록 없음</p>'}
@@ -209,8 +264,8 @@ async function renderHistory() {
           <div class="flex items-center gap-2 py-1.5 border-b border-slate-700/50 last:border-0">
             <span class="text-lg">${typeEmoji(w.type)}</span>
             <div class="flex-1">
-              <div class="text-sm">${w.type} · ${w.duration_min}분</div>
-              <div class="text-[10px] text-slate-500">${w.date} · ${w.intensity}${w.memo ? " · " + w.memo : ""}</div>
+              <div class="text-sm">${esc(w.type)} · ${esc(w.duration_min)}분</div>
+              <div class="text-[10px] text-slate-500">${esc(w.date)} · ${esc(w.intensity)}${w.memo ? " · " + esc(w.memo) : ""}</div>
             </div>
           </div>
         `).join("") || '<p class="text-slate-500 text-sm">기록 없음</p>'}
@@ -238,8 +293,8 @@ async function renderMate() {
         <div class="text-sm font-bold mb-2 text-amber-300">받은 신청 (${myIncoming.length})</div>
         ${myIncoming.map(a => `
           <div class="flex items-center gap-2 py-2 border-b border-slate-700/50 last:border-0">
-            <span class="text-lg">${a.applicant_avatar}</span>
-            <span class="text-sm flex-1">${a.applicant_name}</span>
+            <span class="text-lg">${esc(a.applicant_avatar)}</span>
+            <span class="text-sm flex-1">${esc(a.applicant_name)}</span>
             <button onclick="window.respondApplication('${a.id}', 'accepted')" class="bg-green-500 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg">수락</button>
             <button onclick="window.respondApplication('${a.id}', 'rejected')" class="bg-red-500 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg">거절</button>
           </div>
@@ -263,15 +318,15 @@ async function renderMate() {
           <div class="bg-slate-800/80 border border-slate-700 rounded-2xl p-4">
             <div class="flex items-center gap-2 mb-2">
               <span class="text-xl">${p.author_avatar}</span>
-              <span class="font-bold text-sm">${p.author_name}</span>
-              <span class="text-[10px] text-slate-500 ml-auto">${p.region}</span>
+              <span class="font-bold text-sm">${esc(p.author_name)}</span>
+              <span class="text-[10px] text-slate-500 ml-auto">${esc(p.region)}</span>
             </div>
             <div class="flex flex-wrap gap-1.5 mb-2">
               ${types.map(t => `<span class="chip bg-slate-900 border border-slate-600 text-[10px] px-2 py-0.5 rounded-full">${t}</span>`).join("")}
               <span class="chip bg-slate-900 border border-slate-600 text-[10px] px-2 py-0.5 rounded-full">${p.mode === "online" ? "온라인" : "오프라인"}</span>
             </div>
-            <p class="text-sm text-slate-300 mb-2">${p.intro}</p>
-            <div class="text-[10px] text-slate-500 mb-2">${p.time_slot} · 최대 ${p.capacity}명 · ${p.status === "recruiting" ? "모집중" : "마감"}</div>
+            <p class="text-sm text-slate-300 mb-2">${esc(p.intro)}</p>
+            <div class="text-[10px] text-slate-500 mb-2">${esc(p.time_slot)} · 최대 ${p.capacity}명 · ${p.status === "recruiting" ? "모집중" : "마감"}</div>
             ${myAppliedPostIds.includes(p.id) ? `<div class="w-full bg-slate-700/50 text-slate-400 text-sm font-bold py-2 rounded-xl text-center">신청 완료</div>` : `<button onclick="window.applyPost('${p.id}', '${p.author_id}')" class="w-full bg-slate-700 text-white text-sm font-bold py-2 rounded-xl">신청하기</button>`}
           </div>
         `;
@@ -282,30 +337,27 @@ async function renderMate() {
   `;
 }
 
-// 응원 보내기 - 시트에서 대상 선택
-window.openCheerSheet = async () => {
-  // 모든 사용자 목록 가져오기 (posts 에서 저자 목록 추출)
+// 메이트 대상 목록 (posts 저자 + applications 신청자, 나 제외)
+async function fetchMates() {
   const posts = await sync.query("SELECT DISTINCT author_id, author_name, author_avatar FROM posts WHERE public_id = 'main'", []);
   const applications = await sync.query("SELECT DISTINCT user_id, applicant_name, applicant_avatar FROM applications WHERE public_id = 'main'", []);
-  
-  // 중복 제거하면서 병합
   const userMap = new Map();
-  posts.forEach(p => {
-    if (p.author_id !== actorId) userMap.set(p.author_id, { id: p.author_id, name: p.author_name, avatar: p.author_avatar });
-  });
-  applications.forEach(a => {
-    if (a.user_id !== actorId && !userMap.has(a.user_id)) userMap.set(a.user_id, { id: a.user_id, name: a.applicant_name, avatar: a.applicant_avatar });
-  });
-  
-  const users = Array.from(userMap.values());
+  posts.forEach(p => { if (p.author_id !== actorId) userMap.set(p.author_id, { id: p.author_id, name: p.author_name, avatar: p.author_avatar }); });
+  applications.forEach(a => { if (a.user_id !== actorId && !userMap.has(a.user_id)) userMap.set(a.user_id, { id: a.user_id, name: a.applicant_name, avatar: a.applicant_avatar }); });
+  return Array.from(userMap.values());
+}
+
+// 응원 보내기 - 시트에서 대상 선택
+window.openCheerSheet = async () => {
+  const users = await fetchMates();
   
   openSheet("응원하기", `
     <div class="space-y-3">
       <div class="text-sm text-slate-400">응원할 메이트를 선택해주세요</div>
       ${users.length ? users.map(u => `
-        <button onclick="window.selectCheerTarget('${u.id}', '${u.name}', '${u.avatar}')" class="w-full flex items-center gap-3 bg-slate-800 border border-slate-700 rounded-xl p-3 hover:bg-slate-700">
-          <span class="text-2xl">${u.avatar}</span>
-          <span class="font-bold">${u.name}</span>
+        <button onclick="window.selectCheerTarget('${esc(u.id)}', '${esc(u.name)}', '${esc(u.avatar)}')" class="w-full flex items-center gap-3 bg-slate-800 border border-slate-700 rounded-xl p-3 hover:bg-slate-700">
+          <span class="text-2xl">${esc(u.avatar)}</span>
+          <span class="font-bold">${esc(u.name)}</span>
         </button>
       `).join("") : '<p class="text-slate-500 text-center py-4">아직 메이트가 없어요</p>'}
     </div>
@@ -363,7 +415,7 @@ async function renderMission() {
         ${pending.length ? pending.map(m => `
           <div class="flex items-center gap-2 py-2 border-b border-slate-700/50 last:border-0">
             <div class="flex-1">
-              <div class="text-sm font-bold">${m.title}</div>
+              <div class="text-sm font-bold">${esc(m.title)}</div>
               <div class="text-[10px] text-slate-500">목표 ${m.goal}회 · ${m.due_date || "기한없음"}</div>
             </div>
             <button onclick="window.completeMission('${m.id}')" class="bg-green-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg">달성</button>
@@ -376,7 +428,7 @@ async function renderMission() {
         ${myAssigned.length ? myAssigned.map(m => `
           <div class="flex items-center gap-2 py-2 border-b border-slate-700/50 last:border-0">
             <div class="flex-1">
-              <div class="text-sm">${m.title}</div>
+              <div class="text-sm">${esc(m.title)}</div>
               <div class="text-[10px] text-slate-500">목표 ${m.goal}회</div>
             </div>
             <span class="text-xs ${m.status === "done" ? "text-green-400" : "text-yellow-400"}">${m.status === "done" ? "달성" : "진행중"}</span>
@@ -451,7 +503,7 @@ async function renderProfile() {
     <div class="space-y-4">
       <div class="bg-slate-800/80 border border-slate-700 rounded-2xl p-5 text-center">
         <div class="text-5xl mb-2">${userAvatar}</div>
-        <div class="text-lg font-black">${userName}</div>
+        <div class="text-lg font-black">${esc(userName)}</div>
         <div class="text-sm text-slate-400">LV.${level} ${levelName}</div>
         <div class="text-2xl font-black text-amber-300 mt-2">${pts} P</div>
         <div class="text-xs text-slate-500">최고 스트릭 ${st.best || 0}일</div>
@@ -461,7 +513,7 @@ async function renderProfile() {
         <div class="text-sm font-bold mb-2">내 습관 (${habits.length})</div>
         ${habits.length ? habits.map(h => `
           <div class="flex items-center gap-2 py-1.5 border-b border-slate-700/50 last:border-0">
-            <span class="text-sm flex-1">${h.title}</span>
+            <span class="text-sm flex-1">${esc(h.title)}</span>
             <span class="text-xs text-slate-400">주 ${h.target_days}일</span>
           </div>
         `).join("") : '<p class="text-slate-500 text-sm">습관을 추가해보세요</p>'}
@@ -493,6 +545,23 @@ function openSheet(title, bodyHtml) {
 }
 function closeSheet() { if (sheetMask) { sheetMask.remove(); sheetMask = null; } }
 
+// 습관 체크 토글: 오늘 habit_logs 존재면 삭제, 없으면 추가
+window.toggleHabit = async (habitId) => {
+  const today = todayStr();
+  const rows = await sync.query("SELECT * FROM habit_logs WHERE user_id = ? AND habit_id = ? AND date = ?", [actorId, habitId, today]);
+  if (rows.length) {
+    await sync.remove("habit_logs", rows[0].id);
+  } else {
+    await sync.mutate("habit_logs", {
+      id: "hl_" + ms() + "_" + Math.random().toString(36).slice(2,6),
+      user_id: actorId, habit_id: habitId, date: today, created_at_ms: ms(),
+    });
+    await addPoints(5, "습관 기록");
+  }
+  await sync.handle.syncUntilIdle();
+  await renderTab(currentTab);
+};
+
 // 운동 기록 시트
 window.openWorkoutSheet = () => {
   openSheet("운동 기록", `
@@ -521,6 +590,7 @@ window.openWorkoutSheet = () => {
       date: todayStr(), created_at_ms: ms(),
     });
     await addPoints(10, "운동 기록");
+    await updateStreak();
     await sync.handle.syncUntilIdle();
     closeSheet();
     await renderTab(currentTab);
@@ -638,7 +708,9 @@ window.completeMission = async (missionId) => {
 window.openAssignMissionSheet = () => {
   openSheet("메이트에게 미션 부여", `
     <form id="assignForm" class="space-y-3">
-      <input id="mTargetId" placeholder="메이트 ID (상대방)" class="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-white">
+      <select id="mTarget" class="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-white">
+        <option value="">대상 선택중...</option>
+      </select>
       <input id="mTitle" placeholder="미션 제목 (예: 이번 주 러닝 3회)" class="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-white">
       <input id="mGoal" type="number" min="1" value="3" placeholder="목표 횟수" class="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-white">
       <input id="mDue" type="date" placeholder="기한 (선택)" class="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-white">
@@ -647,11 +719,12 @@ window.openAssignMissionSheet = () => {
   `);
   document.getElementById("assignForm").onsubmit = async (e) => {
     e.preventDefault();
-    const targetId = document.getElementById("mTargetId").value.trim();
+    const sel = document.getElementById("mTarget");
+    const targetId = sel.value;
     const title = document.getElementById("mTitle").value.trim();
     const goal = parseInt(document.getElementById("mGoal").value);
     const due = document.getElementById("mDue").value || null;
-    if (!targetId) return alert("메이트 ID를 입력해주세요");
+    if (!targetId) return alert("대상을 선택해주세요");
     if (!title) return alert("미션 제목을 입력해주세요");
     await sync.mutate("missions", {
       id: "m_" + ms() + "_" + Math.random().toString(36).slice(2,6),
@@ -663,7 +736,18 @@ window.openAssignMissionSheet = () => {
     closeSheet();
     await renderTab(currentTab);
   };
+  // 대상 목록 로드
+  fetchMates().then(mates => {
+    const sel = document.getElementById("mTarget");
+    if (mates.length === 0) {
+      sel.innerHTML = '<option value="">메이트 없음</option>';
+    } else {
+      sel.innerHTML = '<option value="">메이트 선택</option>' +
+        mates.map(m => `<option value="${m.id}">${m.avatar} ${m.name}</option>`).join("");
+    }
+  });
 };
+
 
 // 습관 추가 시트
 window.openHabitSheet = () => {
@@ -719,6 +803,7 @@ function cheerEmoji(t) {
 
 // 전역 노출 (esbuild DCE 방지)
 window.openWorkoutSheet = window.openWorkoutSheet;
+window.toggleHabit = window.toggleHabit;
 window.deleteWorkout = window.deleteWorkout;
 window.respondApplication = window.respondApplication;
 window.openAssignMissionSheet = window.openAssignMissionSheet;
