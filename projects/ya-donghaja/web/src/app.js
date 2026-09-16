@@ -3,6 +3,17 @@ import { schema } from "./schema.ts";
 
 const SYNC_URL = "https://ya-donghaja-sync.dydtnsp.workers.dev";
 
+// 기본 운동 종류 (타입이 없으면 시드)
+const DEFAULT_WORKOUT_TYPES = [
+  { name: "헬스", emoji: "🏋️" },
+  { name: "러닝", emoji: "🏃" },
+  { name: "홈트", emoji: "🏠" },
+  { name: "자전거", emoji: "🚴" },
+  { name: "요가", emoji: "🧘" },
+  { name: "등산", emoji: "⛰️" },
+  { name: "걷기", emoji: "🚶" },
+];
+
 // actorId 고정 (localStorage)
 let actorId = localStorage.getItem("ya_actor_id");
 if (!actorId) {
@@ -107,9 +118,11 @@ async function init() {
     await sync.subscribe({ id: "s-missions", table: "missions", scopes: { public_id: ["main"] } });
     await sync.subscribe({ id: "s-cheers", table: "cheers", scopes: { public_id: ["main"] } });
     await sync.subscribe({ id: "s-points", table: "point_ledger", scopes: { user_id: [actorId] } });
+    await sync.subscribe({ id: "s-workout-types", table: "workout_types", scopes: { user_id: [actorId] } });
 
     handle.onChange?.(() => renderTab(currentTab));
     setStatus("연결됨", true);
+    await getWorkoutTypes();
     await renderTab(currentTab);
   } catch (e) {
     console.error("[init]", e);
@@ -141,6 +154,22 @@ async function renderTab(tab) {
 async function getStreak() {
   const rows = await sync.query("SELECT * FROM streaks WHERE user_id = ?", [actorId]);
   return rows[0] || { current: 0, best: 0, last_date: null };
+}
+
+// 내 운동 종류 목록 (빈 상태면 기본 타입 시드)
+async function getWorkoutTypes() {
+  let rows = await sync.query("SELECT * FROM workout_types WHERE user_id = ? ORDER BY created_at_ms ASC", [actorId]);
+  if (rows.length === 0) {
+    for (const d of DEFAULT_WORKOUT_TYPES) {
+      await sync.mutate("workout_types", {
+        id: "wt_" + ms() + "_" + Math.random().toString(36).slice(2,6),
+        user_id: actorId, name: d.name, emoji: d.emoji, created_at_ms: ms(),
+      });
+    }
+    await sync.handle.syncUntilIdle();
+    rows = await sync.query("SELECT * FROM workout_types WHERE user_id = ? ORDER BY created_at_ms ASC", [actorId]);
+  }
+  return rows;
 }
 
 async function getPoints() {
@@ -496,6 +525,7 @@ async function renderProfile() {
   const pts = await getPoints();
   const st = await getStreak();
   const habits = await sync.query("SELECT * FROM habits WHERE user_id = ?", [actorId]);
+  const workoutTypes = await getWorkoutTypes();
   const level = pts >= 2000 ? 5 : pts >= 900 ? 4 : pts >= 400 ? 3 : pts >= 150 ? 2 : 1;
   const levelName = ["", "🌱 새싹", "🔥 주니어", "⚡ 시니어", "🏅 에이스", "👑 레전드"][level];
 
@@ -507,6 +537,22 @@ async function renderProfile() {
         <div class="text-sm text-slate-400">LV.${level} ${levelName}</div>
         <div class="text-2xl font-black text-amber-300 mt-2">${pts} P</div>
         <div class="text-xs text-slate-500">최고 스트릭 ${st.best || 0}일</div>
+      </div>
+
+      <div class="bg-slate-800/80 border border-slate-700 rounded-2xl p-4">
+        <div class="text-sm font-bold mb-2">운동 종류 (${workoutTypes.length})</div>
+        ${workoutTypes.map(wt => `
+          <div class="flex items-center gap-2 py-1.5 border-b border-slate-700/50 last:border-0">
+            <span class="text-lg">${esc(wt.emoji || "💪")}</span>
+            <span class="text-sm flex-1">${esc(wt.name)}</span>
+            <button onclick="window.deleteWorkoutType('${esc(wt.id)}')" class="text-slate-500 text-xs">🗑️</button>
+          </div>
+        `).join("")}
+        <div class="flex gap-2 mt-2">
+          <input id="newTypeEmoji" maxlength="4" placeholder="🏋️" class="w-16 bg-slate-900 border border-slate-600 rounded-xl px-2 py-2 text-white text-center">
+          <input id="newTypeName" placeholder="운동 이름" class="flex-1 bg-slate-900 border border-slate-600 rounded-xl px-3 py-2 text-white">
+          <button onclick="window.addWorkoutType()" class="bg-slate-700 text-white text-sm font-bold px-4 rounded-xl">추가</button>
+        </div>
       </div>
 
       <div class="bg-slate-800/80 border border-slate-700 rounded-2xl p-4">
@@ -573,12 +619,39 @@ window.deleteHabit = async (habitId) => {
   await renderTab(currentTab);
 };
 
+// 운동 종류 추가
+window.addWorkoutType = async () => {
+  const name = (document.getElementById("newTypeName").value || "").trim();
+  if (!name) return alert("운동 이름을 입력해주세요");
+  const emoji = (document.getElementById("newTypeEmoji").value || "").trim() || "💪";
+  await sync.mutate("workout_types", {
+    id: "wt_" + ms() + "_" + Math.random().toString(36).slice(2,6),
+    user_id: actorId, name, emoji, created_at_ms: ms(),
+  });
+  await sync.handle.syncUntilIdle();
+  await renderTab(currentTab);
+};
+
+// 운동 종류 삭제 (운동 기록이 있으면 삭제 불가)
+window.deleteWorkoutType = async (typeId) => {
+  const rows = await sync.query("SELECT * FROM workouts WHERE user_id = ? AND type = (SELECT name FROM workout_types WHERE id = ?)", [actorId, typeId]);
+  if (rows.length) {
+    alert("기록이 있는 운동 종류는 삭제할 수 없습니다. 먼저 운동을 삭제해주세요.");
+    return;
+  }
+  if (!confirm("이 운동 종류를 삭제할까요?")) return;
+  await sync.remove("workout_types", typeId);
+  await sync.handle.syncUntilIdle();
+  await renderTab(currentTab);
+};
+
 // 운동 기록 시트
-window.openWorkoutSheet = () => {
+window.openWorkoutSheet = async () => {
+  const types = await getWorkoutTypes();
   openSheet("운동 기록", `
     <form id="workoutForm" class="space-y-3">
       <select id="wType" class="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-white">
-        <option>헬스</option><option>러닝</option><option>홈트</option><option>자전거</option><option>요가</option><option>등산</option><option>걷기</option>
+        ${types.length ? types.map(ty => `<option value="${esc(ty.name)}">${esc(ty.emoji || "💪")} ${esc(ty.name)}</option>`).join("") : '<option value="">운동 종류 없음</option>'}
       </select>
       <input id="wDuration" type="number" min="1" placeholder="운동 시간(분)" class="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-white">
       <select id="wIntensity" class="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-white">
@@ -609,11 +682,12 @@ window.openWorkoutSheet = () => {
 };
 
 // 메이트 모집 시트
-window.openPostSheet = () => {
+window.openPostSheet = async () => {
+  const types = await getWorkoutTypes();
   openSheet("메이트 모집", `
     <form id="postForm" class="space-y-3">
       <div class="flex flex-wrap gap-1.5" id="typeChips">
-        ${["헬스","러닝","홈트","자전거","요가","등산","걷기"].map(t => `<button type="button" class="type-chip bg-slate-800 border border-slate-600 text-xs px-3 py-1.5 rounded-full" data-type="${t}">${t}</button>`).join("")}
+        ${types.map(ty => `<button type="button" class="type-chip bg-slate-800 border border-slate-600 text-xs px-3 py-1.5 rounded-full" data-type="${esc(ty.name)}">${esc(ty.emoji || "💪")} ${esc(ty.name)}</button>`).join("")}
       </div>
       <select id="pMode" class="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2.5 text-white">
         <option value="offline">오프라인</option><option value="online">온라인</option>
@@ -823,6 +897,8 @@ window.applyPost = window.applyPost;
 window.completeMission = window.completeMission;
 window.openHabitSheet = window.openHabitSheet;
 window.deleteHabit = window.deleteHabit;
+window.addWorkoutType = window.addWorkoutType;
+window.deleteWorkoutType = window.deleteWorkoutType;
 window.editProfile = window.editProfile;
 window.closeSheet = closeSheet;
 

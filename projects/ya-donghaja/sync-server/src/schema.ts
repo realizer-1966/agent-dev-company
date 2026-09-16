@@ -135,7 +135,20 @@ export const schema: Schema = {
       primaryKey: "id",
       scopes: [{ pattern: "public:{public_id}", column: "public_id" }],
     },
-    // 9. point_ledger - 포인트 내역 (user)
+    // 9. workout_types - 사용자 정의 운동 종류 (user)
+    {
+      name: "workout_types",
+      columns: [
+        { name: "id", type: "string", nullable: false },
+        { name: "user_id", type: "string", nullable: false },
+        { name: "name", type: "string", nullable: false },
+        { name: "emoji", type: "string", nullable: true },
+        { name: "created_at_ms", type: "integer", nullable: false },
+      ],
+      primaryKey: "id",
+      scopes: [{ pattern: "user:{user_id}", column: "user_id" }],
+    },
+    // 10. point_ledger - 포인트 내역 (user)
     {
       name: "point_ledger",
       columns: [
