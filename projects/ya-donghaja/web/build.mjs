@@ -88,6 +88,15 @@ for (const f of ['icon.png', 'site.webmanifest']) {
   const src = path.join(path.dirname(root), f);
   if (fs.existsSync(src)) fs.copyFileSync(src, path.join(dist, f));
 }
+// 아이콘 + 웹 매니페스트 복사
+const iconsDir = path.join(root, 'icons');
+if (fs.existsSync(iconsDir)) {
+  fs.mkdirSync(path.join(dist, 'icons'), { recursive: true });
+  for (const f of fs.readdirSync(iconsDir)) fs.copyFileSync(path.join(iconsDir, f), path.join(dist, 'icons', f));
+}
+if (fs.existsSync(path.join(root, 'site.webmanifest'))) {
+  fs.copyFileSync(path.join(root, 'site.webmanifest'), path.join(dist, 'site.webmanifest'));
+}
 
 const out = fs.readdirSync(dist, { recursive: true }).map(f => `  ${f} (${fs.statSync(path.join(dist, f)).size}B)`);
 console.log('빌드 완료:\n' + out.join('\n'));
