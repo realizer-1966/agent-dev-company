@@ -515,6 +515,7 @@ async function renderProfile() {
           <div class="flex items-center gap-2 py-1.5 border-b border-slate-700/50 last:border-0">
             <span class="text-sm flex-1">${esc(h.title)}</span>
             <span class="text-xs text-slate-400">주 ${h.target_days}일</span>
+            <button onclick="window.deleteHabit('${esc(h.id)}')" class="text-slate-500 text-xs">🗑️</button>
           </div>
         `).join("") : '<p class="text-slate-500 text-sm">습관을 추가해보세요</p>'}
         <button onclick="window.openHabitSheet()" class="w-full mt-2 bg-slate-700 text-white text-sm font-bold py-2 rounded-xl">+ 습관 추가</button>
@@ -558,6 +559,16 @@ window.toggleHabit = async (habitId) => {
     });
     await addPoints(5, "습관 기록");
   }
+  await sync.handle.syncUntilIdle();
+  await renderTab(currentTab);
+};
+
+// 습관 삭제 (습관 정의 + 관련 habit_logs 모두 삭제)
+window.deleteHabit = async (habitId) => {
+  if (!confirm("이 습관을 삭제할까요?")) return;
+  const logs = await sync.query("SELECT * FROM habit_logs WHERE user_id = ? AND habit_id = ?", [actorId, habitId]);
+  for (const log of logs) await sync.remove("habit_logs", log.id);
+  await sync.remove("habits", habitId);
   await sync.handle.syncUntilIdle();
   await renderTab(currentTab);
 };
@@ -811,6 +822,7 @@ window.openPostSheet = window.openPostSheet;
 window.applyPost = window.applyPost;
 window.completeMission = window.completeMission;
 window.openHabitSheet = window.openHabitSheet;
+window.deleteHabit = window.deleteHabit;
 window.editProfile = window.editProfile;
 window.closeSheet = closeSheet;
 
