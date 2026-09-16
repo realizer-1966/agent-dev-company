@@ -548,10 +548,12 @@ async function renderProfile() {
             <button onclick="window.deleteWorkoutType('${esc(wt.id)}')" class="text-slate-500 text-xs">🗑️</button>
           </div>
         `).join("")}
-        <div class="flex gap-2 mt-2">
-          <input id="newTypeEmoji" maxlength="4" placeholder="🏋️" class="w-16 bg-slate-900 border border-slate-600 rounded-xl px-2 py-2 text-white text-center">
-          <input id="newTypeName" placeholder="운동 이름" class="flex-1 bg-slate-900 border border-slate-600 rounded-xl px-3 py-2 text-white">
-          <button onclick="window.addWorkoutType()" class="bg-slate-700 text-white text-sm font-bold px-4 rounded-xl">추가</button>
+        <div class="mt-3 space-y-2">
+          <div class="flex items-center gap-2">
+            <input id="newTypeEmoji" maxlength="4" placeholder="🏋️" class="w-14 flex-none bg-slate-900 border border-slate-600 rounded-xl px-2 py-2.5 text-white text-center">
+            <input id="newTypeName" placeholder="운동 이름" class="min-w-0 flex-1 bg-slate-900 border border-slate-600 rounded-xl px-3 py-2.5 text-white">
+          </div>
+          <button onclick="window.addWorkoutType()" class="w-full bg-slate-700 text-white text-sm font-bold py-2.5 rounded-xl">+ 운동 종류 추가</button>
         </div>
       </div>
 
