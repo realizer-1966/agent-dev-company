@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>audio.cpp PWA</title>
-<link rel="manifest" href="data:application/json;base64,eyJname": "audio.cpp"}'>
+<link rel="manifest" href="/manifest.json">
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/icon-192.png">
@@ -82,7 +82,10 @@ document.getElementById('apiBase').value = apiBase;
 document.getElementById('apiBase').onchange = e => {
   apiBase = e.target.value.trim().replace(/\/$/,'');
   localStorage.setItem('ap_api', apiBase);
-  const SAMPLE = {
+  checkServer();
+};
+
+const SAMPLE = {
   'kokoro-tts': 'Hello, this is audio cpp running locally on a phone.',
   'supertonic-ko': '안녕하세요. 오디오 씨피피가 폰에서 직접 동작하는 테스트입니다.'
 };
@@ -104,7 +107,6 @@ document.getElementById('ttsModel').addEventListener('change', updateVoices);
 updateVoices();
 
 checkServer();
-};
 
 // 탭
 document.querySelectorAll('.tab').forEach(b => b.onclick = () => {
