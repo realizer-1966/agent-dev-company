@@ -63,8 +63,8 @@ body { background: linear-gradient(160deg,#0b1020,#141c33); font-family:-apple-s
     <!-- ASR 패널 -->
     <section id="p-asr" class="hidden space-y-3">
       <select id="asrModel" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm">
-        <option value="qwen3-asr-ko" selected>한국어 (Qwen3-ASR)</option>
-        <option value="moonshine-asr">영어 (Moonshine)</option>
+        <option value="qwen3-asr-auto" selected>자동 감지 (Qwen3-ASR, 31개 언어)</option>
+        <option value="moonshine-asr">영어 전용 (Moonshine, 빠름)</option>
       </select>
       <div class="bg-slate-800 border border-slate-700 rounded-2xl p-4 text-center">
         <button id="recBtn" onclick="toggleRec()" class="w-20 h-20 rounded-full bg-slate-700 text-3xl">🎤</button>
