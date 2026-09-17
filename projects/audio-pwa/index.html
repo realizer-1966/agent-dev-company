@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>audio.cpp PWA</title>
+<link rel="manifest" href="data:application/json;base64,eyJname": "audio.cpp"}'>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="theme-color" content="#f97316">
+<script>
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
+</script>
+<style>
+body { background: linear-gradient(160deg,#0b1020,#141c33); font-family:-apple-system,sans-serif; }
+.tab.active { color:#f97316; border-bottom:2px solid #f97316; }
+</style>
+</head>
+<body class="text-white min-h-screen">
+<div class="max-w-md mx-auto min-h-screen flex flex-col">
+  <header class="px-4 pt-4 pb-3 flex items-center justify-between">
+    <h1 class="text-xl font-black">🔊 audio.cpp</h1>
+    <div id="serverStatus" class="text-xs px-2 py-1 rounded-full bg-slate-800 text-slate-400">확인중...</div>
+  </header>
+
+  <!-- 서버 설정 -->
+  <div class="px-4 mb-2">
+    <input id="apiBase" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm" placeholder="터널 URL (저장됨)">
+  </div>
+
+  <nav class="flex gap-1 px-4">
+    <button class="tab active flex-1 py-2 text-sm font-bold" data-t="tts">🎙️ TTS</button>
+    <button class="tab flex-1 py-2 text-sm font-bold text-slate-400" data-t="asr">📝 ASR</button>
+    <button class="tab flex-1 py-2 text-sm font-bold text-slate-400" data-t="info">ℹ️ 모델</button>
+  </nav>
+
+  <main class="flex-1 px-4 py-4 pb-16">
+    <!-- TTS 패널 -->
+    <section id="p-tts" class="space-y-3">
+      <textarea id="ttsText" rows="4" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2" placeholder="변환할 텍스트 입력">Hello, this is audio cpp running locally.</textarea>
+      <div class="flex gap-2">
+        <select id="ttsVoice" class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm">
+          <option value="af_heart">af_heart (여성)</option>
+          <option value="af_bella">af_bella (여성)</option>
+          <option value="am_michael">am_michael (남성)</option>
+          <option value="bm_george">bm_george (남성UK)</option>
+        </select>
+      </div>
+      <button id="ttsBtn" onclick="doTTS()" class="w-full bg-gradient-to-r from-orange-500 to-rose-500 font-bold py-3 rounded-2xl">음성 생성</button>
+      <div id="ttsResult" class="hidden bg-slate-800 border border-slate-700 rounded-2xl p-4 space-y-2">
+        <audio id="ttsAudio" controls class="w-full"></audio>
+        <div id="ttsStat" class="text-xs text-slate-400"></div>
+      </div>
+    </section>
+
+    <!-- ASR 패널 -->
+    <section id="p-asr" class="hidden space-y-3">
+      <div class="bg-slate-800 border border-slate-700 rounded-2xl p-4 text-center">
+        <button id="recBtn" onclick="toggleRec()" class="w-20 h-20 rounded-full bg-slate-700 text-3xl">🎤</button>
+        <div id="recStat" class="text-sm text-slate-400 mt-2">녹음 대기</div>
+      </div>
+      <div id="asrResult" class="hidden bg-slate-800 border border-slate-700 rounded-2xl p-4">
+        <div class="text-xs text-slate-400 mb-1">인식 결과</div>
+        <div id="asrText" class="text-sm"></div>
+        <div id="asrStat" class="text-xs text-slate-500 mt-2"></div>
+      </div>
+    </section>
+
+    <!-- 모델 정보 -->
+    <section id="p-info" class="hidden space-y-2">
+      <div id="modelList" class="space-y-2 text-sm"></div>
+    </section>
+  </main>
+</div>
+
+<script>
+let apiBase = localStorage.getItem('ap_api') || 'https://determines-nvidia-anatomy-passion.trycloudflare.com';
+document.getElementById('apiBase').value = apiBase;
+document.getElementById('apiBase').onchange = e => {
+  apiBase = e.target.value.trim().replace(/\/$/,'');
+  localStorage.setItem('ap_api', apiBase);
+  checkServer();
+};
+
+// 탭
+document.querySelectorAll('.tab').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.tab').forEach(x => { x.classList.remove('active','text-orange-400'); x.classList.add('text-slate-400'); });
+  b.classList.add('active','text-orange-400'); b.classList.remove('text-slate-400');
+  ['tts','asr','info'].forEach(t => document.getElementById('p-'+t).classList.toggle('hidden', t !== b.dataset.t));
+});
+
+async function checkServer() {
+  const el = document.getElementById('serverStatus');
+  try {
+    const r = await fetch(apiBase + '/v1/models', {signal: AbortSignal.timeout(15000)});
+    if (r.ok) { el.textContent = '서버 연결됨'; el.className = 'text-xs px-2 py-1 rounded-full bg-green-900 text-green-300'; loadModels(); }
+    else el.textContent = '서버 오류 ' + r.status;
+  } catch { el.textContent = '서버 꺼짐'; }
+}
+
+async function loadModels() {
+  try {
+    const r = await fetch(apiBase + '/v1/models');
+    const j = await r.json();
+    document.getElementById('modelList').innerHTML = j.data.map(m =>
+      `<div class="bg-slate-800 border border-slate-700 rounded-xl p-3 flex justify-between">
+        <span>${m.id}</span><span class="text-slate-500 text-xs">${m.task} · ${m.loaded ? '로드됨' : '대기'}</span></div>`).join('');
+  } catch(e) { document.getElementById('modelList').textContent = '로드 실패: ' + e; }
+}
+
+async function doTTS() {
+  const btn = document.getElementById('ttsBtn');
+  btn.disabled = true; btn.textContent = '생성중... (폰 CPU 최대 30초)';
+  try {
+    const r = await fetch(apiBase + '/v1/audio/speech', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({model:'kokoro-tts', input: document.getElementById('ttsText').value, voice: document.getElementById('ttsVoice').value, response_format:'wav'})
+    });
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const box = document.getElementById('ttsResult');
+    box.classList.remove('hidden');
+    document.getElementById('ttsAudio').src = url;
+    document.getElementById('ttsStat').textContent = `${(blob.size/1024).toFixed(0)}KB 수신`;
+  } catch(e) { alert('TTS 실패: '+e.message); }
+  btn.disabled = false; btn.textContent = '음성 생성';
+}
+
+let mediaRec = null, chunks = [];
+async function toggleRec() {
+  const btn = document.getElementById('recBtn'), stat = document.getElementById('recStat');
+  if (mediaRec && mediaRec.state === 'recording') { mediaRec.stop(); return; }
+  const stream = await navigator.mediaDevices.getUserMedia({audio:{channelCount:1, sampleRate:16000}});
+  chunks = [];
+  mediaRec = new MediaRecorder(stream, {mimeType:'audio/webm'});
+  mediaRec.ondataavailable = e => chunks.push(e.data);
+  mediaRec.onstop = async () => {
+    stream.getTracks().forEach(t => t.stop());
+    btn.textContent = '🎤'; stat.textContent = '변환중...';
+    const webm = new Blob(chunks, {type:'audio/webm'});
+    // webm → wav 변환 없이 전송 (서버가 WAV만 받으면 16k wav로 변환 필요 → 브라우저 AudioBuffer로 PCM 재인코딩)
+    const wav = await webmToWav(webm);
+    const fd = new FormData();
+    fd.append('model','moonshine-asr'); fd.append('file', new Blob([wav],{type:'audio/wav'}), 'rec.wav');
+    const r = await fetch(apiBase + '/v1/audio/transcriptions', {method:'POST', body:fd});
+    const box = document.getElementById('asrResult'); box.classList.remove('hidden');
+    if (!r.ok) { document.getElementById('asrText').textContent = '실패: HTTP '+r.status; return; }
+    const j = await r.json();
+    document.getElementById('asrText').textContent = j.text;
+    document.getElementById('asrStat').textContent = `${(j.timing.wall_ms/1000).toFixed(1)}초 처리 / ${(j.timing.audio_duration_ms/1000).toFixed(1)}초 오디오 (RTF ${j.timing.rtf.toFixed(2)})`;
+    stat.textContent = '녹음 대기';
+  };
+  mediaRec.start(); btn.textContent = '⏹️'; stat.textContent = '녹음중... 다시 눌러 중지';
+}
+
+async function webmToWav(webm) {
+  const ab = await webm.arrayBuffer();
+  const ac = new (window.AudioContext||window.webkitAudioContext)();
+  const buf = await ac.decodeAudioData(ab);
+  const ch = buf.getChannelData(0);
+  // 16kHz 리샘플
+  const off = new OfflineAudioContext(1, Math.ceil(buf.duration*16000), 16000);
+  const src = off.createBufferSource(); src.buffer = buf; src.connect(off.destination); src.start();
+  const res = await off.startRendering();
+  const d = res.getChannelData(0);
+  const wav = new ArrayBuffer(44 + d.length*2), v = new DataView(wav);
+  const W = (o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i))};
+  W(0,'RIFF'); v.setUint32(4, 36+d.length*2, true); W(8,'WAVEfmt ');
+  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,16000,true); v.setUint32(28,32000,true); v.setUint16(32,2,true); v.setUint16(34,16,true);
+  W(36,'data'); v.setUint32(40, d.length*2, true);
+  for(let i=0;i<d.length;i++) v.setInt16(44+i*2, Math.max(-1,Math.min(1,d[i]))*32767, true);
+  ac.close();
+  return wav;
+}
+
+checkServer();
+</script>
+</body>
+</html>

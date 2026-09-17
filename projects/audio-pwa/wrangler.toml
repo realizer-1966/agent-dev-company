@@ -1,0 +1,15 @@
+name = "audio-pwa"
+compatibility_date = "2024-09-23"
+
+[assets]
+directory = "./dist"
+not_found_handling = "single-page-application"
+
+# API 프록시: /api/* 요청을 폰 터널로 전달 (CORS 회피 + 안정 URL)
+[vars]
+ORIGIN_URL = "https://determines-nvidia-anatomy-passion.trycloudflare.com"
+
+[[rules]]
+type = "Text"
+globs = ["**/*.html"]
+fallthrough = true
