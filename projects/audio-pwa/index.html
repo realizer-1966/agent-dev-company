@@ -46,13 +46,6 @@ body { background: linear-gradient(160deg,#0b1020,#141c33); font-family:-apple-s
           <option value="supertonic-ko" selected>한국어 (Supertonic)</option>
         </select>
         <select id="ttsVoice" class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm">
-          <option value="af_heart">af_heart</option>
-          <option value="af_bella">af_bella</option>
-          <option value="am_michael">am_michael</option>
-          <option value="F1">F1 (여성)</option>
-          <option value="F2">F2</option>
-          <option value="M1">M1 (남성)</option>
-          <option value="M3">M3</option>
         </select>
         </div>
       </div>
@@ -89,7 +82,19 @@ document.getElementById('apiBase').value = apiBase;
 document.getElementById('apiBase').onchange = e => {
   apiBase = e.target.value.trim().replace(/\/$/,'');
   localStorage.setItem('ap_api', apiBase);
-  checkServer();
+  const VOICES = {
+  'kokoro-tts': [['af_heart','af_heart (여성)'],['af_bella','af_bella (여성)'],['am_michael','am_michael (남성)'],['bm_george','bm_george (영국 남성)']],
+  'supertonic-ko': [['F1','F1 (여성)'],['F2','F2 (여성)'],['F3','F3 (여성)'],['F4','F4 (여성)'],['F5','F5 (여성)'],['M1','M1 (남성)'],['M2','M2 (남성)'],['M3','M3 (남성)'],['M4','M4 (남성)'],['M5','M5 (남성)']]
+};
+function updateVoices() {
+  const model = document.getElementById('ttsModel').value;
+  const sel = document.getElementById('ttsVoice');
+  sel.innerHTML = (VOICES[model] || []).map(([v,n]) => `<option value="${v}">${n}</option>`).join('');
+}
+document.getElementById('ttsModel').addEventListener('change', updateVoices);
+updateVoices();
+
+checkServer();
 };
 
 // 탭
