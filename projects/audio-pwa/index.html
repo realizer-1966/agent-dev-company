@@ -65,6 +65,7 @@ body { background: linear-gradient(160deg,#0b1020,#141c33); font-family:-apple-s
       <select id="asrModel" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm">
         <option value="qwen3-asr-ko" selected>한국어 (Qwen3-ASR)</option>
         <option value="qwen3-asr-ja">일본어 (Qwen3-ASR)</option>
+        <option value="moonshine-asr">영어 (Moonshine, 초고속)</option>
       </select>
       <div class="bg-slate-800 border border-slate-700 rounded-2xl p-4 text-center">
         <button id="recBtn" onclick="toggleRec()" class="w-20 h-20 rounded-full bg-slate-700 text-3xl">🎤</button>
@@ -85,7 +86,7 @@ body { background: linear-gradient(160deg,#0b1020,#141c33); font-family:-apple-s
 </div>
 
 <script>
-let apiBase = localStorage.getItem('ap_api') || 'https://determines-nvidia-anatomy-passion.trycloudflare.com';
+let apiBase = localStorage.getItem('ap_api') || 'https://hospitals-conscious-tracked-perform.trycloudflare.com';
 document.getElementById('apiBase').value = apiBase;
 document.getElementById('apiBase').onchange = e => {
   apiBase = e.target.value.trim().replace(/\/$/,'');
