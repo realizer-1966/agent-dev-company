@@ -58,6 +58,10 @@ body { background: linear-gradient(160deg,#0b1020,#141c33); font-family:-apple-s
 
     <!-- ASR 패널 -->
     <section id="p-asr" class="hidden space-y-3">
+      <select id="asrModel" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm">
+        <option value="qwen3-asr-ko" selected>한국어 (Qwen3-ASR)</option>
+        <option value="moonshine-asr">영어 (Moonshine)</option>
+      </select>
       <div class="bg-slate-800 border border-slate-700 rounded-2xl p-4 text-center">
         <button id="recBtn" onclick="toggleRec()" class="w-20 h-20 rounded-full bg-slate-700 text-3xl">🎤</button>
         <div id="recStat" class="text-sm text-slate-400 mt-2">녹음 대기</div>
@@ -169,7 +173,7 @@ async function toggleRec() {
     // webm → wav 변환 없이 전송 (서버가 WAV만 받으면 16k wav로 변환 필요 → 브라우저 AudioBuffer로 PCM 재인코딩)
     const wav = await webmToWav(webm);
     const fd = new FormData();
-    fd.append('model','moonshine-asr'); fd.append('file', new Blob([wav],{type:'audio/wav'}), 'rec.wav');
+    fd.append('model', document.getElementById('asrModel').value); fd.append('file', new Blob([wav],{type:'audio/wav'}), 'rec.wav');
     const r = await fetch(apiBase + '/v1/audio/transcriptions', {method:'POST', body:fd});
     const box = document.getElementById('asrResult'); box.classList.remove('hidden');
     if (!r.ok) { document.getElementById('asrText').textContent = '실패: HTTP '+r.status; return; }
