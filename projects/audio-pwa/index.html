@@ -42,8 +42,12 @@ body { background: linear-gradient(160deg,#0b1020,#141c33); font-family:-apple-s
       <div class="flex gap-2">
         <div class="flex gap-2">
         <select id="ttsModel" class="bg-slate-800 border border-slate-700 rounded-xl px-2 py-2 text-sm">
-          <option value="kokoro-tts">영어 (Kokoro)</option>
           <option value="supertonic-ko" selected>한국어 (Supertonic)</option>
+          <option value="supertonic-ja">일본어 (Supertonic)</option>
+          <option value="supertonic-en">영어 (Supertonic)</option>
+          <option value="supertonic-de">독일어 (Supertonic)</option>
+          <option value="supertonic-fr">프랑스어 (Supertonic)</option>
+          <option value="kokoro-tts">영어 (Kokoro)</option>
         </select>
         <select id="ttsVoice" class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm">
         </select>
@@ -91,11 +95,20 @@ document.getElementById('apiBase').onchange = e => {
 
 const SAMPLE = {
   'kokoro-tts': 'Hello, this is audio cpp running locally on a phone.',
-  'supertonic-ko': '안녕하세요. 오디오 씨피피가 폰에서 직접 동작하는 테스트입니다.'
+  'supertonic-ko': '안녕하세요. 오디오 씨피피가 폰에서 직접 동작하는 테스트입니다.',
+  'supertonic-ja': 'こんにちは。オーディオ・シーピーピーがスマホで動いています。',
+  'supertonic-en': 'Hello, this is audio cpp running locally on a phone.',
+  'supertonic-de': 'Guten Tag, dies ist ein Test von Audio CPP.',
+  'supertonic-fr': 'Bonjour, ceci est un test de audio CPP.'
 };
+const SUPERTONIC_VOICES = [['F1','F1 (여성)'],['F2','F2 (여성)'],['F3','F3 (여성)'],['F4','F4 (여성)'],['F5','F5 (여성)'],['M1','M1 (남성)'],['M2','M2 (남성)'],['M3','M3 (남성)'],['M4','M4 (남성)'],['M5','M5 (남성)']];
 const VOICES = {
   'kokoro-tts': [['af_heart','af_heart (여성)'],['af_bella','af_bella (여성)'],['am_michael','am_michael (남성)'],['bm_george','bm_george (영국 남성)']],
-  'supertonic-ko': [['F1','F1 (여성)'],['F2','F2 (여성)'],['F3','F3 (여성)'],['F4','F4 (여성)'],['F5','F5 (여성)'],['M1','M1 (남성)'],['M2','M2 (남성)'],['M3','M3 (남성)'],['M4','M4 (남성)'],['M5','M5 (남성)']]
+  'supertonic-ko': SUPERTONIC_VOICES,
+  'supertonic-ja': SUPERTONIC_VOICES,
+  'supertonic-en': SUPERTONIC_VOICES,
+  'supertonic-de': SUPERTONIC_VOICES,
+  'supertonic-fr': SUPERTONIC_VOICES
 };
 function updateVoices() {
   const model = document.getElementById('ttsModel').value;
