@@ -86,7 +86,7 @@ body { background: linear-gradient(160deg,#0b1020,#141c33); font-family:-apple-s
 </div>
 
 <script>
-let apiBase = localStorage.getItem('ap_api') || 'https://hospitals-conscious-tracked-perform.trycloudflare.com';
+let apiBase = localStorage.getItem('ap_api') || 'https://dominant-keen-entities-brass.trycloudflare.com';
 document.getElementById('apiBase').value = apiBase;
 document.getElementById('apiBase').onchange = e => {
   apiBase = e.target.value.trim().replace(/\/$/,'');
@@ -189,7 +189,7 @@ async function toggleRec() {
     const fd = new FormData();
     fd.append('model', document.getElementById('asrModel').value); fd.append('file', new Blob([wav],{type:'audio/wav'}), 'rec.wav');
     const asrUrl = fd.get('model').startsWith('moonshine-tiny')
-      ? 'https://tiffany-submissions-cumulative-circular.trycloudflare.com/v1/audio/transcriptions'
+      ? 'https://alabama-crossword-proteins-pee.trycloudflare.com/v1/audio/transcriptions'
       : apiBase + '/v1/audio/transcriptions';
     const r = await fetch(asrUrl, {method:'POST', body:fd});
     const box = document.getElementById('asrResult'); box.classList.remove('hidden');
