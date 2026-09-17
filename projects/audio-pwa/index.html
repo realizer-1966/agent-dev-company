@@ -63,9 +63,9 @@ body { background: linear-gradient(160deg,#0b1020,#141c33); font-family:-apple-s
     <!-- ASR 패널 -->
     <section id="p-asr" class="hidden space-y-3">
       <select id="asrModel" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm">
-        <option value="audio8-asr-ko" selected>한국어 (Audio8, 빠름)</option>
-        <option value="audio8-asr-ja">일본어 (Audio8, 빠름)</option>
-        <option value="moonshine-asr">영어 (Moonshine, 초고속)</option>
+        <option value="moonshine-tiny-ko" selected>한국어 (Moonshine, 초고속)</option>
+        <option value="moonshine-tiny-ja">일본어 (Moonshine, 초고속)</option>
+        <option value="audio8-asr-ko">한국어 (Audio8)</option>
       </select>
       <div class="bg-slate-800 border border-slate-700 rounded-2xl p-4 text-center">
         <button id="recBtn" onclick="toggleRec()" class="w-20 h-20 rounded-full bg-slate-700 text-3xl">🎤</button>
@@ -86,7 +86,7 @@ body { background: linear-gradient(160deg,#0b1020,#141c33); font-family:-apple-s
 </div>
 
 <script>
-let apiBase = localStorage.getItem('ap_api') || 'https://hospitals-conscious-tracked-perform.trycloudflare.com';
+let apiBase = localStorage.getItem('ap_api') || 'https://tiffany-submissions-cumulative-circular.trycloudflare.com';
 document.getElementById('apiBase').value = apiBase;
 document.getElementById('apiBase').onchange = e => {
   apiBase = e.target.value.trim().replace(/\/$/,'');
@@ -188,7 +188,10 @@ async function toggleRec() {
     const wav = await webmToWav(webm);
     const fd = new FormData();
     fd.append('model', document.getElementById('asrModel').value); fd.append('file', new Blob([wav],{type:'audio/wav'}), 'rec.wav');
-    const r = await fetch(apiBase + '/v1/audio/transcriptions', {method:'POST', body:fd});
+    const asrUrl = fd.get('model').startsWith('moonshine-tiny')
+      ? 'https://tiffany-submissions-cumulative-circular.trycloudflare.com/v1/audio/transcriptions'
+      : apiBase + '/v1/audio/transcriptions';
+    const r = await fetch(asrUrl, {method:'POST', body:fd});
     const box = document.getElementById('asrResult'); box.classList.remove('hidden');
     if (!r.ok) { document.getElementById('asrText').textContent = '실패: HTTP '+r.status; return; }
     const j = await r.json();
