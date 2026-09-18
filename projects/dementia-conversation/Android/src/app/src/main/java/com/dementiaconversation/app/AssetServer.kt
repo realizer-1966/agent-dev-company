@@ -35,24 +35,28 @@ class AssetServer(
   private var running = false
   private var server: ServerSocket? = null
 
-  /** 127.0.0.1 에만 바인딩한다 (외부 노출 금지). */
+  /**
+   * 127.0.0.1 에만 바인딩한다 (외부 노출 금지).
+   *
+   * ServerSocket 을 **동기적으로** 만든다. 스레드 안에서 만들면 start() 가
+   * 반환된 직후의 loadUrl() 이 리스닝 전에 실행되어 연결이 거부된다
+   * (WebView 에 "서버에 연결할 수 없음" 으로 나타나는 경쟁 조건).
+   */
+  @Throws(Exception::class)
   fun start() {
     if (running) return
+    val ss = ServerSocket(port, 8, InetAddress.getByName("127.0.0.1"))
+    server = ss
     running = true
+    // accept 루프만 백그라운드로 돌린다 (리스닝은 이미 확립됨)
     thread(isDaemon = true, name = "asset-server") {
-      try {
-        val ss = ServerSocket(port, 8, InetAddress.getByName("127.0.0.1"))
-        server = ss
-        while (running) {
-          val sock = try {
-            ss.accept()
-          } catch (_: Exception) {
-            break
-          }
-          thread(isDaemon = true) { serve(sock) }
+      while (running) {
+        val sock = try {
+          ss.accept()
+        } catch (_: Exception) {
+          break
         }
-      } catch (_: Exception) {
-        // 포트가 이미 쓰이거나 종료 중 — 조용히 넘긴다
+        thread(isDaemon = true) { serve(sock) }
       }
     }
   }

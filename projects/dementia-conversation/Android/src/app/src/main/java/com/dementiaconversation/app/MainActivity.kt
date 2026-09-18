@@ -35,9 +35,20 @@ class MainActivity : Activity() {
     super.onCreate(state)
 
     // 1) assets 를 http://127.0.0.1:<port>/ 로 서빙
+    //    start() 는 동기적으로 리스닝을 확립한다 (아래 loadUrl 이 바로 이어진다).
     val server = AssetServer(this)
-    server.start()
-    assets = server
+    try {
+      server.start()
+      assets = server
+    } catch (e: Exception) {
+      // 포트 충돌 등으로 실패하면 사용자에게 원인을 보여준다.
+      // 조용히 file:// 로 폴백하면 "서버에 연결할 수 없음" 으로만 보여 진단이 어렵다.
+      Toast.makeText(
+        this,
+        "내부 서버 시작 실패: " + e.message,
+        Toast.LENGTH_LONG
+      ).show()
+    }
 
     // 2) WebView 준비
     web = WebView(this)
