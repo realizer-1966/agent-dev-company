@@ -193,8 +193,11 @@ details .body{padding-top:12px}
 
 <script>
 /* ── 상태 ────────────────────────────────────────────── */
+// 기본 서버 주소: 서버가 이 폰 안(proot)에서 도는 경우가 기본 시나리오.
+// 127.0.0.1 은 폰과 proot 가 공유하므로 별도 설정 없이 바로 연결된다.
+const DEFAULT_API = 'http://127.0.0.1:8912';
 const LS = {
-  get api(){ return localStorage.getItem('dc_api') || '' },
+  get api(){ return localStorage.getItem('dc_api') ?? DEFAULT_API },
   set api(v){ localStorage.setItem('dc_api', v) },
   get voice(){ return localStorage.getItem('dc_voice') || 'M1' },
   set voice(v){ localStorage.setItem('dc_voice', v) },
