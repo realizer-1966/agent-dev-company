@@ -17,16 +17,73 @@ Android aarch64 / proot 기기에서 **실제로 빌드하고 한국어 TTS→AS
 | `Android/` | **APK** — WebView 로 WebUI 를 감싼 안드로이드 앱 ("마음이") |
 | `*.md`, `run_*.sh`, `toolchain/` | 엔진 빌드·검증 자료 (아래 "검증된 결과") |
 
+## 서버 주소란?
+
+**"서버 주소"는 TTS(음성 합성)와 ASR(음성 인식)을 실제로 실행하는 프로그램이 떠 있는 곳의 주소**입니다.
+앱과 WebUI 는 화면과 마이크만 담당하고, 실제 음성 추론은 전부 이 서버가 합니다.
+
+```
+[폰의 앱/웹UI]  --HTTP-->  [로컬 서버 (audiocpp_server)]  -->  모델 추론
+ 화면·마이크만              TTS /v1/audio/speech
+                           ASR /v1/audio/transcriptions
+```
+
+앱에 모델을 내장하지 않은 이유는 크기 때문입니다 — TTS 454MB + ASR 1,151MB 라
+앱 하나에 넣기엔 너무 크고, 기기 CPU·메모리도 모델 2개를 동시에 감당하기 어렵습니다.
+그래서 **앱은 얇은 껍데기, 추론은 서버**로 나눴습니다.
+
+### 무엇을 넣어야 하나
+
+서버를 띄운 **그 기기의 주소 + 포트**입니다. 대표적인 세 가지:
+
+| 상황 | 서버 주소 | 설명 |
+|---|---|---|
+| **서버가 이 폰 안에서 돌 때** | `http://127.0.0.1:8912` | 가장 흔한 경우. **이 환경에서 실측 검증됨** |
+| 서버가 같은 Wi-Fi 의 PC 일 때 | `http://192.168.0.10:8912` | PC 의 LAN IP. `ipconfig`/`ifconfig` 로 확인 |
+| 서버가 외부 서버일 때 | `https://xxx.example.com` | 터널(cloudflared 등)이나 클라우드 주소 |
+
+**포트 기본값: `8912`** (`unified_server.json` 의 `port` 값. TTS+ASR 통합 서버).
+분리형으로 띄우면 TTS `8911` / ASR `8910` 이지만, **앱은 하나의 주소만 받으므로 통합형(8912)을 쓰세요.**
+
+### 이 환경(proot)에서의 중요한 사실 — 실측 확인
+
+`unified_server.json` 에는 `"host": "127.0.0.1"` 로 적혀 있지만,
+**폰의 브라우저/앱에서도 `http://127.0.0.1:8912` 로 접속됩니다.**
+
+실험으로 확인한 내용 (`/am` 브릿지로 안드로이드에서 URL 을 열어 서버 로그 대조):
+
+```
+$ python3 -m http.server 8877 --bind 0.0.0.0      # proot 안에서 서버 기동
+$ POST /am {"action":"VIEW","data":"http://127.0.0.1:8877/probe_from_android"}
+$ cat server.log
+  "GET /probe_from_android HTTP/1.1" 404 -        # ← 안드로이드에서 도달함
+  "GET /favicon.ico HTTP/1.1" 404 -               # ← 브라우저가 실제 렌더링함
+```
+
+→ **proot 와 안드로이드가 같은 loopback 을 공유**합니다.
+따라서 같은 폰에서 서버를 띄우면 주소는 `http://127.0.0.1:8912` 입니다.
+
+> 참고: proot 안에서 `ip addr` 는 아무것도 보여주지 않습니다 (네트워크 인터페이스 비노출).
+> LAN IP 를 알아야 하면 서버를 띄운 **기기 자체**에서 확인하세요.
+
+### 확인 방법
+
+**⚙️ 설정** 탭에 주소를 넣고 **저장하고 연결 확인**을 누르면
+`GET /health` 를 호출해 결과를 보여줍니다:
+
+- 성공 → `연결됨 · 모델 N개` (초록 점)
+- 실패 → `서버에 연결할 수 없어요` (빨간 점)
+
 ## APK 받기 (마음이)
 
 1. **Actions → Build Dementia Conversation APK → 최신 성공 실행 → Artifacts → `dementia-conversation-apk`**
    https://github.com/realizer-1966/agent-dev-company/actions/workflows/build-dementia-conversation-apk.yml
 2. 내려받은 zip 을 풀면 `app-release.apk` (약 1.7MB). 폰에 설치 (v2/v3 서명됨).
-3. 앱 실행 → **⚙️ 설정** → 서버 주소 입력 (예: `http://192.168.0.10:8912`) → **저장하고 연결 확인**
+3. 앱 실행 → **⚙️ 설정** → 서버 주소 입력 (예: `http://127.0.0.1:8912`) → **저장하고 연결 확인**
 4. **💬 대화** 탭 → 큰 **말하기** 버튼 → 말씀 → 자동으로 인식·응답·재생
 
-> 서버가 없으면 화면만 뜨고 음성은 동작하지 않습니다. 로컬 서버 띄우는 법은
-> 아래 `run_unified.sh` (단일형) 또는 `run_pipeline.sh` (분리형) 를 참고하세요.
+> 서버가 없으면 화면만 뜨고 음성은 동작하지 않습니다. 서버 띄우는 법은
+> 아래 `run_unified.sh` (단일형, 권장) 또는 `run_pipeline.sh` (분리형).
 
 ### 앱 사용 흐름
 
