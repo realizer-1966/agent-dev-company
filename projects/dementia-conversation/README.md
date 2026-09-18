@@ -9,6 +9,39 @@ Android aarch64 / proot 기기에서 **실제로 빌드하고 한국어 TTS→AS
 
 > **모든 수치는 이 저장소의 스크립트로 재현 가능합니다.** 가정이나 문서 인용이 아닙니다.
 
+## 구성
+
+| 경로 | 무엇 |
+|---|---|
+| `web/` | **WebUI** — 환자용 음성 대화 화면 (PWA, 단독 배포 가능) |
+| `Android/` | **APK** — WebView 로 WebUI 를 감싼 안드로이드 앱 ("마음이") |
+| `*.md`, `run_*.sh`, `toolchain/` | 엔진 빌드·검증 자료 (아래 "검증된 결과") |
+
+## APK 받기 (마음이)
+
+1. **Actions → Build Dementia Conversation APK → 최신 성공 실행 → Artifacts → `dementia-conversation-apk`**
+   https://github.com/realizer-1966/agent-dev-company/actions/workflows/build-dementia-conversation-apk.yml
+2. 내려받은 zip 을 풀면 `app-release.apk` (약 1.7MB). 폰에 설치 (v2/v3 서명됨).
+3. 앱 실행 → **⚙️ 설정** → 서버 주소 입력 (예: `http://192.168.0.10:8912`) → **저장하고 연결 확인**
+4. **💬 대화** 탭 → 큰 **말하기** 버튼 → 말씀 → 자동으로 인식·응답·재생
+
+> 서버가 없으면 화면만 뜨고 음성은 동작하지 않습니다. 로컬 서버 띄우는 법은
+> 아래 `run_unified.sh` (단일형) 또는 `run_pipeline.sh` (분리형) 를 참고하세요.
+
+### 앱 사용 흐름
+
+```
+[말하기 버튼] → 녹음 → 16kHz WAV 변환 → POST /v1/audio/transcriptions
+   → 인식 텍스트를 말풍선에 표시 → 규칙 기반 응답 생성 (기기 내)
+   → POST /v1/audio/speech → 자동 재생
+```
+
+- **외부 전송 없음**: WebUI 는 외부 도메인을 전혀 호출하지 않고, 응답 생성은
+  기기 내 규칙 테이블입니다. 대화 내용이 밖으로 나가지 않습니다.
+- **접근성**: 글자 크기 3단계(보통/크게/아주 크게), 최소 터치 높이 76px,
+  고대비 색상, 단순한 3탭 구조.
+- **자주 쓰는 문장** 5개를 원터치로 재생 (말하기 탭).
+
 ## 왜 이 두 엔진인가
 
 | 요구 | 근거 |
