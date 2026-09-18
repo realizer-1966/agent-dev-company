@@ -108,12 +108,69 @@ $ cat server.log
 | 저지연 대화 | 단일형 RTF 0.30 (3.5초 발화를 1.07초에 인식) |
 | 라이선스 | moonshine-base-ko = **MIT** (상업 배포 가능), Supertonic = 오픈 |
 
+## 서버 자동 실행 (무인 운영)
+
+서버를 매번 손으로 띄우지 않아도 되게 **워치독 + 스케줄러**로 자동 복구합니다.
+
+### 관리 명령
+
+```bash
+cd projects/dementia-conversation
+bash server.sh start      # 기동 (이미 떠 있으면 그대로 둠)
+bash server.sh status     # 상태 (exit 0=정상, 1=중지)
+bash server.sh stop       # 정상 종료 — 모델을 언로드한다
+bash server.sh restart    # 재기동
+bash server.sh ensure     # 죽어 있으면 살림 (워치독이 호출하는 명령)
+```
+
+```
+$ bash server.sh start
+기동 완료 (5초) — {"status":"ok","backend":"cpu","models":2,...}
+
+$ bash server.sh status
+UP   port=8912 pids='6578'
+     {"status":"ok","backend":"cpu","models":2,...}
+```
+
+### 자동 감시 (Hermes cron)
+
+5분마다 서버 생존을 확인하고, 죽어 있으면 **자동 재기동 후 텔레그램으로 알립니다.**
+서버가 정상이면 **아무 알림도 보내지 않습니다**(무소음 watchdog).
+
+```
+job cb66b8b7b2c8  dementia-conversation 서버 워치독
+  Schedule: every 5m
+  Mode:     no-agent (스크립트 stdout 을 그대로 전달)
+  Deliver:  telegram
+```
+
+등록/확인:
+
+```bash
+hermes cron list          # 등록된 잡 보기
+hermes cron status        # 스케줄러가 도는지 확인
+hermes cron remove cb66b8b7b2c8   # 끄고 싶을 때
+```
+
+워치독 스크립트: `~/.hermes/scripts/dementia_server_watchdog.sh`
+
+### 왜 이렇게 만들었나 (proot 실측 함정 2가지)
+
+| 함정 | 대응 |
+|---|---|
+| `ps aux` 가 프로세스를 거의 못 보여준다 | `/proc/*/cmdline` 순회로 프로세스를 찾는다 |
+| SIGKILL 로 죽이면 모델이 메모리에 남아 **다음 추론이 24배 느려진다** | `SIGTERM` 으로 정상 종료해 모델을 언로드한다 |
+
+`server.sh` 는 이 둘을 모두 처리합니다 — pidfile 을 우선 쓰되 낡았으면 `/proc` 순회로
+보정하고, 정지 시 `SIGTERM` 을 먼저 보낸 뒤 20초 기다렸다가에야 `SIGKILL` 을 씁니다.
+
 ## 무엇이 들어있나
 
 | 파일 | 내용 |
 |---|---|
 | **`DESIGN.md`** | 설계서 (887줄) — 두 레포 분석, 아키텍처 A/B안, 모델 전략, 로드맵, 함정 |
 | **`VERIFICATION.md`** | 실측 기록 (15섹션) — 빌드 로그, 추론 결과, 실패와 우회 |
+| **`server.sh`** | 서버 관리 (start/stop/restart/status/ensure) |
 | `run_pipeline.sh` | **분리형** 원샷 검증 (TTS 서버 + ASR 서버 2개) |
 | `run_unified.sh` | **단일형** 원샷 검증 (서버 1개에서 TTS+ASR) |
 | `asr_server.c` | transcribe.cpp C API 최소 래퍼 (stdin f32 → stdout JSON) |
