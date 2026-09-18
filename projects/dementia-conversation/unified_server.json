@@ -1,0 +1,29 @@
+{
+  "host": "127.0.0.1",
+  "port": 8912,
+  "backend": "cpu",
+  "device": 0,
+  "threads": 6,
+  "lazy_load": true,
+  "models": [
+    {
+      "id": "supertonic-ko",
+      "family": "supertonic",
+      "path": "/root/workspace/models/tts/Supertonic-3-GGUF/supertonic-3-q8_0.gguf",
+      "task": "tts",
+      "mode": "offline",
+      "language": "ko",
+      "default_voice_preset": {
+        "voice_id": "M1"
+      }
+    },
+    {
+      "id": "qwen3-asr",
+      "family": "qwen3_asr",
+      "path": "/root/workspace/models/asr/qwen3-asr-0.6b-q8_0-audiocpp.gguf",
+      "task": "asr",
+      "mode": "offline",
+      "language": "ko"
+    }
+  ]
+}

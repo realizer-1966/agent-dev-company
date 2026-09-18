@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# zig-ar: CMake invokes the archiver as `<CMAKE_AR> <op> <archive> <objs...>`
+# (e.g. `qc libfoo.a a.o b.o`). zig exposes that as `zig ar <op> ...`.
+set -u
+ZIG_BIN="${ZIGCC_ZIG:?set ZIGCC_ZIG to the zig executable}"
+exec "$ZIG_BIN" ar "$@"
