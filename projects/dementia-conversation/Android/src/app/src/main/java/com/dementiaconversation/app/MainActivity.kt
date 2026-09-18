@@ -12,15 +12,21 @@ import android.webkit.WebViewClient
 import android.widget.Toast
 
 /**
- * 마음이 — 치매 대화 도우미.
+ * 마음이 - 치매 대화 도우미.
  *
- * 번들된 WebUI(assets/index.html)를 WebView 로 띄우고,
- * 마이크(getUserMedia) 권한을 앱 권한과 연결해 준다.
+ * 번들된 WebUI 를 WebView 로 띄우고, 마이크(getUserMedia) 권한을 앱 권한과 연결한다.
  * 음성 추론은 전부 사용자가 지정한 로컬 서버에서 수행된다.
+ *
+ * ## file:// 대신 내장 HTTP 서버를 쓰는 이유
+ * assets 를 file:// 로 열면 페이지 origin 이 null 이 되어
+ *  1) 교차 출처 fetch 가 차단된다      -> "서버에 연결할 수 없다"
+ *  2) getUserMedia 의 secure context 요건이 불안정하다 (마이크 불가)
+ * 127.0.0.1 은 potentially-trustworthy 로 취급되므로 두 문제가 모두 사라진다.
  */
 class MainActivity : Activity() {
 
   private lateinit var web: WebView
+  private var assets: AssetServer? = null
   private var pending: PermissionRequest? = null
 
   private val reqCode = 1001
@@ -28,16 +34,23 @@ class MainActivity : Activity() {
   override fun onCreate(state: Bundle?) {
     super.onCreate(state)
 
+    // 1) assets 를 http://127.0.0.1:<port>/ 로 서빙
+    val server = AssetServer(this)
+    server.start()
+    assets = server
+
+    // 2) WebView 준비
     web = WebView(this)
     setContentView(web)
 
     val s = web.settings
     s.javaScriptEnabled = true
-    s.domStorageEnabled = true        // localStorage (서버 주소 저장)
+    s.domStorageEnabled = true                   // localStorage (서버 주소 저장)
     s.databaseEnabled = true
     s.mediaPlaybackRequiresUserGesture = false   // 합성 음성 자동 재생
-    s.allowFileAccess = true
     s.cacheMode = WebSettings.LOAD_DEFAULT
+    // file:// 접근은 더 이상 필요하지 않다 (내장 서버가 대신 서빙)
+    s.allowFileAccess = false
 
     web.webViewClient = WebViewClient()
 
@@ -56,7 +69,7 @@ class MainActivity : Activity() {
       }
     }
 
-    web.loadUrl("file:///android_asset/index.html")
+    web.loadUrl("http://127.0.0.1:" + AssetServer.DEFAULT_PORT + "/index.html")
   }
 
   @Deprecated("Deprecated in Java")
@@ -86,6 +99,7 @@ class MainActivity : Activity() {
   }
 
   override fun onDestroy() {
+    assets?.stop()
     web.destroy()
     super.onDestroy()
   }

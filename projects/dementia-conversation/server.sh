@@ -97,8 +97,13 @@ do_start() {
 
   echo "기동: $BIN --config unified_server.json --port $PORT"
   cd "$WORK" || return 1
+  # --cors-origins "*" 가 필수다:
+  #   앱(WebView)은 file:// 에서 로드되므로 Origin: null 로 요청을 보내고,
+  #   브라우저 fetch() 는 CORS 헤더가 없으면 응답을 차단한다.
+  #   curl/Chrome 직접 접속은 CORS 를 적용받지 않아 이 문제가 드러나지 않는다.
   # setsid 로 세션을 분리해 이 스크립트가 끝나도 살아남게 한다
   setsid "$BIN" --config "$CONFIG" --port "$PORT" --backend cpu --threads 6 \
+    --cors-origins "*" \
     --log-file "$LOG" >>"$WORK/unified_stdout.log" 2>&1 &
   echo $! > "$PIDFILE"
 
