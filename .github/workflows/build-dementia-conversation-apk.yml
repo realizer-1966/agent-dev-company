@@ -31,10 +31,13 @@ jobs:
 
       # WebUI(web/)를 APK assets 로 동기화한다.
       # 이 단계가 없으면 web/ 수정이 앱에 반영되지 않고 조용히 어긋난다.
+      # 주의: working-directory 가 Android/src 이므로 상대경로 ../web 은 틀린다.
+      #       (그건 Android/web 을 가리킨다) → 저장소 루트 기준 절대경로를 쓴다.
       - name: Sync WebUI into app assets
         run: |
-          DEST=app/src/main/assets
-          SRC=../web
+          PROJ="$GITHUB_WORKSPACE/projects/dementia-conversation"
+          DEST="$PROJ/Android/src/app/src/main/assets"
+          SRC="$PROJ/web"
           mkdir -p "$DEST"
           cp "$SRC/index.html" "$SRC/manifest.json" "$SRC/sw.js" \
              "$SRC/icon-192.png" "$SRC/icon-512.png" "$DEST/"
@@ -44,13 +47,14 @@ jobs:
       # assets 와 web/ 이 실제로 일치하는지 확인 (드리프트 방지)
       - name: Verify assets match web source
         run: |
+          PROJ="$GITHUB_WORKSPACE/projects/dementia-conversation"
           for f in index.html manifest.json sw.js icon-192.png icon-512.png; do
-            if ! cmp -s "../web/$f" "app/src/main/assets/$f"; then
+            if ! cmp -s "$PROJ/web/$f" "$PROJ/Android/src/app/src/main/assets/$f"; then
               echo "::error::assets/$f 가 web/$f 와 다릅니다"
               exit 1
             fi
           done
-          echo "✅ assets == web"
+          echo "assets == web"
 
       - name: Build
         run: ./gradlew assembleRelease --stacktrace
