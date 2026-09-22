@@ -1,5 +1,0 @@
-{
-  "name": "audio-pwa",
-  "private": true,
-  "scripts": { "deploy": "wrangler deploy" }
-}

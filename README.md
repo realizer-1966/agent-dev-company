@@ -46,16 +46,11 @@ hermes kanban list    # 현재 업무 현황
 
 ## 프로젝트 목록
 
+현재 **rental-web 집중 개발** 모드입니다. 나머지 프로젝트는 GitHub에 이력 보존 후 워크스페이스에서 정리되었습니다.
+
 | 프로젝트 | 상태 | 설명 |
 |---|---|---|
-| [hello-cli](projects/hello-cli/) | ✅ 완료 | 한국어 인사말 출력 Python CLI (TDD, 3 tests) |
-| [todo-list](projects/todo-list/) | ✅ 완료 | 할일 관리 CLI (add/list/done/remove, JSON 저장, 30 tests) |
-| [fastapi-backend](projects/fastapi-backend/) | ✅ 완료 | FastAPI 웹 백엔드 (RESTful API, TDD, 5 tests) |
-| [todo-web](projects/todo-web/) | ✅ 완료 | 할일 관리 웹앱 (FastAPI + UI) |
-| [rental-web](projects/rental-web/) | ✅ 완료 | 임대관리 웹앱 (건물·세입자 관리, OnDev 배포) |
-| [glowscript-agent](projects/glowscript-agent/) | ✅ 완료 | GlowScript/VPython 시뮬레이션 생성·검증 에이전트 (TDD, 56 tests) |
-| [glowscript-llm](projects/glowscript-llm/) | ✅ 완료 | GlowScript LLM 생성 백엔드 (FastAPI, 자연어→코드, TDD, 7 tests) |
-| [litert-chat-deploy](projects/litert-chat-deploy/) | ✅ 완료 | LiteRT Chat 온디바이스 LLM 데모 웹앱 (Vue3, 스킬 호출 시뮬레이션, OnDev 배포) |
+| [rental-web](projects/rental-web/) | 🚧 진행 중 | 임대관리 웹앱 (건물·세입자 관리, OnDev 배포) |
 
 ## 운영 자동화
 

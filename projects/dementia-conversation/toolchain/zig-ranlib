@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-# zig-ranlib: CMake invokes ranlib as `<CMAKE_RANLIB> <archive>`.
-set -u
-ZIG_BIN="${ZIGCC_ZIG:?set ZIGCC_ZIG to the zig executable}"
-exec "$ZIG_BIN" ranlib "$@"

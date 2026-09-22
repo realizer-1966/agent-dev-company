@@ -1,9 +1,0 @@
-{
-  "name": "ya-donghaja-sync",
-  "version": "1.0.0",
-  "private": true,
-  "dependencies": {
-    "@syncular/server": "0.15.48",
-    "@syncular/server-workers": "0.15.48"
-  }
-}
