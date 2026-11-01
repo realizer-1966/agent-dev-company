@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>임대관리 앱 — 설치</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="manifest" href="../manifest.json">
+  <meta name="theme-color" content="#4f46e5">
+  <style>
+    body { background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%); }
+    .btn { transition: all .15s ease; }
+    .btn:active { transform: scale(.96); }
+  </style>
+</head>
+<body class="min-h-screen text-slate-200 flex items-center justify-center p-6">
+
+  <div class="max-w-sm w-full text-center space-y-6">
+    <img src="../icon-512.png" alt="임대관리 앱 아이콘"
+         class="w-28 h-28 mx-auto rounded-3xl shadow-2xl shadow-indigo-900/50">
+    <div>
+      <h1 class="text-2xl font-bold text-white">임대관리 앱</h1>
+      <p class="text-sm text-slate-400 mt-2">
+        건물·세입자·월세를 내 기기에 설치해 쓰세요.<br>
+        데이터는 기기 안에만 저장됩니다.
+      </p>
+    </div>
+
+    <button id="installBtn"
+      class="btn hidden w-full py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700
+             text-white text-lg font-bold shadow-lg shadow-indigo-900/40">
+      📲 지금 설치하기
+    </button>
+
+    <div id="status" class="text-sm text-slate-300 bg-slate-800/60 rounded-2xl p-4 text-left space-y-2">
+      <p><b class="text-indigo-300">Android (Chrome):</b> 위 <b>지금 설치하기</b> 버튼이 뜨면 누릅니다.
+        버튼이 없으면 브라우저 메뉴(⋮) → <b>앱 설치 / 홈 화면에 추가</b>.</p>
+      <p><b class="text-indigo-300">iOS (Safari):</b> 공유 버튼(⬆️) → <b>홈 화면에 추가</b>.</p>
+    </div>
+
+    <a href="/" class="btn inline-block w-full py-3 rounded-2xl bg-slate-700 hover:bg-slate-600 text-slate-100 font-semibold">
+      ▶ 설치 없이 앱 바로 열기
+    </a>
+  </div>
+
+  <script>
+    (function () {
+      var btn = document.getElementById('installBtn');
+      var deferred = null;
+      function show(msg, ok) {
+        var s = document.getElementById('status');
+        s.innerHTML = '<p class="' + (ok ? 'text-emerald-300' : 'text-slate-300') + '">' + msg + '</p>';
+      }
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        deferred = e;
+        btn.classList.remove('hidden');
+      });
+      btn.addEventListener('click', function () {
+        if (!deferred) return;
+        btn.disabled = true;
+        deferred.prompt();
+        deferred.userChoice.then(function (choice) {
+          if (choice && choice.outcome === 'accepted') show('설치되었습니다! 홈 화면에서 여세요. 🎉', true);
+          else show('설치가 보류되었습니다. 필요하면 브라우저 메뉴(⋮) → 앱 설치로도 가능합니다.', false);
+          deferred = null;
+          btn.disabled = false;
+        });
+      });
+      window.addEventListener('appinstalled', function () {
+        show('설치 완료! 홈 화면 아이콘으로 여세요. 🎉', true);
+        btn.classList.add('hidden');
+      });
+    })();
+  </script>
+</body>
+</html>
