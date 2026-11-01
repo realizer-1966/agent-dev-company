@@ -1,6 +1,6 @@
 # rental-web — 임대관리 앱
 
-OnDev Store에 배포된 **임대관리 웹앱**입니다.
+**https://rental-web-aeh.pages.dev** 에 배포되어 있는 **임대관리 웹앱**입니다 (Cloudflare Pages, PWA 설치 가능).
 
 ## ✨ 기능
 
@@ -30,7 +30,18 @@ rental-web/
 └── rental-web.zip  # 배포용 ZIP
 ```
 
-## 🚀 재배포
+## ☁️ Cloudflare Pages 배포 (주 채널 — https라 PWA 설치 가능)
+
+- **배포 URL**: https://rental-web-aeh.pages.dev (설치 페이지: [/install/](https://rental-web-aeh.pages.dev/install/))
+- **인증**: Cloudflare OAuth(wrangler device flow) — 토큰은 이 기기의 `~/.wrangler/config/default.toml`에만 저장(리프레시로 자동 연장)
+- **재배포**:
+  ```bash
+  npx wrangler pages deploy projects/rental-web --project-name=rental-web --branch=main --commit-dirty=true
+  ```
+  (qa/ 등을 제외하려면 임시 dist 폴더로 앱 파일만 복사해 배포)
+- 배포 상태 확인: `curl -s https://rental-web-aeh.pages.dev/ | grep -o "<title>[^<]*</title>"`
+
+## 🚀 OnDev Store 재배포 (대안 — claim 불안정)
 
 ```bash
 cd projects/rental-web
