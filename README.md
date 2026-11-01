@@ -30,7 +30,7 @@ backlog → ready → in_progress → review → done
 ## 사무실 구조
 
 ```
-agent-company/
+agent-dev-company/
 ├── AGENTS.md        # 사내 공통 규칙 (모든 직원이 로드)
 ├── README.md        # 회사 소개 (이 파일)
 └── projects/        # 실제 개발 프로젝트
@@ -40,13 +40,11 @@ agent-company/
 ## 시작하기
 
 ```bash
-cd /root/workspace/agent-company
+cd /root/workspace/agent-dev-company
 hermes kanban list    # 현재 업무 현황
 ```
 
 ## 프로젝트 목록
-
-현재 **rental-web 집중 개발** 모드입니다. 나머지 프로젝트는 GitHub에 이력 보존 후 워크스페이스에서 정리되었습니다.
 
 | 프로젝트 | 상태 | 설명 |
 |---|---|---|
@@ -62,12 +60,12 @@ hermes kanban list    # 현재 업무 현황
 
 ```bash
 # 1. 텔레그램에서 봇에게 말하기 (가장 편함)
-@agent_dev_company_bot → "todo-list에 카테고리 추가해줘"
+@agent_dev_company_bot → "rental-web에 백업 기능 개선해줘"
 
 # 2. 터미널에서 직접
-cd /root/workspace/agent-company
+cd /root/workspace/agent-dev-company
 hermes kanban create "작업 내용" --assignee dev
 
 # 3. 이 WebUI 대화에서 말하기
-"hello-cli에 버그 수정해줘"
+"rental-web에 버그 수정해줘"
 ```

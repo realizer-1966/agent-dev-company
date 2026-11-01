@@ -7,27 +7,6 @@ on:
     branches: [ "main" ]
 
 jobs:
-  test-projects:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        project: ["hello-cli", "todo-list", "fastapi-backend", "glowscript-agent", "glowscript-llm"]
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
-
-    - name: Install dependencies & Run Tests
-      run: |
-        python -m pip install --upgrade pip
-        cd projects/${{ matrix.project }}
-        pip install -e '.[dev]' pytest pytest-cov pytest-mock mutmut || pip install '.[dev]' pytest pytest-cov pytest-mock mutmut
-        pytest -q --cov --cov-report=xml
-
   # rental-web: 계산 로직 QA 파이프라인 (Node 기반)
   # 데이터 주입 → 연산 → 손계산 기대값(골든 마스터) 비교. 실패 시 CI가 빨간불.
   test-rental-web-qa:
