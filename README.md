@@ -52,9 +52,10 @@ hermes kanban list    # 현재 업무 현황
 
 ## 운영 자동화
 
-- **데일리 스탠드업**: 매일 09:00에 Kanban 현황 자동 보고 (cron `agent-company-standup`)
-- **텔레그램 발주**: @agent_dev_company_bot 에게 메시지를 보내면 티켓으로 전환되어 자동 처리
-- **대시보드**: http://127.0.0.1:9119 (Hermes Web UI, Kanban 탭 포함)
+- **데일리 스탠드업**: 매일 09:00 KST에 Kanban 현황 자동 보고 (cron `agent-company-standup`, 이 채널 전달)
+- **텔레그램 발주**: @agent_dev_company_bot 에게 메시지를 보내면 티켓으로 전환되어 자동 처리 (※ 현재 기기는 봇 토큰 미설정 — 이 채널이나 터미널로 발주)
+- **대시보드**: http://127.0.0.1:18935 (Hermes Web UI) — 보드는 `hermes kanban list`로도 확인
+- **리뷰 레인**: 작업 티켓은 생성 직후/진행 중에 `hermes kanban request-review <id> --reviewer reviewer`로 리뷰 요청 → reviewer가 검증 후 승인(done) 또는 반려(block)
 
 ## 일 시키는 방법
 
