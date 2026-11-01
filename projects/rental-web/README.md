@@ -43,9 +43,9 @@ curl -s -X POST https://ondev.store/api/deploy -H "Content-Type: application/jso
 }"
 ```
 
-현재 배포 claim_url: https://ondev.store/claim/37256y (2026-11-01 재배포; 이전 gtumon 토큰은 만료·404)
+현재 배포 claim_url: https://ondev.store/claim/112mo1 (2026-11-01, PWA 설치 가능 버전 — 최신; 이전 gtumon·37256y·9277hm 토큰들은 만료/폐기)
 
-※ 배포는 **claim 점유 후 활성화**된다: claim_url을 브라우저로 열어 소유 점유하면 `rental-web.ondev.store` 서브도메인이 살아난다. 로컬 실행: `cd projects/rental-web && python3 -m http.server 8899` 후 `http://127.0.0.1:8899` (Tailwind CDN 때문에 첫 로딩만 인터넷 필요).
+※ 배포는 **claim 점유 후 활성화**된다: claim_url을 브라우저로 열어 소유 점유하면 `rental-web.ondev.store` 서브도메인이 살아난다. PWA 설치 필수 요건(manifest.json + sw.js + PNG 아이콘 192/512)을 2026-11-01 추가해 "앱을 설치할 수 없습니다" 문제 해소. 로컬 실행: `cd projects/rental-web && python3 -m http.server 8899` 후 폰 브라우저에서 `http://127.0.0.1:8899` (Tailwind CDN 때문에 첫 로딩만 인터넷 필요). QA 로더가 첫 bare `<script>`를 앱 본체로 파싱하므로 head의 PWA 스크립트는 `data-pwa` 어트리뷰트로 구별해야 한다.
 
 ## 💾 데이터 저장 방식
 
