@@ -1,0 +1,1 @@
+"""unittest 기반 계약 테스트 — 표준 라이브러리만 사용 (AGENTS.md pytest 지침의 v2a 예외, README 참조)."""
