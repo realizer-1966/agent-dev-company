@@ -166,10 +166,14 @@ test('regimeShift — 시프트·보정 실동작: 프리셋 반환·미지 국�
 });
 
 // -------------------------------------------------------------- rebalance.js
-test('rebalance — 트리거 상수 5%p(7장)·함수 시그니처 확정', () => {
+test('rebalance — 트리거 상수 5%p(7장)·실동작: 5.00%p 제안·4.99%p 미제안 (상세는 tests/rebalance.test.js)', () => {
   assert.equal(REBALANCE_TRIGGER_PCT, 5);
-  assert.equal(typeof suggestRebalance, 'function');
-  assert.throws(() => suggestRebalance(BASIS_ALLOCATION, REGIME_PRESETS[0].targetAllocation), STUB_RE);
+  const over = { 木: 35, 火: 10, 土: 20, 金: 25, 水: 15 };
+  assert.deepEqual(suggestRebalance(over, BASIS_ALLOCATION), [
+    { element: '木', gapPct: 5, direction: 'decrease' },
+  ], '격차 5.00%p는 제안(7장 경계 포함)');
+  assert.deepEqual(suggestRebalance({ ...BASIS_ALLOCATION, 水: 19.99 }, BASIS_ALLOCATION), [],
+    '격차 4.99%p는 미제안');
 });
 
 // -------------------------------------------------------------- circulate.js
