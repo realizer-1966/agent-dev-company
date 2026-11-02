@@ -24,9 +24,6 @@ DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 # (모듈, 함수명, 필수 인자 개수) — 골격 계약: 존재·callable·(아직 stub이면)NotImplementedError.
 # ②에서 구현이 채워진 모듈(sources)은 stub 본문 검사에서 제외 — 계층 테스트가 계약을 인수받았다.
 STUB_FUNCTIONS: dict[str, list[tuple[str, int]]] = {
-    "feaas.indicators": [
-        ("indicators_for", 1),
-    ],
     "feaas.scores": [
         ("carry_forward", 1),
         ("rolling_percentile", 1),
@@ -133,7 +130,6 @@ class SkeletonStubBodyContract(unittest.TestCase):
         import feaas.report as report
 
         calls: list[tuple[str, object, tuple]] = [
-            ("indicators.indicators_for", indicators.indicators_for, ("목",)),
             ("scores.carry_forward", scores.carry_forward, ((1.0, None, 2.0),)),
             ("scores.rolling_percentile", scores.rolling_percentile, ((1.0, 2.0),)),
             ("scores.invert", scores.invert, (40.0,)),
