@@ -96,11 +96,13 @@ test('classify — CLASSIFY_KEYWORDS: 6장 전체 유형 대상 키워드 상수
   }
 });
 
-test('classify — 분류 함수 3종 시그니처 확정, 스텁은 TODO 에러로 거부', () => {
+test('classify — 분류 함수 3종 실동작 (상세는 tests/classify.test.js)', () => {
   for (const fn of [classifyAsset, classifyToAssetType, classifyToElement]) {
     assert.equal(typeof fn, 'function');
-    assert.throws(() => fn('금'), STUB_RE);
   }
+  assert.equal(classifyToAssetType('금(Gold)'), 'gold');
+  assert.equal(classifyToElement('금'), '金');
+  assert.throws(() => classifyAsset('비트코인'), /분류 실패/);
 });
 
 // --------------------------------------------------------------- weighted.js
