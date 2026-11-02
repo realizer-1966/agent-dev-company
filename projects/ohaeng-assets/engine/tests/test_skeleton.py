@@ -21,17 +21,9 @@ if str(ENGINE_DIR) not in sys.path:
 FIXTURES_DIR = ENGINE_DIR / "data" / "fixtures"
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
-# (모듈, 함수명, 필수 인자 개수) — 골격 계약: 존재·callable·NotImplementedError stub
+# (모듈, 함수명, 필수 인자 개수) — 골격 계약: 존재·callable·(아직 stub이면)NotImplementedError.
+# ②에서 구현이 채워진 모듈(sources)은 stub 본문 검사에서 제외 — 계층 테스트가 계약을 인수받았다.
 STUB_FUNCTIONS: dict[str, list[tuple[str, int]]] = {
-    "feaas.sources": [
-        ("parse_fred_csv", 1),
-        ("build_fred_url", 1),
-        ("build_stooq_url", 1),
-        ("fetch_fred", 1),
-        ("fetch_stooq", 1),
-        ("load_cache", 2),
-        ("save_cache", 3),
-    ],
     "feaas.indicators": [
         ("indicators_for", 1),
     ],
@@ -141,9 +133,6 @@ class SkeletonStubBodyContract(unittest.TestCase):
         import feaas.report as report
 
         calls: list[tuple[str, object, tuple]] = [
-            ("sources.parse_fred_csv", sources.parse_fred_csv, ("DATE,IDX\n2024-01-02,1.5\n",)),
-            ("sources.build_fred_url", sources.build_fred_url, ("DGS10",)),
-            ("sources.build_stooq_url", sources.build_stooq_url, ("sp500",)),
             ("indicators.indicators_for", indicators.indicators_for, ("목",)),
             ("scores.carry_forward", scores.carry_forward, ((1.0, None, 2.0),)),
             ("scores.rolling_percentile", scores.rolling_percentile, ((1.0, 2.0),)),
@@ -200,7 +189,7 @@ class FixtureFormatContract(unittest.TestCase):
 
     def test_fixture_fred_graph_csv_format(self) -> None:
         """헤더 DATE/<ID> 또는 실측 observation_date/<ID> · 결측 '.' 또는 빈칸 · 날짜 정규형."""
-        csvs = sorted(FIXTURES_DIR.glob("*.csv"))
+        csvs = sorted(FIXTURES_DIR.glob("fredgraph_*.csv"))
         self.assertGreaterEqual(len(csvs), 2)
         missing_seen = False
         for path in csvs:
