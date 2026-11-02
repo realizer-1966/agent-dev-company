@@ -78,10 +78,10 @@ test('vectors — ELEMENT_SCORE_MEANINGS: 6장 5요소 의미 상수', () => {
   }
 });
 
-test('vectors — getBasicVector 시그니처 확정, 스텁은 TODO 에러로 거부', () => {
+test('vectors — getBasicVector: 유형→기본 벡터·미지 유형 거부 (9장 1번 실동작, 상세는 tests/vectors.test.js)', () => {
   assert.equal(typeof getBasicVector, 'function');
-  assert.throws(() => getBasicVector('equity'), STUB_RE);
-  assert.throws(() => getBasicVector('unknown-type'), STUB_RE);
+  assert.deepEqual(getBasicVector('equity'), { 木: 90, 火: 40, 土: 0, 金: 0, 水: 30 });
+  assert.throws(() => getBasicVector('unknown-type'), /알 수 없는 자산 유형/);
 });
 
 // --------------------------------------------------------------- classify.js

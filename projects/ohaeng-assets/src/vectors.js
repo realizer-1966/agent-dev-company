@@ -50,23 +50,19 @@ export const ASSET_TYPES = [
 ];
 
 /**
- * 스캐폴딩 단계 규약(티켓 t_c227b7e3 ①): 계산 함수는 모듈 경계·시그니처만 확정하고
- * 본문은 코어 엔진 TDD 티켓 t_27551fb2(②)가 RED→GREEN으로 채운다.
- * 스텁은 조용히 undefined를 반환하는 대신 TODO 에러로 거부한다 —
- * 구현 전 의존 코드가 조용히 잘못된 계산을 계속하는 것을 방지하기 위해서다.
- */
-const notImplemented = (name) => {
-  throw new Error(
-    `TODO(t_27551fb2): ${name} — 본문은 코어 엔진 TDD 티켓(②)에서 구현한다 (골격·시그니처는 티켓 ①스캐폴딩이 확정)`,
-  );
-};
-
-/**
  * 유형 ID → req 6장 기본 5요소 벡터.
  * @param {string} typeId ASSET_TYPES의 id ('equity'|'energy'|'realty'|'gold'|'bonds'|'cash')
+ *   — 유형 ID는 정확히 일치하는 식별자 lookup이다(텍스트 입력의 자동 분류는 classify.js 담당).
  * @returns {Record<'木'|'火'|'土'|'金'|'水', number>} 0~100 벡터(원본 데이터 복사본 — 호출자가 변형해도 상수가 오염되지 않게)
- * @throws 알 수 없는 typeId(req 9장 1번 — 표에 없는 유형은 명확히 거부)
+ * @throws 알 수 없는 typeId(req 9장 1번 — 표에 없는 유형은 조용한 undefined 대신 명확히 거부)
  */
 export function getBasicVector(typeId) {
-  notImplemented('getBasicVector(typeId)');
+  const type = ASSET_TYPES.find((t) => t.id === typeId);
+  if (!type) {
+    throw new Error(
+      `알 수 없는 자산 유형: ${JSON.stringify(typeId)} — req 6장 표의 유형 `
+      + `(${ASSET_TYPES.map((t) => t.id).join(', ')})만 허용된다(req 9장 1번: 표에 없는 유형은 명확히 거부)`,
+    );
+  }
+  return { ...type.basicVector };
 }
