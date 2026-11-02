@@ -15,16 +15,13 @@ import * as barrel from '../src/index.js';
  *
  * 목적:
  *  - 코어 모듈 경계 7종의 존재·export 시그니처 확정 검증
- *  - ①이 배시하는 데이터 상수(기본 벡터·기준 배분·허용 범위·국면 프리셋·상생 매핑)의
+ *  - ①이 확정하는 데이터 상수(기본 벡터·기준 배분·허용 범위·국면 프리셋·상생 매핑)의
  *    형상 위생(키 완전성·합 100·허용 범위 내)
- *  - 계산 함수는 전부 notImplemented 스텁이므로 "스텁이 TODO 에러로 명확히 거부한다"
- *    는 경계 동작까지만 확인 (조용히 undefined를 반환하는 실수를 방지)
+ *  - 각 모듈의 핵심 실동작 요약 단언(조용히 undefined를 반환하는 실수를 방지)
  *
- * 실제 수치·행위 케이스(requirements.md 9장 수용기준)는 후속 TDD 티켓
- * t_27551fb2(② 코어 엔진 TDD)가 RED→GREEN으로 채운다.
+ * 실제 수치·행위 케이스(requirements.md 9장 수용기준 1번 8종)는 티켓 t_27551fb2(② 코어 엔진
+ * TDD)가 RED→GREEN으로 채워 각 모듈 테스트 파일과 본 실동작 단언으로 완료했다.
  */
-
-const STUB_RE = /t_27551fb2/;
 
 // ---------------------------------------------------------------- vectors.js
 test('vectors — ELEMENTS 5오행 상수', () => {
@@ -121,9 +118,11 @@ test('ebi — EBI 정의가 주석·문자열 상수로 문서화 (7장)', () =>
   assert.ok(EBI_DEFINITION.includes('0~100'), '범위 문서화');
 });
 
-test('ebi — computeEBI 시그니처 확정, 스텁은 TODO 에러로 거부', () => {
+test('ebi — computeEBI 실동작: 기준 배분 동일=최대 100·단일 집중=최저 (상세는 tests/ebi.test.js)', () => {
   assert.equal(typeof computeEBI, 'function');
-  assert.throws(() => computeEBI(BASIS_ALLOCATION), STUB_RE);
+  assert.equal(computeEBI(BASIS_ALLOCATION), 100, '기준 배분 동일 → 최대(req 9장 6번)');
+  assert.equal(computeEBI({ 木: 0, 火: 100, 土: 0, 金: 0, 水: 0 }), 10, '단일 집중 → 최저(火 기준 비중)');
+  assert.throws(() => computeEBI({ 木: 30, 火: 10, 土: 20, 金: 25 }), /5오행/, '키 불완전 거부');
 });
 
 // ----------------------------------------------------------- regimeShift.js
