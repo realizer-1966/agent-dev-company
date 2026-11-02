@@ -106,9 +106,12 @@ test('classify — 분류 함수 3종 실동작 (상세는 tests/classify.test.j
 });
 
 // --------------------------------------------------------------- weighted.js
-test('weighted — 금액 가중 평균 시그니처 확정, 스텁은 TODO 에러로 거부', () => {
-  assert.equal(typeof weightedElementDistribution, 'function');
-  assert.throws(() => weightedElementDistribution([]), STUB_RE);
+test('weighted — 금액 가중 평균 실동작: 정규화 가중평균·0-총액·음수 거부 (상세는 tests/weighted.test.js)', () => {
+  // equity 기본 벡터(합 160)를 합 100으로 정규화: 木56.25·火25·土0·金0·水18.75
+  assert.deepEqual(weightedElementDistribution([{ typeId: 'equity', amount: 1000000 }]),
+    { 木: 56.25, 火: 25, 土: 0, 金: 0, 水: 18.75 });
+  assert.throws(() => weightedElementDistribution([]), /총액이 0/, '0-총액 규칙');
+  assert.throws(() => weightedElementDistribution([{ typeId: 'equity', amount: -1 }]), /음수/);
 });
 
 // -------------------------------------------------------------------- ebi.js
