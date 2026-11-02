@@ -20,9 +20,29 @@ Firefox/LibreWolf는 "Module source URI is not allowed… / CORS request not htt
 cd projects/ohaeng-assets && python3 -m http.server 8000
 # → http://localhost:8000 접속 — index.html이 ui/app.js(ES 모듈 진입점)를 로드해 앱이 동작한다
 
-# 방법 2 — Cloudflare Pages(배포)
+# 방법 2 — Cloudflare Pages(배포): https://feaas-ohaeng.pages.dev
 # http(s) 서빙이므로 동일하게 동작 — rental-web 인증 경로 재사용, 별도 프로젝트 이름(req 8장)
 ```
+
+## 배포 (Cloudflare Pages — req 8장·수용기준 3번)
+
+- **프로덕션 URL**: https://feaas-ohaeng.pages.dev — 별도 프로젝트 **`feaas-ohaeng`**(rental-web-aeh.pages.dev와 분리, 덮어쓰기 없음)
+- **인증**: rental-web과 동일한 기기 OAuth device-flow 토큰 재사용(`/root/.wrangler/config/default.toml` — 만료 시 refresh_token으로 자동 연장). 프로필 샌드박스 환경에서는 `HOME=/root`로 실행해야 레거시 `~/.wrangler` 토큰 경로를 읽는다.
+
+```bash
+# 최초 1회 — 프로젝트 생성 (production branch: main)
+HOME=/root npx --yes wrangler pages project create feaas-ohaeng --production-branch=main
+
+# 배포(재배포 동일) — repo 루트에서 실행
+HOME=/root npx --yes wrangler pages deploy projects/ohaeng-assets --project-name=feaas-ohaeng --branch=main --commit-dirty=true
+
+# 도달 확인 (수용기준 3번)
+curl -sS -o /dev/null -w '%{http_code}\n' https://feaas-ohaeng.pages.dev/                 # → 200
+curl -sS -o /dev/null -w '%{http_code}\n' https://feaas-ohaeng.pages.dev/ui/app.js       # → 200 (ES 모듈 진입점)
+curl -sS https://rental-web-aeh.pages.dev/ | grep -o "<title>[^<]*</title>"              # → <title>임대관리 앱</title> (대조 — 영향 없음)
+```
+
+- 2026-11-02 첫 배포 실적: 29파일 업로드, `/`·`ui/app.js`·`src/*.js` 전부 HTTP 200, 배포 스냅샷 `https://a316f1d5.feaas-ohaeng.pages.dev`
 
 ## 테스트 방법
 
