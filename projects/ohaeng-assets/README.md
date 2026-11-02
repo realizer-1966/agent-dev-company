@@ -89,10 +89,10 @@ cd projects/ohaeng-assets/engine
 
 | 파일 | 역할 | 상태 |
 |---|---|---|
-| `engine/feaas/sources.py` | FRED·Stooq CSV fetcher + 로컬 캐시·retry — **네트워크·FS 격리 계약**: 실 fetch는 이 모듈만 | skeleton(stub) |
-| `engine/feaas/indicators.py` | 지표 정의서 — 오행×데이터 ID 매핑 | skeleton(stub) |
-| `engine/feaas/scores.py` | 표준화 — 10년 rolling percentile → 0~100 | skeleton(stub) |
-| `engine/feaas/classifier.py` | 국면 A~E 판정(복수 지표 조합 규칙) | skeleton(stub) |
+| `engine/feaas/sources.py` | FRED·Stooq CSV fetcher + 로컬 캐시·retry — **네트워크·FS 격리 계약**: 실 fetch는 이 모듈만 | **② v2a 구현 완료** (총 3시도 retry·백오프·timeout 30s·캐시 히트 0네트워크) |
+| `engine/feaas/indicators.py` | 지표 정의서 — 오행×데이터 ID 매핑 | **② v2a 구현 완료** — `INDICATOR_DEFS` 17종 확정 → [`docs/indicator-map.md`](docs/indicator-map.md) |
+| `engine/feaas/scores.py` | 표준화 — 10년 rolling percentile → 0~100 | **② v2a 구현 완료** (carry-forward·역방향 100−p·평균 round·clamp·부족=누락 표기) |
+| `engine/feaas/classifier.py` | 국면 A~E 판정(복수 지표 조합 규칙) | skeleton(stub) — ③ |
 | `engine/feaas/backtest.py` | 국면→배분 시프트 시뮬레이션·성과지표 | skeleton(stub) |
 | `engine/feaas/report.py` | state.json 구성·스키마 검증(순수) | skeleton(stub) |
 | `engine/run_pipeline.py` | 배치 진입점 stub — 실행 순서 문서화 | stub(NotImplementedError) |
@@ -109,11 +109,17 @@ fetch 실측 포맷과 일치시켜 ② 티켓이 그대로 재사용하는 샘�
 | `fredgraph_VIXCLS_2021-02.csv` | 실측 다운로드 원본 | VIX (일간, 역방향 지표, 결측 1건) |
 | `fredgraph_UNRATE_2024.csv` | 실측 다운로드 원본 | 실업률 (월간, 수준 지표) |
 | `fredgraph_LEGACY_DATE_dot.sample.csv` | 문서 포맷 · 합성 샘플 | 결측 `.` 마커 시연 |
+| `stooq_spx_daily.sample.csv` | 문서 포맷 · 합성 샘플 | Stooq 일별 CSV(Date,Open,High,Low,Close,Volume — ② 확정) |
 
 - **실측 포맷(2026-11-02 확인)**: 헤더 `observation_date,<FRED_ID>` — 결측은 **빈 문자열** (예: `2024-01-15,`)
 - **문서 포맷(req-v2 §0·티켓 명시, 구 FRED 응답)**: 헤더 `DATE,<FRED_ID>` — 결측 `.` (예: `2024-01-09,.`)
 - 파서 계약(② 구현): 두 헤더 변형 모두 수용, 결측 `.`·빈 문자열을 모두 None으로 정규화 — fixture 4종으로 고정
 - URL: `https://fred.stlouisfed.org/graph/fredgraph.csv?id=<ID>` — API 키 불필요(실측 200, req-v2 §0)
+- **지표 정의서(② 산출)**: [`docs/indicator-map.md`](docs/indicator-map.md) — 오행×ID 17종 매핑 표,
+  후보 기각·대체 근거(BAMLH0A0HYM2/SP500/SOFR 라이선스·이력 한계), 표준화 정책(carry-forward·역방향
+  100−p·평균 round·clamp·**부족 10년 → 누락 표기 확정**)을 전부 기록
+- fetch 정책(② 확정): 총 3시도(재시도 2회·백오프 0.5→1.0s)·timeout 30s·실패 시 `FetchError`·
+  캐시 히트 시 네트워크 0호출(refresh=True만 재수집) — 캐시 파일은 `engine/data/cache/`(FRED `<ID>.csv`·Stooq `stooq-<심볼>-<주기>.csv`)
 
 ### v2a / v2b 경계
 
@@ -144,11 +150,12 @@ projects/ohaeng-assets/
 │   ├── feaas/            # sources·indicators·scores·classifier·backtest·report (순수 함수)
 │   ├── run_pipeline.py   # 배치 진입점 stub — 실행은 ②③ 티켓
 │   ├── tests/            # v2a unittest — 표준 라이브러리(venv 기준, pytest 예외)
-│   ├── data/fixtures/    # FRED fredgraph.csv 포맷 샘플 4종 (실측 3 + 문서 포맷 1)
+│   ├── data/fixtures/    # FRED fredgraph.csv 샘플 4종 + Stooq 샘플 1종 (② 확정)
 │   └── requirements.txt  # numpy 최소 · pandas/scipy 선택 주석
 ├── docs/
 │   ├── requirements.md        # v1(web MVP) 유일 근거문서 v2.0
 │   ├── requirements-v2.md     # v2a 엔진 유일 근거문서
+│   ├── indicator-map.md       # v2a 지표 정의서 — 오행×ID 매핑·기각 근거·표준화 정책 (②)
 │   └── v2-ideas.md            # v2 기록 전용 (MVP 금지 항목)
 └── package.json          # 테스트 실행 안내 수준 (의존성 0)
 ```
