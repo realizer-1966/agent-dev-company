@@ -1,0 +1,339 @@
+/* styles.css — 오행 자산 진단기 UI(티켓 ③). 라이브러리 0, 모바일 우선: 375px 실측 기준.
+   데스크톱(≥700px)에서만 소폭 2열 배치 — 나머지는 375px 흐름과 동일(반응형은 확장, 분기 아님). */
+
+:root {
+  --ink: #27352c;
+  --muted: #65706a;
+  --line: #e0e4df;
+  --paper: #f6f8f5;
+  --card: #ffffff;
+  --accent: #2f6f54;
+  --accent-soft: #eef4f0;
+  --warn: #b3261e;
+  --radius: 12px;
+  --gap: 10px;
+  /* 오행 색 — 레이더·뱃지·상생 다이어그램 공통 */
+  --el-木: #2e8a4f;
+  --el-火: #d05c2a;
+  --el-土: #a5732a;
+  --el-金: #7c848e;
+  --el-水: #3f6fb5;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.wrap { max-width: 760px; margin: 0 auto; padding: 0 14px; }
+
+/* ---------------------------------------------------------------- 상시 고지 바 */
+#notice-bar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: #f2f6f2;
+  border-bottom: 1px solid var(--line);
+  padding: 7px 14px;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+#notice-bar::-webkit-scrollbar { display: none; }
+.notice-pill {
+  flex: none;
+  border: 1px solid #4a7c593f;
+  background: #fff;
+  color: #3d5c48;
+  border-radius: 999px;
+  padding: 2.5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.notice-pill:active { background: var(--accent-soft); }
+
+/* ---------------------------------------------------------------- 헤더 */
+header { padding-top: 18px; }
+header h1 { font-size: 1.45rem; margin: 0 0 2px; letter-spacing: -0.01em; }
+.subtitle { margin: 2px 0 0; color: var(--muted); font-size: 0.88rem; }
+.philosophy {
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  background: var(--accent-soft);
+  border-left: 4px solid var(--accent);
+  border-radius: 0 10px 10px 0;
+  font-size: 0.92rem;
+  color: #2c4a3a;
+}
+
+/* ---------------------------------------------------------------- 섹션 카드 */
+section {
+  margin-top: 14px;
+  padding: 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+section > h2 { font-size: 1.06rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+.src-ref { font-size: 0.76rem; color: #8a938c; margin: 0 0 10px; }
+.note { font-size: 0.82rem; color: var(--muted); margin: 8px 0 0; }
+.note strong { color: #46584c; }
+
+/* ---------------------------------------------------------------- 폼 공통 */
+.field { margin-bottom: 10px; }
+.field label { display: block; font-size: 0.85rem; font-weight: 600; color: #3c4940; margin-bottom: 3px; }
+input[type="text"], input[type="number"], select {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid #ccd3cd;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 16px; /* 375px 모바일 포커스 확대(iOS) 방지 */
+  background: #fff;
+  color: var(--ink);
+}
+input[type="text"]:focus, input[type="number"]:focus, select:focus {
+  outline: 2px solid #4a7c5988;
+  border-color: #4a7c59;
+}
+input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0; }
+button {
+  font: inherit;
+  border: 1px solid #4a7c59;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 9px;
+  padding: 9px 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+button.ghost {
+  background: #fff;
+  color: #3d5c48;
+  border-color: #4a7c595e;
+  padding: 6px 10px;
+  font-weight: 600;
+}
+button.danger-ghost {
+  background: #fff;
+  color: #a0342c;
+  border-color: #b3261e55;
+  padding: 6px 10px;
+  font-weight: 600;
+}
+button:active { transform: translateY(1px); }
+
+.form-error {
+  color: var(--warn);
+  font-size: 0.85rem;
+  margin: 8px 0 0;
+  background: #fbf1f0;
+  border: 1px solid #e4b6b2;
+  border-radius: 8px;
+  padding: 7px 10px;
+}
+.hint { font-size: 0.8rem; color: var(--muted); margin: 4px 0 0; }
+.hint .suggest { color: #2e6a45; font-weight: 600; }
+
+/* 자산 저장 토글(선택 저장) */
+.save-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 4px 0 12px;
+  padding: 8px 10px;
+  background: var(--accent-soft);
+  border-radius: 9px;
+  font-size: 0.85rem;
+}
+.save-row input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--accent); margin: 0; }
+.save-row label { font-weight: 600; color: #2c4a3a; }
+
+/* ---------------------------------------------------------------- 자산 카드 */
+#asset-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 10px; }
+.asset-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  background: #fcfdfc;
+}
+.asset-head { display: flex; gap: 8px; align-items: center; }
+.asset-head input[type="text"] { padding: 7px 9px; }
+.asset-head .element-badge {
+  flex: none;
+  width: 34px; height: 34px;
+  display: grid; place-items: center;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+}
+.asset-meta { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 8px; align-items: center; }
+.asset-meta input[type="number"] { text-align: right; padding: 7px 9px; }
+.asset-memo { margin-top: 8px; padding: 7px 9px; }
+.vector-editor { margin-top: 8px; border-top: 1px dashed var(--line); padding-top: 8px; }
+.vector-editor summary {
+  cursor: pointer;
+  font-size: 0.83rem;
+  color: #3d5c48;
+  font-weight: 600;
+  list-style-position: inside;
+}
+.vector-editor summary .suggest-summary { color: var(--muted); font-weight: 400; font-size: 0.78rem; }
+.vector-editor[open] summary { margin-bottom: 6px; }
+.vec-row { display: grid; grid-template-columns: 64px 1fr 46px; gap: 8px; align-items: center; margin: 2px 0; }
+.vec-row .vec-name { font-size: 0.84rem; font-weight: 600; color: inherit; }
+.vec-row output { font-size: 0.82rem; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.vector-reset-row { margin-top: 6px; text-align: right; }
+
+[data-element="木"] .element-badge, .element-badge[data-element="木"] { background: var(--el-木); }
+[data-element="火"] .element-badge, .element-badge[data-element="火"] { background: var(--el-火); }
+[data-element="土"] .element-badge, .element-badge[data-element="土"] { background: var(--el-土); }
+[data-element="金"] .element-badge, .element-badge[data-element="金"] { background: var(--el-金); }
+[data-element="水"] .element-badge, .element-badge[data-element="水"] { background: var(--el-水); }
+.ind-name-木 { color: var(--el-木); }
+.ind-name-火 { color: var(--el-火); }
+.ind-name-土 { color: var(--el-土); }
+.ind-name-金 { color: var(--el-金); }
+.ind-name-水 { color: var(--el-水); }
+
+/* ---------------------------------------------------- 배분·지표·국면 슬라이더/표 */
+.slider-row { margin-bottom: 2px; }
+.slider-row .row-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.slider-row output { font-size: 0.85rem; color: #46584c; font-variant-numeric: tabular-nums; }
+.ind-examples { font-size: 0.76rem; color: #8a938c; margin: 0 0 8px; }
+
+.table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin: 10px 0 0; }
+.table th, .table td { padding: 6px 6px; border-bottom: 1px solid var(--line); text-align: center; }
+.table th:first-child, .table td:first-child { text-align: left; font-weight: 700; }
+.table thead th { font-size: 0.78rem; color: var(--muted); font-weight: 600; border-bottom: 1px solid #cfd6cf; }
+.table td.num { font-variant-numeric: tabular-nums; }
+.table tr.hint-row td { background: #faf6ec; }
+
+/* 균형도 게이지 */
+.ebi-row { display: flex; align-items: baseline; gap: 8px; }
+#ebi-value {
+  font-size: 2.4rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  min-width: 64px;
+}
+.ebi-scale { color: var(--muted); font-size: 0.9rem; }
+.ebi-bar {
+  position: relative;
+  height: 12px;
+  background: #eef0ee;
+  border-radius: 999px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+#ebi-bar-fill {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 0%;
+  background: linear-gradient(90deg, #79b092, var(--accent));
+  border-radius: 999px;
+  transition: width 0.25s ease;
+}
+.definition { font-size: 0.8rem; color: #5a655e; margin: 10px 0 0; }
+.definition strong { color: #3e4f44; }
+
+/* ------------------------------------------------------------- 레이더·다이어그램 */
+.radar-svg, .circulation-svg { display: block; max-width: 440px; margin: 4px auto; }
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  justify-content: center;
+  margin: 6px 0 0;
+  padding: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend .swatch { display: inline-block; width: 14px; height: 10px; border-radius: 2px; }
+.legend .swatch-basis { background: repeating-linear-gradient(90deg, #6b6b6b 0 4px, transparent 4px 7px); }
+.legend .swatch-band { background: #4a7c59aa; }
+.legend .swatch-current { background: #2f6f5488; border: 1.5px solid #2f6f54; }
+
+#circuit-notes { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 4px; }
+#circuit-notes li {
+  font-size: 0.84rem;
+  border-left: 3px solid #9fb8a8;
+  padding-left: 10px;
+  color: #46584c;
+}
+.concept-disclaimer {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  background: #fdf7e9;
+  border: 1px solid #e2cd9a;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  color: #6a5410;
+}
+
+/* 비어 있을 때의 안내/제안 없음 표시 */
+.empty-note {
+  display: block;
+  padding: 12px;
+  border: 1px dashed #c6cdc6;
+  border-radius: 9px;
+  color: #79837c;
+  font-size: 0.86rem;
+  text-align: center;
+  background: #fbfcfb;
+}
+.form-error[hidden] { display: none; }
+#list-error { margin-top: 10px; }
+#form-error { display: none; }
+#form-error.show { display: block; }
+
+/* ------------------------------------------------------------- 푸터(고지 3종) */
+footer {
+  margin: 20px 0 44px;
+  padding: 14px;
+  background: #fbfbf8;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  color: #565e57;
+  scroll-margin-top: 46px;
+}
+footer h2 { font-size: 0.95rem; color: #38423a; margin: 0 0 8px; }
+footer ul { margin: 0; padding-left: 18px; }
+footer li { margin-top: 4px; }
+.gold-note {
+  margin-top: 10px;
+  padding: 9px 12px;
+  background: #fff7e6;
+  border: 1px solid #e6c980;
+  border-radius: 8px;
+  color: #6a4b00;
+}
+header, main, footer { scroll-margin-top: 46px; }
+
+/* ------------------------------------------------------------ 데스크톱 확장 */
+@media (min-width: 700px) {
+  .dist-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 12px; }
+  .form-grid .field-wide { grid-column: 1 / -1; }
+}
+@media (max-width: 699px) {
+  .dist-grid { display: block; }
+  .form-grid { display: block; }
+}
