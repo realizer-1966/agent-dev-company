@@ -3,17 +3,17 @@
 코어는 순수 데이터·조회 함수만 유지한다(수집은 sources, 수치 표준화는 scores 책임).
 확정 근거·기각 사유·프록시 한계는 docs/indicator-map.md(지표 정의서)로 문서화한다.
 
-확정 원칙(② 티켓): req-v2 §2 '초기 매핑' 표를 시작점으로, 2026-11-02 실측
-(fredgraph.csv 전 ID 200)에서의 **다운로드 가능성·히스토리 길이(10년+)**를 기준으로
-확정 — 유일한 대체: req 후보 BAMLH0A0HYM2는 fredgraph.csv에서 최근 ~3년만 다운로드
-가능(ICE BofA 라이선스) → Moody's Baa 수익률 DBAA(전체 이력, 1986~)로 대체.
+- 유일한 대체: req 후보 BAMLH0A0HYM2는 fredgraph.csv에서 최근 ~3년만 다운로드
+  가능(ICE BofA 라이선스) → Moody's Baa 수익률 DBAA(전체 이력, 1986~)로 대체.
+  수의 단기 금리도 동일 기준: SOFR은 2018-04 시작(일간 이력 ~2240건 < 10년 창 2530건
+  → percentile이 영구 부족) → DFF(유효 연방기금금리, 1954~)로 대체.
 
 매핑 표(17 지표):
 - 목(성장 가능성): GDPC1(QoQ), PAYEMS(YoY), UNRATE(역방향), ^spx(stooq, YoY)
 - 화(인플레이션 압력): CPIAUCSL(YoY), PPIACO(YoY), T10YIE(수준), DCOILWTICO(1y 변동)
 - 토(실물자산 안정성): CSUSHPINSA(YoY), HOUST(수준), CUSR0000SEHA(임대 프록시, YoY)
 - 금(금융 안정성): DBAA(역방향), VIXCLS(역방향), DGS10(수준)
-- 수(시장 유동성): M2SL(YoY), DTWEXBGS(수준), SOFR(역방향)
+- 수(시장 유동성): M2SL(YoY), DTWEXBGS(수준), DFF(역방향)
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ INDICATOR_DEFS: tuple[IndicatorDef, ...] = (
     IndicatorDef("금", "채권 수익률", "fred", ("DGS10",), "level", False),
     IndicatorDef("수", "M2 통화", "fred", ("M2SL",), "yoy", False),
     IndicatorDef("수", "달러 인덱스", "fred", ("DTWEXBGS",), "level", False),
-    IndicatorDef("수", "단기 금리", "fred", ("SOFR",), "level", True),
+    IndicatorDef("수", "단기 금리", "fred", ("DFF",), "level", True),
 )
 
 

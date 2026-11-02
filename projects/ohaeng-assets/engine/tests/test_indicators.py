@@ -34,7 +34,7 @@ EXPECTED_ROWS: list[tuple[str, str, str, tuple[str, ...], str, bool]] = [
     ("금", "채권 수익률", "fred", ("DGS10",), "level", False),
     ("수", "M2 통화", "fred", ("M2SL",), "yoy", False),
     ("수", "달러 인덱스", "fred", ("DTWEXBGS",), "level", False),
-    ("수", "단기 금리", "fred", ("SOFR",), "level", True),
+    ("수", "단기 금리", "fred", ("DFF",), "level", True),
 ]
 EXPECTED_COUNTS = {"목": 4, "화": 4, "토": 3, "금": 3, "수": 3}
 
@@ -90,8 +90,8 @@ class TableDefinitionTests(unittest.TestCase):
         inverse_ids = {d.ids[0] for d in indicators.INDICATOR_DEFS if d.inverse}
         self.assertEqual(
             inverse_ids,
-            {"UNRATE", "DBAA", "VIXCLS", "SOFR"},
-            "역방향 지표 4종(req §2 — BAML 슬롯은 DBAA 대체)",
+            {"UNRATE", "DBAA", "VIXCLS", "DFF"},
+            "역방향 지표 4종(req §2 — BAML·SOFR 슬롯은 DBAA·DFF 대체)",
         )
 
 
