@@ -1,0 +1,13 @@
+{
+  "name": "ohaeng-assets",
+  "version": "0.1.0",
+  "description": "FEAAS 1단계 — 오행 자산 진단기 (한국어 단일 페이지 정적 웹앱, 외부 의존성 0)",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"tests/**/*.test.js\""
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
