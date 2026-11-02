@@ -6,6 +6,8 @@
  * UI에 항상 함께 노출돼야 한다(req 5장 고지 필수).
  */
 
+import { ELEMENTS } from './vectors.js';
+
 /** 상생 매핑: 각 오행이 다음으로 흘러가는 오행. 木→火→土→金→水→木 (5오행 순환 닫힘). */
 export const CIRCULATION = {
   木: '火',
@@ -27,18 +29,16 @@ export const CIRCULATION_NOTES = [
   '水→木: 현금을 새 성장투자에 투입',
 ];
 
-const notImplemented = (name) => {
-  throw new Error(
-    `TODO(t_27551fb2): ${name} — 본문은 코어 엔진 TDD 티켓(②)에서 구현한다 (골격·시그니처는 티켓 ①스캐폴딩이 확정)`,
-  );
-};
-
 /**
  * 상생 순환의 다음 오행.
+ * 5장의 흐름: 木(성장투자)→火(수익 실현)→土(실물 전환·축적)→金(현금흐름·수익 확정)→水(현금화·유동성)→木(재투자).
  * @param {'木'|'火'|'土'|'金'|'水'} element 현재 오행
  * @returns {'木'|'火'|'土'|'金'|'水'} CIRCULATION[element]
- * @throws 오행 외 값(ELEMENTS에 없는 문자열)
+ * @throws 오행 외 값(ELEMENTS에 없는 문자열 — 조용한 undefined 방지)
  */
 export function nextOf(element) {
-  notImplemented('nextOf(element)');
+  if (!ELEMENTS.includes(element)) {
+    throw new Error(`오행이 아니다: ${String(element)} — ELEMENTS(${ELEMENTS.join('·')})의 값만 허용된다`);
+  }
+  return CIRCULATION[element];
 }

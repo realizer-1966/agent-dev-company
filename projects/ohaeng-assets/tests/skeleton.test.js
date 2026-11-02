@@ -183,10 +183,11 @@ test('circulate — 상생 매핑 상수: 木→火→土→金→水 5오행 �
   assert.equal(el, '木', '순환 닫힘');
 });
 
-test('circulate — 상생 노트 5종·nextOf 시그니처 확정', () => {
+test('circulate — 상생 노트 5종·nextOf 실동작 (상세는 tests/circulate.test.js)', () => {
   assert.equal(CIRCULATION_NOTES.length, 5);
   assert.equal(typeof nextOf, 'function');
-  assert.throws(() => nextOf('木'), STUB_RE);
+  assert.equal(nextOf('木'), '火');
+  assert.throws(() => nextOf('불'), /오행이 아니다/);
 });
 
 // ----------------------------------------------------------------- index.js
