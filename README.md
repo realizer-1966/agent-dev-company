@@ -49,6 +49,7 @@ hermes kanban list    # 현재 업무 현황
 | 프로젝트 | 상태 | 설명 |
 |---|---|---|
 | [rental-web](projects/rental-web/) | 🚧 진행 중 | 임대관리 웹앱 (건물·세입자 관리, OnDev 배포) |
+| [ohaeng-assets](projects/ohaeng-assets/) | 🆕 발주 (2026-11-02) | FEAAS 오행 자산 진단기 (Five Elements AI Asset Allocation System · MVP 1단계, Cloudflare Pages 배포 예정) |
 
 ## 운영 자동화
 
