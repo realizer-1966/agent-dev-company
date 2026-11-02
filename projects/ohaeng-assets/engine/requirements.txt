@@ -1,0 +1,12 @@
+# FEAAS v2a 엔진 — 런타임 최소 의존성 (유일 근거문서: docs/requirements-v2.md §0)
+# 설치: cd projects/ohaeng-assets && engine/.venv/bin/pip install -r engine/requirements.txt
+# venv 부스트랩(1회): python3 -m venv engine/.venv
+numpy>=2.0,<3
+# aarch64 호스트 wheel 설치 실측: numpy 2.4.6 (Python 3.11.2 venv, 2026-11-02) — 폴백 불필요
+
+# 선택 항목 — v2a 미사용, 설치 금지(req-v2 §0 stdlib 우선·선택): 설치 시 수용기준 stdlib 설계를 깨지 않도록 폴백 전환만 허용
+# pandas>=2.0
+# scipy>=1.11
+
+# v2b(다음 발주) 관련 — v2a 스코프 절대 포함 금지: ML 예측(XGBoost/LightGBM·TFT),
+# CVXPY/PyPortfolioOpt, PostgreSQL 드라이버. API 서버 자동 실행·월간 크론 등록도 금지(CEO 직접).
