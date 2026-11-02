@@ -159,12 +159,10 @@ test('regimeShift — REGIME_PRESETS: 4장 국면 A~E 5종, 목표 배분 합100
   }
 });
 
-test('regimeShift — 시프트 함수 2종 시그니처 확정, 스텁은 TODO 에러로 거부', () => {
-  assert.equal(typeof shiftAllocation, 'function');
-  assert.equal(typeof normalizeToAllowed, 'function');
-  assert.throws(() => shiftAllocation('A'), STUB_RE);
-  assert.throws(() => shiftAllocation('UNKNOWN'), STUB_RE); // 미지 국면도 스텁 규정상 거부
-  assert.throws(() => normalizeToAllowed(BASIS_ALLOCATION), STUB_RE);
+test('regimeShift — 시프트·보정 실동작: 프리셋 반환·미지 국면 거부·clamp 보정 (상세는 tests/regimeShift.test.js)', () => {
+  assert.deepEqual(shiftAllocation('A'), REGIME_PRESETS[0].targetAllocation);
+  assert.throws(() => shiftAllocation('UNKNOWN'), /알 수 없는 국면/, '미지 국면 거부(req 9장 3번)');
+  assert.deepEqual(normalizeToAllowed(BASIS_ALLOCATION), BASIS_ALLOCATION, '유효 배분은 무보정 복사본');
 });
 
 // -------------------------------------------------------------- rebalance.js
