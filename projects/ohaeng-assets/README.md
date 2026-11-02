@@ -6,6 +6,7 @@
 - **FEAAS**: Five Elements AI Asset Allocation System — 운용 기간 3~5년 중장기, 균형 성장형
 - 철학: "자산을 예측하는 것이 아니라 경제의 변화를 예측하고, 경제의 변화에 맞춰 자산의 균형을 조절한다."
 - **유일 근거문서**: [`docs/requirements.md`](docs/requirements.md) (v2.0) — 이 README는 그 요약이다
+- **v2a Python 엔진(엔진 계열)**: [`docs/requirements-v2.md`](docs/requirements-v2.md) — 엔진 스코프의 유일 근거문서 (아래「FEAAS v2a — Python 엔진」섹션)
 - v2 아이디어(실시간 경제데이터·ML 예측·백테스트·자동 리밸런싱·Python/DB 스택)는 MVP에 포함 금지 — [`docs/v2-ideas.md`](docs/v2-ideas.md) 기록 전용
 
 ## 실행 방법
@@ -58,6 +59,67 @@ node --test "tests/**/*.test.js"   # 또는: npm test
 - `tests/*.test.js` (모듈별) — 실제 수치·행위 케이스(req 9장 수용기준 1번 8종) — 코어 엔진 TDD 티켓이 RED→GREEN으로 채움
 - `tests/ui-*.test.js` (UI 3종) — 상태 모듈 계약({ok, state|error}·원자적 복원), 레이더·상생 SVG 빌더, index.html 구조 계약 — UI 티켓 TDD로 채움. 현재 **122/122 통과(코어 78 + UI 44)**
 
+## FEAAS v2a — Python 엔진 (engine/)
+
+v2a 스코프: **실측 경제 데이터(FRED·Stooq) fetch → 오행 경제지수(10년 rolling percentile, 0~100) →
+국면 A~E 자동 판정 → 15년 백테스트 검증 → 정적 웹앱 "실측 모드"(state.json) 반영**.
+- 유일 근거문서: [`docs/requirements-v2.md`](docs/requirements-v2.md) — `docs/requirements.md`는 v1(web MVP) 기준일 뿐
+- **테스트 정책**: 표준 라이브러리 **unittest**(venv 기준) — AGENTS.md pytest 지침의 v2a 예외. pytest-mock·mutmut·cProfile은 v2a 미적용
+
+### venv 부스트랩(1회)
+
+```bash
+cd projects/ohaeng-assets
+python3 -m venv engine/.venv
+engine/.venv/bin/pip install -r engine/requirements.txt   # numpy 최소 — aarch64 wheel 실측 2.4.6 (2026-11-02)
+```
+
+- 설치 실패 시 **stdlib 폴백 전환**: numpy 미사용을 이 README에 선언하고 코어를 순수 stdlib로
+  설계해 수용기준을 유지한다(req-v2 §0). 현재는 설치 성공 → 코어는 **stdlib 우선 + numpy 허용**.
+- pandas·scipy는 선택 항목 — v2a에서 **설치 금지**.
+
+### 테스트 실행
+
+```bash
+cd projects/ohaeng-assets/engine
+.venv/bin/python -m unittest discover        # 골격 계약 + 모듈 행위 테스트 전부
+```
+
+### 구조 v2a (req-v2 §1) — 현재 골격 상태
+
+| 파일 | 역할 | 상태 |
+|---|---|---|
+| `engine/feaas/sources.py` | FRED·Stooq CSV fetcher + 로컬 캐시·retry — **네트워크·FS 격리 계약**: 실 fetch는 이 모듈만 | skeleton(stub) |
+| `engine/feaas/indicators.py` | 지표 정의서 — 오행×데이터 ID 매핑 | skeleton(stub) |
+| `engine/feaas/scores.py` | 표준화 — 10년 rolling percentile → 0~100 | skeleton(stub) |
+| `engine/feaas/classifier.py` | 국면 A~E 판정(복수 지표 조합 규칙) | skeleton(stub) |
+| `engine/feaas/backtest.py` | 국면→배분 시프트 시뮬레이션·성과지표 | skeleton(stub) |
+| `engine/feaas/report.py` | state.json 구성·스키마 검증(순수) | skeleton(stub) |
+| `engine/run_pipeline.py` | 배치 진입점 stub — 실행 순서 문서화 | stub(NotImplementedError) |
+
+함수 본문(구현)은 계층 ②(지수·판정)·③(백테스트·실측 모드) 티켓이 TDD(RED→GREEN)로 채운다.
+
+### FRED fixture 포맷 (`engine/data/fixtures/`)
+
+fetch 실측 포맷과 일치시켜 ② 티켓이 그대로 재사용하는 샘플 — **4종**:
+
+| fixture | 포맷 | 내용 |
+|---|---|---|
+| `fredgraph_DGS10_2024-01.csv` | 실측 다운로드 원본 | 미국채 10년 (일간, 결측 1건) |
+| `fredgraph_VIXCLS_2021-02.csv` | 실측 다운로드 원본 | VIX (일간, 역방향 지표, 결측 1건) |
+| `fredgraph_UNRATE_2024.csv` | 실측 다운로드 원본 | 실업률 (월간, 수준 지표) |
+| `fredgraph_LEGACY_DATE_dot.sample.csv` | 문서 포맷 · 합성 샘플 | 결측 `.` 마커 시연 |
+
+- **실측 포맷(2026-11-02 확인)**: 헤더 `observation_date,<FRED_ID>` — 결측은 **빈 문자열** (예: `2024-01-15,`)
+- **문서 포맷(req-v2 §0·티켓 명시, 구 FRED 응답)**: 헤더 `DATE,<FRED_ID>` — 결측 `.` (예: `2024-01-09,.`)
+- 파서 계약(② 구현): 두 헤더 변형 모두 수용, 결측 `.`·빈 문자열을 모두 None으로 정규화 — fixture 4종으로 고정
+- URL: `https://fred.stlouisfed.org/graph/fredgraph.csv?id=<ID>` — API 키 불필요(실측 200, req-v2 §0)
+
+### v2a / v2b 경계
+
+- **v2a(본 스코프)**: fetch+표준화, 지표 정의서, 국면 판정, 백테스트(한계 정량화 목적 — 수익 우위 필수 아님), state.json 생성·검증. 월간 배치 크론 등록은 **CEO 직접**(엔진·티켓에 크론 포함 금지, req-v2 §4)
+- **v2b 절대 금지**: ML 예측(XGBoost/LightGBM·TFT), CVXPY/PyPortfolioOpt 최적화, API 서버 자동 실행, PostgreSQL
+
 ## 구조
 
 ```
@@ -77,10 +139,17 @@ projects/ohaeng-assets/
 │   ├── rebalance.js      # 리밸런싱 제안 (±5%p 트리거, req 7장)
 │   ├── circulate.js      # 상생 매핑 상수 木→火→土→金→水 (req 5장)
 │   └── index.js          # barrel — UI는 이 모듈만 import, 계산 재구현 금지
-├── tests/                # node --test (Node 22 내장 러너)
+├── tests/                # node --test (Node 22 내장 러너) — 웹 v1 전용
+├── engine/               # v2a Python 엔진 — 「FEAAS v2a — Python 엔진」섹션
+│   ├── feaas/            # sources·indicators·scores·classifier·backtest·report (순수 함수)
+│   ├── run_pipeline.py   # 배치 진입점 stub — 실행은 ②③ 티켓
+│   ├── tests/            # v2a unittest — 표준 라이브러리(venv 기준, pytest 예외)
+│   ├── data/fixtures/    # FRED fredgraph.csv 포맷 샘플 4종 (실측 3 + 문서 포맷 1)
+│   └── requirements.txt  # numpy 최소 · pandas/scipy 선택 주석
 ├── docs/
-│   ├── requirements.md   # 유일 근거문서 v2.0
-│   └── v2-ideas.md       # v2 기록 전용 (MVP 금지 항목)
+│   ├── requirements.md        # v1(web MVP) 유일 근거문서 v2.0
+│   ├── requirements-v2.md     # v2a 엔진 유일 근거문서
+│   └── v2-ideas.md            # v2 기록 전용 (MVP 금지 항목)
 └── package.json          # 테스트 실행 안내 수준 (의존성 0)
 ```
 
