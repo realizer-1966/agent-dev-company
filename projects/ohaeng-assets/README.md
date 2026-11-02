@@ -10,19 +10,19 @@
 
 ## 실행 방법
 
-빌드 도구·서버 불필요. 브라우저에서 바로 연다:
+빌드 도구는 불필요하지만, 코어 로직이 ES 모듈(import/export)이므로 **정적 서버(http) 경유가 필요하다**.
+`file://` 직접 열기는 동작하지 않는다 — ES 모듈 CORS 제약: Chromium은 file:// 모듈 로딩을 전면 차단하고
+Firefox/LibreWolf는 "Module source URI is not allowed… / CORS request not http"로 상위 디렉터리 import를
+차단한다(WHATWG whatwg/html#8121 참조).
 
 ```bash
-# 방법 1 — 파일 직접 열기
-open projects/ohaeng-assets/index.html          # macOS
-xdg-open projects/ohaeng-assets/index.html      # Linux
-
-# 방법 2 — 정적 서버(선택, 동일 결과)
+# 방법 1 — 정적 서버(권장, 로컬 실측 기준)
 cd projects/ohaeng-assets && python3 -m http.server 8000
-# → http://localhost:8000 접속
-```
+# → http://localhost:8000 접속 — index.html이 ui/app.js(ES 모듈 진입점)를 로드해 앱이 동작한다
 
-UI 바인딩·계산 연결은 후속 UI 티켓 예정이며, 현재 index.html은 섹션 구조·고지 문구 3종·Gold=金 노트를 갖춘 뼈대다.
+# 방법 2 — Cloudflare Pages(배포)
+# http(s) 서빙이므로 동일하게 동작 — rental-web 인증 경로 재사용, 별도 프로젝트 이름(req 8장)
+```
 
 ## 테스트 방법
 
@@ -36,12 +36,18 @@ node --test "tests/**/*.test.js"   # 또는: npm test
 - `tests/structure.test.js` — 러너·Node 버전 구조 확인(플레이스홀더)
 - `tests/skeleton.test.js` — 골격 계약 테스트: 코어 7모듈의 export 시그니처 존재성, 데이터 상수 형상(키 완전성·합 100·허용 범위 내), 각 모듈 핵심 실동작 요약 단언
 - `tests/*.test.js` (모듈별) — 실제 수치·행위 케이스(req 9장 수용기준 1번 8종) — 코어 엔진 TDD 티켓이 RED→GREEN으로 채움
+- `tests/ui-*.test.js` (UI 3종) — 상태 모듈 계약({ok, state|error}·원자적 복원), 레이더·상생 SVG 빌더, index.html 구조 계약 — UI 티켓 TDD로 채움. 현재 **122/122 통과(코어 78 + UI 44)**
 
 ## 구조
 
 ```
 projects/ohaeng-assets/
-├── index.html            # 한국어 단일 페이지 정적 진단기 (뼈대)
+├── index.html            # 한국어 단일 페이지 정적 진단기 — 7섹션 전체 (ui/app.js가 module 진입점)
+├── ui/                   # UI 레이어 — 계산은 src barrel import 전용(UI에서 재구현 금지)
+│   ├── app.js            # 엔트리 — DOM 생성·이벤트·렌더 바인딩 ({ok, state|error} 계약 경유)
+│   ├── state.js          # 상태 모듈 — 항목 추가·수정·삭제, 지표/국면/토글, 직렬화·완전검증 복원
+│   ├── radar.js          # 오각형 레이더·상생 순환 SVG 빌더 (허용 범위 밴드·기준 배분 오버레이)
+│   └── styles.css        # 스타일 — 고지 스티키 바, 375px 모바일 우선 레이아웃
 ├── src/                  # 코어 로직 — UI와 분리된 순수 ES 모듈 (req 8장)
 │   ├── vectors.js        # 유형별 기본 5요소 벡터 상수 (req 6장, Gold=金 반영)
 │   ├── classify.js       # 유형 분류: 투자 대상 → 오행 자산군 (req 2장)
@@ -85,12 +91,16 @@ EBI(d) = Math.round(100 − 0.5·Σ|d−기준|)   // 기준 배분과의 각 �
 - 반올림은 소수점 첫째 자리(Math.round, 0.5는 올림) — 정수 반환. 입력 합계는 100(허용오차 1e-9)으로
   검증하며 어긋나면 거부한다.
 
-## 구현 상태 (티켓 ① 스캐폴딩 + ② 코어 엔진 TDD)
+## 구현 상태 (티켓 ① 스캐폴딩 + ② 코어 엔진 TDD + ③ UI 구현)
 
 - 코어 7모듈 + barrel의 **경계·시그니처 확정 완료(①)**. 계산 함수 본문은 ② 티켓이
   모듈별 수직 슬라이스(RED→GREEN)로 구현 완료:
   vectors(수용기준 1) · circulate(7) · classify(8) · weighted(2) · regimeShift(3·4) ·
   rebalance(5) · ebi(6).
+- UI는 ③ 티켓이 구현 완료: `index.html`의 `<script type="module" src="ui/app.js">` 진입점으로
+  레이더·자산 입력·벡터 슬라이더·지표·국면 제안(Δ%p)·리밸런싱 힌트·EBI·상생 SVG·고지 3종+
+  Gold=金 노트·localStorage 토글·375px 모바일 우선을 바인딩 — 계산은 코어 barrel 경유(UI 재구현 0).
 - `src/*` 데이터 상수(ASSET_TYPES 기본 벡터·기준 배분·허용 범위·국면 프리셋·상생 매핑)는 확정 값이며
   골격 계약 테스트 + 모듈별 행위 테스트로 고정돼 있다.
-- UI 바인딩 → QA → Cloudflare Pages 배포는 후속 티켓.
+- QA(브라우저 실측 — 수용기준 2번: 레이더 갱신·국면 제안·localStorage 복원·375px) →
+  Cloudflare Pages 배포는 후속 티켓.
