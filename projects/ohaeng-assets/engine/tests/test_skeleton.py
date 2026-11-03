@@ -119,9 +119,8 @@ class SkeletonStubBodyContract(unittest.TestCase):
         import feaas.report as report
 
         calls: list[tuple[str, object, tuple]] = [
-            # backtest.*는 ③에서 구현 완료(git 94422ab 이후 backtest 커밋) — 본 계약에서 제외,
-            # 회계 정확성은 tests/test_backtest.py 고정 fixture 계약으로 이관(req-v2 §5.3).
-            ("report.validate_state", report.validate_state, (dict(),)),
+            # report.* 구현 완료 — stub 본문 계약에서 제외(스키마 본문 계약은
+            # tests/test_report.py가 인수받음: req-v2 §4·§5.5).
         ]
         for item in calls:
             if len(item) == 3:
