@@ -337,3 +337,38 @@ header, main, footer { scroll-margin-top: 46px; }
   .dist-grid { display: block; }
   .form-grid { display: block; }
 }
+
+/* ------------------------------------------------------------- 실측 모드(티켓 ⑤) */
+/* 배너 — app.js가 data/state.json 존재 시에만 노출(기본 hidden: 수동 모드가 그대로). */
+.batch-banner {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  background: #ebf2f7;
+  border: 1.5px solid #3f6fb5;
+  border-radius: var(--radius);
+}
+.batch-banner[hidden] { display: none; }
+.batch-banner-line { margin: 0; font-size: 0.95rem; color: #27517e; }
+#batch-reasons {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 0.8rem;
+  color: #46584c;
+}
+#batch-reasons li { margin-top: 2px; }
+#batch-proxy-note { color: #5a6b5e; }
+
+/* 레이더 지도 — 실측 지수(배치) 오버레이: 현재(초록 실선)·기준(회 점선)과 구분되는 파랑 긴 점선 */
+.legend .swatch-measured {
+  background: rgba(63, 111, 181, 0.16);
+  border: 1.5px dashed #3f6fb5;
+}
+
+/* 배치 제안 리밸런싱(6번 섹션 내 — 기준 배분 → 국면 목표 배분) */
+#batch-rebalance[hidden] { display: none; }
+#batch-rebalance {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 0.85rem;
+}
+#batch-rebalance li { margin-top: 3px; }

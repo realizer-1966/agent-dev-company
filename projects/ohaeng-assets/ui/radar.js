@@ -83,6 +83,11 @@ function gridRings(scaleMax) {
   }
   parts.push(`<text x="${RADAR_CX + 4}" y="${RADAR_CY - (RADAR_R * (scaleMax / 4) / scaleMax) - 3}"
       font-size="9" fill="#999" text-anchor="start">${fmtTick(scaleMax / 4)}</text>`);
+  if (scaleMax > RADAR_SCALE_DEFAULT) {
+    // 스케일 확장 시 최상단 눈금도 노출한다 — 실측 지수(배치)가 40을 넘으면 "40 기준" 축척을 읽을 수 없어서다.
+    parts.push(`<text x="${RADAR_CX + 4}" y="${RADAR_CY - RADAR_R - 3}"
+        font-size="9" fill="#999" text-anchor="start">${fmtTick(scaleMax)}</text>`);
+  }
   return parts.join('');
 }
 
@@ -117,13 +122,18 @@ function round1(v) {
 /**
  * 오각형 레이더 SVG 문자열.
  * @param {{current: {木,火,土,金,水}|null, basis?: {木,火,土,金,水}, ranges?: object,
- *          scaleMax?: number}} args
+ *          scaleMax?: number, measured?: {木,火,土,金,水}|null}} args
  *  - current: 포트폴리오 분포(computeDistribution 결과). null이면 현재 다각형 없이
  *    "자산을 추가하면" 안내만 표시(기준·밴드는 그대로 — 배분 참조용).
  *  - basis/ranges: 기본값은 코어 BASIS_ALLOCATION·ALLOWED_RANGES(코어 상수 그대로).
+ *  - measured: 엔진 배치 실측 지수 5종(티켓 ⑤ — 5종이 모두 있을 때만
+ *    batch.js measuredScores가 넘긴다). null·미지정이면 오버레이 없음 — v1 출력과 동일.
+ *    스케일 확장(computeScaleMax)은 current·measured 둘 다 기준으로 판단한다.
  */
-export function buildRadarSVG({ current = null, basis = null, ranges = null, scaleMax = null } = {}) {
-  const scale = scaleMax === null ? computeScaleMax(current) : scaleMax;
+export function buildRadarSVG({ current = null, basis = null, ranges = null, scaleMax = null, measured = null } = {}) {
+  const scale = scaleMax === null
+    ? Math.max(computeScaleMax(current), computeScaleMax(measured))
+    : scaleMax;
   const basisValues = basis === null ? core.BASIS_ALLOCATION : basis;
   const band = ranges === null ? core.ALLOWED_RANGES : ranges;
 
@@ -141,8 +151,15 @@ export function buildRadarSVG({ current = null, basis = null, ranges = null, sca
     : `<text data-role="radar-empty" x="${RADAR_CX}" y="${RADAR_CY + 8}" text-anchor="middle"
         font-size="12" fill="#777">자산을 추가하면 오행 분포가 표시된다</text>`;
 
+  // 실측 지수 오버레이(티켓 ⑤) — 점선 별색 다각형. measured가 null이면 미노출(v1 출력 바이트 동일).
+  const measuredPolygon = measured
+    ? `<polygon data-role="measured-polygon" data-testid="radar-measured"
+        points="${polygonPoints(measured, scale)}"
+        fill="rgba(63,111,181,0.08)" stroke="#3f6fb5" stroke-width="2" stroke-dasharray="5 3" stroke-linejoin="round" />`
+    : '';
+
   return `<svg class="radar-svg" viewBox="0 0 ${RADAR_SIZE} ${RADAR_SIZE}" width="100%" role="img"
-      aria-label="포트폴리오 오행 분포 오각형 레이더 — 현재 분포·기준 배분(설계용)·허용 범위 밴드">
+      aria-label="포트폴리오 오행 분포 오각형 레이더 — 현재 분포·기준 배분(설계용)·허용 범위 밴드${measured ? '·엔진 배치 실측 지수' : ''}">
     ${gridRings(scale)}
     ${axisLines}
     <polygon data-role="allowed-band" data-testid="radar-band"
@@ -152,6 +169,7 @@ export function buildRadarSVG({ current = null, basis = null, ranges = null, sca
       points="${polygonPoints(basisValues, scale)}"
       fill="rgba(120,120,120,0.05)" stroke="#6b6b6b" stroke-width="1.4" stroke-dasharray="6 4" />
     ${currentPolygon}
+    ${measuredPolygon}
     ${axisLabels(scale, current)}
   </svg>`;
 }

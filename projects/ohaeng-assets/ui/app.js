@@ -36,6 +36,14 @@ import {
   STORAGE_KEY,
 } from './state.js';
 import { buildRadarSVG, buildCirculationSVG } from './radar.js';
+import {
+  BATCH_URL,
+  loadBatch,
+  applyBatch,
+  batchBannerText,
+  formatRebalanceRow,
+  measuredScores,
+} from './batch.js';
 
 /* ------------------------------------------------------------------ 상태·저장 */
 
@@ -273,7 +281,9 @@ const escapeAttr = (text) =>
 const radarContainer = $('#radar-container');
 
 function renderRadar() {
-  radarContainer.innerHTML = buildRadarSVG({ current: computeDistribution(state) });
+  // 실측 지수 오버레이(티켓 ⑤) — 배치의 지수 5종이 모두 있을 때만(부분 부족은 0 다각형 왜곡 방지로 미표시).
+  const measured = state.batch ? measuredScores(state.batch) : null;
+  radarContainer.innerHTML = buildRadarSVG({ current: computeDistribution(state), measured });
 }
 
 /* ------------------------------------------------------------------ EBI(항목 7) */
@@ -389,6 +399,53 @@ saveToggle.addEventListener('change', () => {
   }
 });
 
+/* ------------------------------------------------------------------ 실측 모드(티켓 ⑤ — req-v2 §4·§5-5) */
+
+const batchBanner = $('#batch-banner');
+const batchBannerTextEl = $('#batch-banner-text');
+const batchReasonsEl = $('#batch-reasons');
+const batchProxyNoteEl = $('#batch-proxy-note');
+const batchRebalanceNoteEl = $('#batch-rebalance-note');
+const batchRebalanceEl = $('#batch-rebalance');
+
+/** 배치 산출물(engine/data/state.json의 반영물)이 반영돼 있을 때만 배너·근거·고지·제안을 노출한다. */
+function renderBatch() {
+  const batchMeta = state.batch ?? null;
+  const hasBatch = batchMeta !== null;
+  batchBanner.hidden = !hasBatch;
+  batchRebalanceNoteEl.hidden = !hasBatch || batchMeta.target === null;
+  batchRebalanceEl.hidden = !hasBatch || batchMeta.proposals.length === 0;
+  if (!hasBatch) return;
+
+  batchBannerTextEl.textContent = batchBannerText(batchMeta);
+  batchReasonsEl.innerHTML = batchMeta.reasons
+    .map((reason) => `<li>${escapeAttr(reason)}</li>`)
+    .join('');
+  batchProxyNoteEl.textContent = batchMeta.proxyNote;
+  batchRebalanceNoteEl.textContent =
+    '배치 제안 리밸런싱 — 기준 배분(engine 기준) → 국면 목표 배분("검토 후 적용" 성격):';
+  batchRebalanceEl.innerHTML = batchMeta.proposals
+    .map((row) => `<li>${escapeAttr(formatRebalanceRow(row))}</li>`)
+    .join('');
+}
+
+/**
+ * 배치 산출물 로드·적용 — `fetch('data/state.json')`(index.html 상대경로, 정적 fetch 전용 —
+ * API 서버 없음 · 자동 배치 서버 없음, req-v2 §4). 부재(404)·네트워크 실패·무결 위반은
+ * 전부 배치 없음으로 수렴해 **조용히 포기**한다(콘솔 에러 노출 금지 — 수동 모드가 그대로).
+ * 존재 시: 배너·지수 5종·국면·목표 배분·제안 리밸런싱·프록시 고지를 실측 값으로 채우고
+ * 기존 수동 모드 UI를 그대로 재사용해 다시 그린다(계산은 state.js→코어 barrel 경유).
+ */
+async function initStateBatch() {
+  const batch = await loadBatch(() => fetch(BATCH_URL));
+  if (batch === null) return; // 부재(404)·무결 위반 — 수동 모드 유지(콘솔 노출 없음)
+  const result = applyBatch(state, batch);
+  if (!result.ok) return;
+  state = result.state; // 배치 메타는 세션 스코프 — persist() 직렬화에 오염되지 않는다(tests/batch-mode.test.js)
+  persist();
+  render();
+}
+
 /* ------------------------------------------------------------------ 렌더 파이프라인 */
 
 function renderDerived() {
@@ -403,6 +460,10 @@ function render() {
   renderIndicators();
   renderAssetList();
   renderDerived();
+  renderBatch();
 }
 
 render();
+
+// 실측 모드 부팅 — 초기 수동 렌더 이후 배치 산출물을 확인해 값만 실측으로 덧씌운다.
+initStateBatch();

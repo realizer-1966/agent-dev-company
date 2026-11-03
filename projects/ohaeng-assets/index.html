@@ -30,6 +30,14 @@
 
   <main class="wrap">
 
+    <!-- 티켓 ⑤ — 실측 모드 배너: app.js가 data/state.json 존재 시에만 노출한다(부재·무결 위반은
+         여전히 hidden — 수동 모드 유지, 조용한 포기 · 콘솔 에러 노출 없음). 값은 배치 산출(engine/data/state.json)이다. -->
+    <div id="batch-banner" class="batch-banner" role="status" hidden>
+      <p class="batch-banner-line"><strong id="batch-banner-text"></strong></p>
+      <ul id="batch-reasons" class="batch-reasons"></ul>
+      <p class="note" id="batch-proxy-note"></p>
+    </div>
+
     <!-- 항목 2·3·10: 자산 입력(유형 선택 + 직접 입력) · 5요소 벡터 슬라이더 · localStorage 토글 -->
     <section id="input-section" aria-labelledby="input-title">
       <h2 id="input-title">1. 자산 입력</h2>
@@ -92,6 +100,7 @@
         <span><span class="swatch swatch-current"></span>현재 분포</span>
         <span><span class="swatch swatch-basis"></span>기준 배분(설계용)</span>
         <span><span class="swatch swatch-band"></span>허용 범위(木20~40·火5~15·土10~30·金20~35·水10~30)</span>
+        <span><span class="swatch swatch-measured"></span>실측 지수(엔진 배치 — 실측 모드 전용)</span>
       </div>
     </section>
 
@@ -170,6 +179,10 @@
       <p class="src-ref">요구사항 7장 · |현재 비중 − 목표 비중| ≥ 5%p인 자산군만 이동 제안 (경계 4.99%p는 제안 없음)</p>
       <ul id="rebalance-list"></ul>
       <p class="empty-note" id="rebalance-empty"></p>
+      <!-- 티켓 ⑤ — 배치 제안 리밸런싱(실측 모드 전용): state.json의 rebalance_proposals.
+           국면·목표 배분이 판정된 배치에서만 노출한다(국면 null 배치는 미노출). -->
+      <p class="note" id="batch-rebalance-note" hidden></p>
+      <ul id="batch-rebalance" hidden></ul>
       <p class="note">자동 리밸런싱이 아니라 제안(힌트)이다. 자동 실행은 v2 범위(docs/v2-ideas.md)다.</p>
     </section>
 
