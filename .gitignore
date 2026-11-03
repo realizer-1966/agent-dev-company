@@ -28,3 +28,4 @@ node_modules/
 # Cloudflare 로컬 시크릿 (wrangler secret 의 로컬 대응, 추적 제외)
 .dev.vars
 .env
+projects/ohaeng-assets/engine/data/cache/
