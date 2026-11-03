@@ -69,11 +69,16 @@ jobs:
           exit 0
         fi
         HOME="$GITHUB_WORKSPACE" npx --yes wrangler@4.156.0 pages deploy . --project-name=feaas-ohaeng --branch=main --commit-dirty=true
-        LIVE=$(curl -s https://feaas-ohaeng.pages.dev/data/state.json | sha256sum | awk '{print substr($1,1,16)}')
         LOCAL=$(cat /tmp/state_hash | awk '{print $3}')
+        LIVE=""
+        for i in 1 2 3; do
+          sleep 8
+          LIVE=$(curl -s https://feaas-ohaeng.pages.dev/data/state.json | sha256sum | awk '{print substr($1,1,16)}')
+          if [ "$LIVE" = "$LOCAL" ]; then break; fi
+        done
         echo "state hash local=$LOCAL live=$LIVE"
         if [ "$LIVE" != "$LOCAL" ]; then
-          echo "[WARN] 배포본 state.json 해시 불일치 — 캐시 지연 또는 배포 실패 확인 요망"
+          echo "[WARN] 배포본 state.json 해시 불일치 — 캐시 지연(전파)일 수 있음 — 5분 후 재확인 요망"
         fi
 
     - name: engine 복귀 (항상)
