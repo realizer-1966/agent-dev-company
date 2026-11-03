@@ -1,0 +1,85 @@
+name: FEAAS 월간 배치+배포
+
+on:
+  schedule:
+    - cron: '0 0 1 * *'   # 매월 1일 00:00 UTC (09:00 KST) — 로컬 월간 크론을 대체(2026-11-03)
+  workflow_dispatch: {}    # 수동 트리거(긴급 배치 — Projects/Actions 탭에서 실행 가능)
+
+permissions:
+  contents: write
+
+concurrency:
+  group: feaas-batch
+  cancel-in-progress: false
+
+jobs:
+  batch-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: venv bootstrap + install
+      working-directory: projects/ohaeng-assets/engine
+      run: |
+        python -m venv .venv
+        .venv/bin/pip install --quiet -r requirements.txt
+
+    - name: 테스트 게이트 (unittest — 실패 시 배치·배포 중단)
+      working-directory: projects/ohaeng-assets/engine
+      run: .venv/bin/python -m unittest discover -s tests
+
+    - name: 월간 배치 실행 (FRED 실측 fetch — refresh)
+      working-directory: projects/ohaeng-assets/engine
+      run: .venv/bin/python run_pipeline.py --refresh
+
+    - name: 배포용 반영 (engine/data/state.json → data/state.json)
+      run: mkdir -p projects/ohaeng-assets/data && cp projects/ohaeng-assets/engine/data/state.json projects/ohaeng-assets/data/state.json
+
+    - name: 커밋·푸시 (배치 산출 변경 있을 때만)
+      run: |
+        git config user.name "feaas-batch-bot"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add -A projects/ohaeng-assets/engine/data projects/ohaeng-assets/engine/out projects/ohaeng-assets/data
+        if git diff --cached --quiet; then
+          echo "[skip] 배치 산출 변경 없음 — 커밋·푸시 생략(단일 지점 재배포는 다음 단계에서 수행)"
+        else
+          REGIME=$(python3 -c "import json;print(json.load(open('projects/ohaeng-assets/data/state.json')).get('regime') or 'null')")
+          git commit -m "data: 월간 배치 산출 ($(date -u +'%Y-%m') 국면 $REGIME) — Actions 자동 배치"
+          git push
+        fi
+        sha256sum projects/ohaeng-assets/engine/data/state.json | awk '{print "state hash:", substr($1,1,16)}' | tee /tmp/state_hash
+
+    - name: engine 스태시 이동 (배포에서 제외)
+      run: mv projects/ohaeng-assets/engine /tmp/engine-stash
+
+    - name: Cloudflare Pages 배포 (CLOUDFLARE_API_TOKEN 시크릿 있을 때만)
+      working-directory: projects/ohaeng-assets
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      run: |
+        if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+          echo "[SKIP] CLOUDFLARE_API_TOKEN 시크릿 미설정 — 실측 state.json 커밋까지만 완료. 배포는 시크릿 세팅 후 재실행(Actions→feaas-batch→Run workflow)."
+          exit 0
+        fi
+        HOME="$GITHUB_WORKSPACE" npx --yes wrangler@4.156.0 pages deploy . --project-name=feaas-ohaeng --branch=main --commit-dirty=true
+        LIVE=$(curl -s https://feaas-ohaeng.pages.dev/data/state.json | sha256sum | awk '{print substr($1,1,16)}')
+        LOCAL=$(cat /tmp/state_hash | awk '{print $3}')
+        echo "state hash local=$LOCAL live=$LIVE"
+        if [ "$LIVE" != "$LOCAL" ]; then
+          echo "[WARN] 배포본 state.json 해시 불일치 — 캐시 지연 또는 배포 실패 확인 요망"
+        fi
+
+    - name: engine 복귀 (항상)
+      if: always()
+      run: |
+        if [ -d /tmp/engine-stash ]; then
+          rm -rf projects/ohaeng-assets/engine
+          mv /tmp/engine-stash projects/ohaeng-assets/engine
+        fi

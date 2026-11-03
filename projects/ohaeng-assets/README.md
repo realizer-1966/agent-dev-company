@@ -284,10 +284,16 @@ MDD(고점 대비 최대 하락, 양수)·샤프(rf=0)·거래비용 총액·위
 - `validate_state`는 예외 대신 **오류 메시지 list**(빈 list=유효)를 반환하고 어떤 입력에도 예외를 던지지 않는다
   (전체 방어 계약 — 배치가 조용한 무결성 위반을 낼 수 없게 함).
 
-### 배치 실행 절차(run_pipeline) — 크론 등록은 금지(CEO 세션 영역, req-v2 §4)
+**배치·배포는 GitHub Actions로 수행(2026-11-03 확정 — 로컬 빌드 금지)**:
 
-> ⚠️ **로컬 venv·캐시는 유지하지 않는다(2026-11-03 CEO 결정)** — 월간 크론이 venv 부재 시
-> 자동 부스트랩(위 절차) 후 배치를 실행한다. 로컬에서 수동 실행할 때도 위 부스트랩을 먼저 하라.
+- 워크플로: [`.github/workflows/feaas-batch.yml`](../../.github/workflows/feaas-batch.yml) —
+  매월 1일 00:00 UTC(09:00 KST) 자동 + `workflow_dispatch` 수동 트리거.
+- 흐름: 테스트 게이트(unittest 전체) → 배치(--refresh, FRED 직접 fetch) → state.json 커밋·푸시 → Pages 배포(engine 스태시 이동 절차 내장) → 배포본 해시 검증.
+- **시크릿(일회성 세팅 — repo Settings→Secrets→Actions)**: `CLOUDFLARE_API_TOKEN`
+  (Cloudflare 대시보드 → My Profile → API Tokens → Create — 권한 **Account·Cloudflare Pages → Edit**)·
+  `CLOUDFLARE_ACCOUNT_ID`. 미설정이면 커밋까지만 수행하고 배포 단계를 `[SKIP]` 로깅 — 시크릿 세팅 후
+  Actions 탭에서 Run workflow로 재배포. (로컬 wrangler 인증 경로는 폐지 — 토큰을 채팅으로 다루지 않는 계정 규범 유지)
+- **비상 폴백만 로컬 허용**(Actions 사용 불가 재난 시) — 아래 절차는 폴백 용도로 보관:
 
 ```bash
 cd projects/ohaeng-assets
