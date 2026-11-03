@@ -8,8 +8,11 @@
   수의 단기 금리도 동일 기준: SOFR은 2018-04 시작(일간 이력 ~2240건 < 10년 창 2530건
   → percentile이 영구 부족) → DFF(유효 연방기금금리, 1954~)로 대체.
 
-매핑 표(17 지표):
-- 목(성장 가능성): GDPC1(QoQ), PAYEMS(YoY), UNRATE(역방향), ^spx(stooq, YoY)
+매핑 표(17 지표 — ⑥ 수정: stooq ^spx → FRED로 전환):
+- 목(성장 가능성): GDPC1(QoQ), PAYEMS(YoY), UNRATE(역방향), NASDAQCOM(YoY —
+  stooq 차단(ISSUE-2) 대체로 나스닥 종합 지수를 주식 지수 프록시로 채택(CEO 확정
+  2026-11-03): 일간 이력 1971~ 실측 14,541행 — 10년 창(2530)·15년 백테스트 창 충족.
+  S&P 500(FRED SP500)은 10년 데이터 한계로 후보 2순위.
 - 화(인플레이션 압력): CPIAUCSL(YoY), PPIACO(YoY), T10YIE(수준), DCOILWTICO(1y 변동)
 - 토(실물자산 안정성): CSUSHPINSA(YoY), HOUST(수준), CUSR0000SEHA(임대 프록시, YoY)
 - 금(금융 안정성): DBAA(역방향), VIXCLS(역방향), DGS10(수준)
@@ -39,7 +42,7 @@ INDICATOR_DEFS: tuple[IndicatorDef, ...] = (
     IndicatorDef("목", "실질 GDP 성장", "fred", ("GDPC1",), "qoq", False),
     IndicatorDef("목", "비농업 고용", "fred", ("PAYEMS",), "yoy", False),
     IndicatorDef("목", "실업률", "fred", ("UNRATE",), "level", True),
-    IndicatorDef("목", "S&P 500", "stooq", ("^spx",), "yoy", False),
+    IndicatorDef("목", "나스닥 종합 지수", "fred", ("NASDAQCOM", "SP500"), "yoy", False),
     IndicatorDef("화", "소비자물가", "fred", ("CPIAUCSL",), "yoy", False),
     IndicatorDef("화", "생산자물가", "fred", ("PPIACO",), "yoy", False),
     IndicatorDef("화", "손익분기 인플레", "fred", ("T10YIE",), "level", False),
