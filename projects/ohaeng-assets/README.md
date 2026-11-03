@@ -284,10 +284,15 @@ MDD(고점 대비 최대 하락, 양수)·샤프(rf=0)·거래비용 총액·위
 - `validate_state`는 예외 대신 **오류 메시지 list**(빈 list=유효)를 반환하고 어떤 입력에도 예외를 던지지 않는다
   (전체 방어 계약 — 배치가 조용한 무결성 위반을 낼 수 없게 함).
 
-**배치 실행 절차(run_pipeline) — 크론 등록은 금지(CEO 세션 영역, req-v2 §4)**:
+### 배치 실행 절차(run_pipeline) — 크론 등록은 금지(CEO 세션 영역, req-v2 §4)
+
+> ⚠️ **로컬 venv·캐시는 유지하지 않는다(2026-11-03 CEO 결정)** — 월간 크론이 venv 부재 시
+> 자동 부스트랩(위 절차) 후 배치를 실행한다. 로컬에서 수동 실행할 때도 위 부스트랩을 먼저 하라.
 
 ```bash
 cd projects/ohaeng-assets
+# venv 가드(부재 시 재생성) — 크론·수동 공통
+[ -x engine/.venv/bin/python ] || { python3 -m venv engine/.venv && engine/.venv/bin/pip install -r engine/requirements.txt; }
 # (a) 실측 배치 — 캐시 우선(engine/data/cache), 캐시 미스 시 네트워크 fetch
 engine/.venv/bin/python engine/run_pipeline.py            # → engine/data/state.json + engine/out/backtest.json+.md
 engine/.venv/bin/python engine/run_pipeline.py --refresh  # 캐시 무시하고 재수집
