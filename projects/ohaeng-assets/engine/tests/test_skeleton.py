@@ -22,12 +22,9 @@ FIXTURES_DIR = ENGINE_DIR / "data" / "fixtures"
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 # (모듈, 함수명, 필수 인자 개수) — 골격 계약: 존재·callable·(아직 stub이면)NotImplementedError.
-# ②에서 구현이 채워진 모듈(sources)은 stub 본문 검사에서 제외 — 계층 테스트가 계약을 인수받았다.
+# 구현이 채워진 모듈(sources — ②, classifier — ③)은 stub 본문 검사에서 제외 —
+# 계층 테스트(tests/test_sources.py·tests/test_classifier.py)가 계약을 인수받았다.
 STUB_FUNCTIONS: dict[str, list[tuple[str, int]]] = {
-    "feaas.classifier": [
-        ("detect_regime", 1),
-        ("regime_reasons", 1),
-    ],
     "feaas.backtest": [
         ("compound", 1),
         ("annualized_return", 2),
@@ -118,13 +115,10 @@ class SkeletonStubBodyContract(unittest.TestCase):
         import feaas.sources as sources
         import feaas.indicators as indicators
         import feaas.scores as scores
-        import feaas.classifier as classifier
         import feaas.backtest as backtest
         import feaas.report as report
 
         calls: list[tuple[str, object, tuple]] = [
-            ("classifier.detect_regime", classifier.detect_regime, ({"목": 65.0},)),
-            ("classifier.regime_reasons", classifier.regime_reasons, ({"목": 65.0},)),
             ("backtest.compound", backtest.compound, ((0.01, -0.01),)),
             ("backtest.annualized_return", backtest.annualized_return, (0.1, 12)),
             ("backtest.annualized_vol", backtest.annualized_vol, ((0.01, 0.02),)),
