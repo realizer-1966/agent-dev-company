@@ -1,0 +1,12 @@
+# Cloudflare Pages 배포 아티팩트 제외 목록(wrangler pages deploy 절차 — v2a ⑤).
+# 정적 웹앱(src·ui·tests·docs·index.html·README·package.json)만 배포한다.
+#
+#  - engine/ — v2a Python 엔진 전체(.venv·캐시·out 포함). 배포 유출 금지(티켓 ⑤).
+#    engine 배치 산출물은 CEO 월간 크론이 engine/data/state.json → data/state.json
+#    복사 후 재배포하는 경로로만 웹에 반영된다(README「실측 모드」절).
+#  - data/state.json 등 임시 실측 산출은 절차서 대로 실측 후 제거한다(부재 = 수동 모드).
+#  - .wrangler/ — wrangler 자체 로컬 상태.
+engine/
+.wrangler/
+node_modules/
+.DS_Store
