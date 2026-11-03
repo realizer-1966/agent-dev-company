@@ -355,5 +355,122 @@ class CacheApiTests(unittest.TestCase):
             self.assertTrue((nested / "DGS10.csv").exists())
 
 
+class _FakeResponse:
+    """fetch_stooq 주입 테스트용 최소 응답 — read()·status 계약."""
+
+    def __init__(self, body: bytes, status: int = 200) -> None:
+        self._body = body
+        self.status = status
+
+    def read(self) -> bytes:
+        return self._body
+
+
+class StooqPowChallengeTests(unittest.TestCase):
+    """⑥ — stooq JS PoW 챌린지 처리(CEO 실측 흐름: c·d 추출 → solve → /__verify → 재수집)."""
+
+    CHALLENGE_HTML = (
+        "<html><head><meta charset=\"utf-8\"></head><body>"
+        "<noscript>This site requires JavaScript to verify your browser.</noscript>"
+        '<script nonce="x">(async()=>{const c="AAAAAGrplfNopMx3u6ozWL0D0NI4_lvH0tkV"'
+        ",d=4,t=\"0\".repeat(d),e=new TextEncoder;let n=0;while(1){"
+        'const h=await crypto.subtle.digest("SHA-256",e.encode(c+n)),'
+        "x=Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,\"0\"))."
+        "join(\"\");if(x.startsWith(t))break;n++}"
+        'const r=await fetch("/__verify",{method:"POST",'
+        'headers:{"Content-Type":"application/x-www-form-urlencoded"},'
+        'body:"c="+encodeURIComponent(c)+"&n="+n,credentials:"same-origin"});'
+        "if(r.ok)location.reload()})();</script></body></html>"
+    )
+    CSV_OK = "Date,Close\n2018-01-01,100.0000\n2018-01-02,101.0000\n"
+
+    def test_parse_challenge_extracts_token_and_digits(self) -> None:
+        self.assertEqual(
+            sources.parse_stooq_challenge(self.CHALLENGE_HTML),
+            ("AAAAAGrplfNopMx3u6ozWL0D0NI4_lvH0tkV", 4),
+        )
+
+    def test_parse_challenge_non_challenge_returns_none(self) -> None:
+        self.assertIsNone(sources.parse_stooq_challenge("Date,Close\n2018-01-01,1\n"))
+        self.assertIsNone(sources.parse_stooq_challenge("<html>error page</html>"))
+        self.assertIsNone(sources.parse_stooq_challenge(""))
+
+    def test_solve_pow_is_deterministic_and_correct(self) -> None:
+        import hashlib
+
+        n = sources.solve_pow("AAAA", 2)
+        self.assertEqual(n, sources.solve_pow("AAAA", 2))
+        digest = hashlib.sha256(("AAAA" + str(n)).encode("utf-8")).hexdigest()
+        self.assertTrue(digest.startswith("00"), digest)
+
+    def test_solve_pow_rejects_bad_params(self) -> None:
+        for c_token, digits in (("", 2), ("bad token!", 2), ("AAAA", 0), ("AAAA", 9)):
+            with self.subTest(c_token=c_token, digits=digits):
+                with self.assertRaises(ValueError):
+                    sources.solve_pow(c_token, digits)
+
+    def test_build_verify_request_contract(self) -> None:
+        request = sources.build_verify_request(
+            "TOK_1", 123, referer="https://stooq.com/q/d/l/?s=%5Espx&i=d"
+        )
+        self.assertEqual(request.full_url, sources.STOOQ_VERIFY_URL)
+        self.assertEqual(request.get_method(), "POST")
+        headers = {k.lower(): v for k, v in request.header_items()}
+        self.assertEqual(headers.get("content-type"), "application/x-www-form-urlencoded")
+        self.assertEqual(headers.get("origin"), sources.STOOQ_ORIGIN)
+        self.assertIn("stooq.com", headers.get("referer", ""))
+        self.assertEqual(bytes(request.data), b"c=TOK_1&n=123")
+
+    def test_fetch_stooq_challenge_flow_solves_and_fetches_csv(self) -> None:
+        posts: list[tuple[str, bytes]] = []
+        served = {"n": 0}  # GET: 1회차=챌린지, verify 후=CSV 세션 획득 시나리오
+
+        def get(url: str, timeout: float) -> _FakeResponse:
+            served["n"] += 1
+            body = self.CHALLENGE_HTML if served["n"] == 1 else self.CSV_OK
+            return _FakeResponse(body.encode("utf-8"))
+
+        def post(request: object, timeout: float) -> _FakeResponse:
+            posts.append((request.full_url, bytes(request.data)))
+            return _FakeResponse(b"ok\n")
+
+        got = sources.fetch_stooq(
+            "^spx", cache_dir=None, opener=get, opener_post=post, sleep=lambda s: None
+        )
+        self.assertEqual(got, [("2018-01-01", 100.0), ("2018-01-02", 101.0)])
+        self.assertEqual(len(posts), 1, "verify POST 1회(CEO 실측 흐름)")
+        url, body = posts[0]
+        self.assertEqual(url, sources.STOOQ_VERIFY_URL)
+        self.assertTrue(body.startswith(b"c=AAAAAGrplfNopMx3u6oz"), body)
+        self.assertIn(b"&n=", body)
+
+    def test_fetch_stooq_verify_then_still_blocked_is_cleared_reported(self) -> None:
+        def get(url: str, timeout: float) -> _FakeResponse:
+            return _FakeResponse(self.CHALLENGE_HTML.encode("utf-8"))
+
+        def post(request: object, timeout: float) -> _FakeResponse:
+            return _FakeResponse(b"ok\n")
+
+        with self.assertRaises(sources.FetchError) as context:
+            sources.fetch_stooq(
+                "^spx", cache_dir=None, opener=get, opener_post=post, sleep=lambda s: None
+            )
+        self.assertIn("PoW verify 성공", str(context.exception))
+
+    def test_fetch_stooq_http_404_reports_clearly(self) -> None:
+        def get(url: str, timeout: float) -> _FakeResponse:
+            return _FakeResponse(b"not found", status=404)
+
+        def post(request: object, timeout: float) -> _FakeResponse:
+            return _FakeResponse(b"ok\n")
+
+        with self.assertRaises(sources.FetchError) as context:
+            sources.fetch_stooq(
+                "^spx", cache_dir=None, opener=get, opener_post=post, sleep=lambda s: None
+            )
+        self.assertIn("HTTP 404", str(context.exception))
+        self.assertIn("PoW verify 미동작", str(context.exception))
+
+
 if __name__ == "__main__":
     unittest.main()

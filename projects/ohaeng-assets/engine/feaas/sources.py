@@ -31,11 +31,14 @@ from __future__ import annotations
 import re
 import time
 from collections.abc import Callable
+from http.cookiejar import CookieJar
 from pathlib import Path
 from urllib.parse import urlencode
 
 FRED_BASE_URL: str = "https://fred.stlouisfed.org/graph/fredgraph.csv"
 STOOQ_BASE_URL: str = "https://stooq.com/q/d/l/"
+STOOQ_VERIFY_URL: str = "https://stooq.com/__verify"
+STOOQ_ORIGIN: str = "https://stooq.com"
 
 DEFAULT_RETRIES: int = 2  # 재시도 2회 → 총 3시도 (req-v2 §5.4)
 DEFAULT_TIMEOUT_SECONDS: float = 30.0  # 명시적 timeout(req-v2 티켓 — 예: 30s)
@@ -227,6 +230,88 @@ def _urlopen(url: str, timeout: float) -> object:
     return urllib.request.urlopen(url, timeout=timeout)
 
 
+def _urlopen_post(request: object, timeout: float) -> object:
+    import urllib.request
+
+    return urllib.request.urlopen(request, timeout=timeout)
+
+
+# ─── Stooq JS proof-of-work 챌린지 (⑥ — 2026-11-02~03 CEO 실측 흐름 그대로) ────
+# 서버가 CSV 대신 아래 형태의 HTML을 200으로 서빙해 오면 이 계층이 챌린지를 처리한다:
+#   const c="<token>",d=<digits> … sha256(c+str(n)) hex가 '0'*d 접두사 → POST /__verify
+#   (헤더 Origin·Referer 필수 — 누락 시 403, CEO 실측) → 'ok' + auth 쿠키.
+_CHALLENGE_RE = re.compile(r'const c="([A-Za-z0-9_-]+)",d=(\d+)')
+
+
+def parse_stooq_challenge(text: str) -> tuple[str, int] | None:
+    """응답 본문이 stooq PoW 챌린지 HTML이면 (c, digits) 반환, 아니면 None(순수)."""
+    if "__verify" not in text:
+        return None
+    match = _CHALLENGE_RE.search(text)
+    if match is None:
+        return None
+    return match.group(1), int(match.group(2))
+
+
+def solve_pow(c_token: str, digits: int) -> int:
+    """sha256(c+str(n)) hex가 '0'*digits 접두사로 시작하는 최소 n (순수·결정적).
+
+    방어 한계: n이 4×16^digits를 초과하면 RuntimeError — 비정상 파라미터 조기 차단.
+    """
+    if digits < 1 or digits > 8:
+        raise ValueError(f"digits는 1~8: {digits!r}")
+    if not c_token or not _STOOQ_SYMBOL_RE.fullmatch(c_token):
+        raise ValueError(f"챌린지 토큰 부적합: {c_token!r}")
+    prefix = "0" * digits
+    limit = 4 * (16**digits)
+    for n in range(limit):
+        digest = _sha256_hex(c_token + str(n))
+        if digest.startswith(prefix):
+            return n
+    raise RuntimeError(f"PoW 미해결 — n 한도 {limit} 초과(digits={digits})")
+
+
+def _sha256_hex(text: str) -> str:
+    import hashlib
+
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def build_verify_request(c_token: str, n: int, *, referer: str) -> object:
+    """/__verify POST Request 구성(순수) — Content-Type·Origin·Referer 필수(실측 계약)."""
+    import urllib.request
+    from urllib.parse import quote
+
+    body = f"c={quote(c_token)}&n={n}"
+    return urllib.request.Request(
+        STOOQ_VERIFY_URL,
+        data=body.encode("utf-8"),
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Origin": STOOQ_ORIGIN,
+            "Referer": referer,
+        },
+        method="POST",
+    )
+
+
+def _stooq_session_openers() -> tuple[Callable[..., object], Callable[..., object]]:
+    """라이브 경로 기본 opener 쌍 — cookiejar 세션으로 GET·POST가 auth 쿠키를 공유한다."""
+    import urllib.request
+
+    jar = CookieJar()
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+    opener.addheaders = [("User-Agent", "Mozilla/5.0 Gecko/20100101 Firefox/126.0")]
+
+    def get(url: str, timeout: float) -> object:
+        return opener.open(url, timeout=timeout)
+
+    def post(request: object, timeout: float) -> object:
+        return opener.open(request, timeout=timeout)  # type: ignore[arg-type]
+
+    return get, post
+
+
 def _clip(series: Series, start: str | None, end: str | None) -> Series:
     if not start and not end:
         return series
@@ -290,9 +375,19 @@ def fetch_stooq(
     cache_dir: Path | None = None,
     refresh: bool = False,
     opener: Callable[..., object] | None = None,
+    opener_post: Callable[..., object] | None = None,
     sleep: Callable[[float], None] | None = None,
 ) -> Series:
-    """Stooq 일별 CSV 실측 fetch — 종가 시퀀스만 추출해 Series로 정규화(② 확정)."""
+    """Stooq 일별 CSV 실측 fetch — 종가 시퀀스 정규화 + PoW 챌린지 처리(⑥).
+
+    응답이 CSV면 그대로 파싱한다. JS proof-of-work 챌린지 HTML(`__verify` 마커)이면
+    CEO 실측 흐름(2026-11-02~03)을 그대로 수행한다: c·digits 추출 → sha256 PoW solve →
+    POST /__verify(Http Content-Type/Origin/Referer 필수 — 누락 시 403) → 'ok' + auth
+    쿠키로 재수집 1회. verify 후에도 CSV가 아니면 그 사실을 포함해 FetchError로 보고한다
+    (2026-11-03 실측: verify 성공 후에도 CSV 다운로드 단 'Access denied' — README 병기).
+
+    opener·opener_post 주입: 기본(None)은 cookiejar 세션(GET·POST 쿠키 공유).
+    """
     _require_stooq_symbol(symbol)
     if cache_dir is not None and not refresh:
         cached_text = _stooq_cached_text(cache_dir, symbol, interval)
@@ -302,20 +397,81 @@ def fetch_stooq(
             except ValueError:
                 pass  # 손상 캐시 → 미스 취급(계약) — 네트워크로 회복
     url = build_stooq_url(symbol, interval=interval)
-    raw, series = _download_with_retry(
-        url,
-        parse=parse_stooq_csv,
-        context=f"Stooq '{symbol}' fetch 실패",
-        retries=retries,
-        timeout=timeout,
-        opener=opener,
-        sleep=sleep,
-    )
-    if cache_dir is not None:
-        cache_dir = Path(cache_dir)
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        _atomic_write(cache_dir / _stooq_cache_name(symbol, interval), raw)
-    return series
+    if opener is None and opener_post is None:
+        get_open, post_open = _stooq_session_openers()
+    else:
+        get_open = opener if opener is not None else _urlopen
+        post_open = opener_post if opener_post is not None else _urlopen_post
+    wait = sleep if sleep is not None else time.sleep
+
+    attempts = max(1, retries + 1)
+    last_exc: Exception | None = None
+    verified = False
+
+    def _read_text(response: object) -> str:
+        body = response.read()
+        return body.decode("utf-8", errors="replace")
+
+    def _status(response: object) -> int:
+        return int(getattr(response, "status", 200) or 0)
+
+    for attempt in range(attempts):
+        if attempt > 0:
+            wait(BASE_BACKOFF_SECONDS * (2 ** (attempt - 1)))
+        try:
+            resp = get_open(url, timeout)
+            if _status(resp) >= 400:
+                last_exc = FetchError(f"HTTP {_status(resp)}")
+                continue
+            body = _read_text(resp)
+            try:
+                series = parse_stooq_csv(body)
+            except ValueError as parse_exc:
+                challenge = parse_stooq_challenge(body)
+                if challenge is None:
+                    last_exc = parse_exc
+                    continue
+                c_token, digits = challenge
+                try:
+                    n = solve_pow(c_token, digits)
+                except (ValueError, RuntimeError) as pow_exc:
+                    last_exc = pow_exc
+                    continue
+                vresp = post_open(
+                    build_verify_request(c_token, n, referer=url), timeout
+                )
+                if _status(vresp) >= 400:
+                    last_exc = FetchError(f"__verify HTTP {_status(vresp)}")
+                    continue
+                _read_text(vresp)  # 'ok' 소비 — auth 쿠키는 세션에 저장됨
+                verified = True
+                resp2 = get_open(url, timeout)
+                if _status(resp2) >= 400:
+                    last_exc = FetchError(f"verify 후 HTTP {_status(resp2)}")
+                    continue
+                body2 = _read_text(resp2)
+                try:
+                    series = parse_stooq_csv(body2)
+                except ValueError as reparse_exc:
+                    snippet = " ".join(body2.split())[:80]
+                    last_exc = FetchError(
+                        f"PoW verify 후에도 CSV 아님 — 본문 시작: {snippet!r}"
+                    )
+                    continue
+                body = body2  # 캐시에는 CSV 원본을 저장한다(챌린지 HTML 저장 방지)
+            if cache_dir is not None:
+                cache_dir = Path(cache_dir)
+                cache_dir.mkdir(parents=True, exist_ok=True)
+                _atomic_write(cache_dir / _stooq_cache_name(symbol, interval), body)
+            return series
+        except FetchError as exc:
+            last_exc = exc
+        except OSError as exc:  # 네트워크 계열 — 재시도 대상
+            last_exc = exc
+    raise FetchError(
+        f"Stooq '{symbol}': 총 {attempts}회 시도 실패 · PoW verify "
+        f"{'성공(CSV 회수 불가)' if verified else '미동작'} — 마지막 오류: {last_exc!r}"
+    ) from last_exc
 
 
 def _stooq_cached_text(cache_dir: Path | None, symbol: str, interval: str) -> str | None:
@@ -369,12 +525,17 @@ __all__ = [
     "FetchError",
     "Series",
     "STOOQ_BASE_URL",
+    "STOOQ_ORIGIN",
+    "STOOQ_VERIFY_URL",
     "build_fred_url",
     "build_stooq_url",
+    "build_verify_request",
     "fetch_fred",
     "fetch_stooq",
     "load_cache",
     "parse_fred_csv",
+    "parse_stooq_challenge",
     "parse_stooq_csv",
     "save_cache",
+    "solve_pow",
 ]
