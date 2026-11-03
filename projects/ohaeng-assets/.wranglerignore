@@ -4,8 +4,11 @@
 #  - engine/ — v2a Python 엔진 전체(.venv·캐시·out 포함). 배포 유출 금지(티켓 ⑤).
 #    engine 배치 산출물은 CEO 월간 크론이 engine/data/state.json → data/state.json
 #    복사 후 재배포하는 경로로만 웹에 반영된다(README「실측 모드」절).
-#  - data/state.json 등 임시 실측 산출은 절차서 대로 실측 후 제거한다(부재 = 수동 모드).
+#  - data/state.json — CEO 월간 크론이 engine/data/state.json을 복사·커밋·재배포한다
+#    (⑥ 확정: 트랜시언트가 아닌 '커밋 유지'로 운영 — 부재 = 수동 모드 폴백은 최초 배포 전용).
 #  - .wrangler/ — wrangler 자체 로컬 상태.
+# ※ wrangler@4.156.0 실측: .wranglerignore는 cwd 기준으로만 읽혀 engine/에 적용되지 않음 →
+#   배포는 "engine/ 스태시 이동 → (프로젝트 루트에서) deploy . → 복귀" 절차로 수행한다.
 engine/
 .wrangler/
 node_modules/
