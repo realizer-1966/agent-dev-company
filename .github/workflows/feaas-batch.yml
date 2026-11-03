@@ -2,7 +2,7 @@ name: FEAAS 월간 배치+배포
 
 on:
   schedule:
-    - cron: '0 0 1 * *'   # 매월 1일 00:00 UTC (09:00 KST) — 로컬 월간 크론을 대체(2026-11-03)
+    - cron: '0 0 * * 1'   # 매주 월요일 00:00 UTC (09:00 KST) — 주간 갱신(2026-11-03, 월간에서 변경)
   workflow_dispatch: {}    # 수동 트리거(긴급 배치 — Projects/Actions 탭에서 실행 가능)
 
 permissions:
@@ -50,7 +50,7 @@ jobs:
           echo "[skip] 배치 산출 변경 없음 — 커밋·푸시 생략(단일 지점 재배포는 다음 단계에서 수행)"
         else
           REGIME=$(python3 -c "import json;print(json.load(open('projects/ohaeng-assets/data/state.json')).get('regime') or 'null')")
-          git commit -m "data: 월간 배치 산출 ($(date -u +'%Y-%m') 국면 $REGIME) — Actions 자동 배치"
+          git commit -m "data: 주간 배치 산출 ($(date -u +'%Y-%m-%d') 국면 $REGIME) — Actions 자동 배치"
           git push
         fi
         sha256sum projects/ohaeng-assets/engine/data/state.json | awk '{print "state hash:", substr($1,1,16)}' | tee /tmp/state_hash

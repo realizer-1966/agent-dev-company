@@ -60,7 +60,7 @@ curl -sS https://rental-web-aeh.pages.dev/ | grep -o "<title>[^<]*</title>"     
   CF Pages 단일 페이지 폴백으로 200+index.html(text/html) — 파일 존재가 아님**; 웹앱은 본문이 JSON이 아님을
   검증해 조용히 수동 모드로 유지한다(실측 모드 fetch 계약).
   **이번 배포는 `data/state.json` 없이 배포**(부재 → 수동 모드 — 수용기준 5의 無 케이스 실측이기도 하다);
-  CEO 월간 크론이 `engine/data/state.json` → `data/state.json` 복사 후 재배포하면 실측 모드로 전환된다(아래).
+  CEO 주간 Actions(feaas-batch.yml)가 `engine/data/state.json` → `data/state.json` 복사 후 재배포하면 실측 모드로 전환된다(아래).
 - **배포 후 아티팩트 검증 방법(⑤ 실측 절차)**: (1) `git ls-files`(engine/·docs/ 제외 — 정적 웹 산출물 30종)의
   md5를 배포 URL 응답과 1:1 대조 — 전 파일 MATCH여야 한다(스크래치 도구). (2) 존재해서 안 되는 경로
   (`data/state.json`·`engine/*`)는 CF Pages 단일 페이지 폴백 200+text/html임을 확인 — 파일 존재가 아님.
@@ -78,7 +78,7 @@ curl -sS https://rental-web-aeh.pages.dev/ | grep -o "<title>[^<]*</title>"     
 - 배치 메타(배너·근거·고지·제안)는 세션 스코프 — localStorage 직렬화에서 제외된다(재방문 시 재fetch로 갱신).
 - 배치 산출물 반영 계약은 `ui/batch.js`(순수 ES 모듈, tests/batch-mode.test.js 33케이스)가 담당한다.
 
-**배치 산출물 연결 절차(월간 크론 작업 내용 — CEO 직접 실행 대상, 워커 금지 — req-v2 §4)**:
+**배치 산출물 연결 절차(Actions feaas-batch.yml 매주 월요일 수행 — 로컬 실행 금지, req-v2 §4)**:
 
 ```bash
 cd projects/ohaeng-assets
@@ -127,7 +127,7 @@ node --test "tests/**/*.test.js"   # 또는: npm test
 
 **CI(GitHub Actions)**: push/PR to main 시 `.github/workflows/ci.yml`가 자동 실행 —
 rental-web QA + **ohaeng-assets 웹 테스트(node --test) + v2a 엔진 unittest(venv+numpy)**.
-로컬 푸시·월간 크론 푸시 모두 CI가 게이트로 동작한다(레드 시 채널로 결과 보고).
+로컬 푸시·주간 배치 푸시 모두 CI가 게이트로 동작한다(레드 시 채널로 결과 보고).
 
 - `tests/structure.test.js` — 러너·Node 버전 구조 확인(플레이스홀더)
 - `tests/skeleton.test.js` — 골격 계약 테스트: 코어 7모듈의 export 시그니처 존재성, 데이터 상수 형상(키 완전성·합 100·허용 범위 내), 각 모듈 핵심 실동작 요약 단언
@@ -287,7 +287,7 @@ MDD(고점 대비 최대 하락, 양수)·샤프(rf=0)·거래비용 총액·위
 **배치·배포는 GitHub Actions로 수행(2026-11-03 확정 — 로컬 빌드 금지)**:
 
 - 워크플로: [`.github/workflows/feaas-batch.yml`](../../.github/workflows/feaas-batch.yml) —
-  매월 1일 00:00 UTC(09:00 KST) 자동 + `workflow_dispatch` 수동 트리거.
+  매주 월요일 00:00 UTC(09:00 KST) 자동 + `workflow_dispatch` 수동 트리거(2026-11-03 월간→주간 변경).
 - 흐름: 테스트 게이트(unittest 전체) → 배치(--refresh, FRED 직접 fetch) → state.json 커밋·푸시 → Pages 배포(engine 스태시 이동 절차 내장) → 배포본 해시 검증.
 - **시크릿(일회성 세팅 — repo Settings→Secrets→Actions)**: `CLOUDFLARE_API_TOKEN`
   (Cloudflare 대시보드 → My Profile → API Tokens → Create — 권한 **Account·Cloudflare Pages → Edit**)·
