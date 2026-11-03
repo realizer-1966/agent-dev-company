@@ -21,7 +21,7 @@ EXPECTED_ROWS: list[tuple[str, str, str, tuple[str, ...], str, bool]] = [
     ("목", "실질 GDP 성장", "fred", ("GDPC1",), "qoq", False),
     ("목", "비농업 고용", "fred", ("PAYEMS",), "yoy", False),
     ("목", "실업률", "fred", ("UNRATE",), "level", True),
-    ("목", "S&P 500", "stooq", ("^spx",), "yoy", False),
+    ("목", "나스닥 종합 지수", "fred", ("NASDAQCOM", "SP500"), "yoy", False),  # ⑥ — stooq ^spx 차단 → FRED 전환(CEO 확정)
     ("화", "소비자물가", "fred", ("CPIAUCSL",), "yoy", False),
     ("화", "생산자물가", "fred", ("PPIACO",), "yoy", False),
     ("화", "손익분기 인플레", "fred", ("T10YIE",), "level", False),

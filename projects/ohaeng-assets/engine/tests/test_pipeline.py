@@ -14,7 +14,7 @@ import random
 import sys
 import tempfile
 import unittest
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 ENGINE_DIR = Path(__file__).resolve().parents[1]
@@ -73,18 +73,14 @@ class RunPipelineFixtureModeTests(unittest.TestCase):
         cls.fixtures = root / "fixtures"
         cls.fixtures.mkdir()
         for index, ind in enumerate(INDICATOR_DEFS):
-            (cls.fixtures / f"fredgraph_{ind.ids[0]}.csv").write_text(
-                _fred_csv(ind.ids[0], 0.7 * index + 0.5), encoding="utf-8"
-            )
-        for filename, seed in (
-            ("stooq_spx.csv", 1.0),       # 목 지표(^spx yoy) + 백테스트 목 프록시 공용
-            ("stooq_cl_f.csv", 2.0),      # 화(cl.f — gld.us 폴백 미발동)
-            ("stooq_vnq_us.csv", 3.0),    # 토
-            ("stooq_iet_us.csv", 4.0),    # 금
-            ("stooq_gld_us.csv", 5.0),    # 폴백 프록시(채택되지 않아야 함)
-        ):
-            (cls.fixtures / filename).write_text(_stooq_csv(seed), encoding="utf-8")
-        (cls.fixtures / "fredgraph_DTB3.csv").write_text(_fred_csv("DTB3", 8.5), encoding="utf-8")
+            for key in ind.ids:  # ⑥ — 후보 ID 전부(목: NASDAQCOM+SP500 폴백 포함)
+                (cls.fixtures / f"fredgraph_{key}.csv").write_text(
+                    _fred_csv(key, 0.7 * index + 0.5), encoding="utf-8"
+                )
+        # ⑥: 프록시는 FRED 우선(indicator fixture 공용) — stooq 폴백 파일 작성 불필요.
+        (cls.fixtures / "fredgraph_DTB3.csv").write_text(
+            _fred_csv("DTB3", 8.5), encoding="utf-8"
+        )  # DTB3는 지표가 아닌 수 레그 전용 프록시 — 별도 작성 필요
         cls.state_path = root / "state.json"
         cls.out_dir = root / "out"
         cls.rc = run_pipeline.main(
@@ -157,7 +153,13 @@ class RunPipelineFixtureModeTests(unittest.TestCase):
     def test_proxies_chosen_with_fallback_priority(self) -> None:
         self.assertEqual(
             self.backtest["asset_proxies"],
-            {"목": "^spx", "화": "cl.f", "토": "vnq.us", "금": "iet.us", "수": "DTB3"},
+            {
+                "목": "NASDAQCOM",   # FRED 우선(⑥)
+                "화": "DCOILWTICO",
+                "토": "CSUSHPINSA",
+                "금": "DGS10",       # 듀레이션 근사 총수익
+                "수": "DTB3",
+            },
         )
 
     def test_markdown_report_written(self) -> None:
@@ -231,6 +233,92 @@ class RunPipelineUnitTests(unittest.TestCase):
         )
         text = run_pipeline.state_to_json(state)
         self.assertIn('"generated_at": "2026-11-03T00:00:00+00:00"', text)
+
+
+class RunPipelineDailyWindowTests(unittest.TestCase):
+    """ISSUE-1 회귀 — 일간 시리즈는 주기별 창(scores.window_count_for → 2530)을 쓴다.
+
+    QA 리포트 §7 ISSUE-1: 구 파이프라인은 모든 지표를 DEFAULT(120)로 표준화했다 —
+    일간 지표는 "최근 약 6개월" 창이 되어 국면이 전도될 수 있다(2026-11 실측: B→D 전도).
+    """
+
+    def test_daily_indicator_uses_frequency_window(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            root = Path(tmp_name)
+            fixtures = root / "fixtures"
+            fixtures.mkdir()
+            # 지표 계약: NASDAQCOM은 yoy 파생(1년 전=358일 앵커) → 결측 358일 후 유효 시작.
+            # 유효 관측이 10년 창(2530)을 채우려면 n ≥ 358+2530 → 2950관측 사용.
+            n = 2950
+            lines = ["observation_date,NASDAQCOM"]
+            value = 100.0
+            closes: list[float] = []
+            for k in range(n):
+                day = date(2018, 1, 1) + timedelta(days=k)
+                value *= 1.0 + 0.0004 + 0.0004 * math.sin(k / 11.0)
+                closes.append(value)
+                lines.append(f"{day.isoformat()},{value:.6f}")
+            # 독립 기대값 계산 — yoy(≈358일 앵커, 연속 날짜) → 유효 시퀀스 → percentile
+            valid = [
+                100.0 * (closes[i] / closes[i - 358] - 1.0)
+                for i in range(358, n)
+            ]
+            expected = 100.0 * sum(1 for x in valid[-2530:] if x <= valid[-1]) / 2530
+            expected_uniform120 = (
+                100.0 * sum(1 for x in valid[-120:] if x <= valid[-1]) / 120
+            )
+            self.assertNotAlmostEqual(
+                expected,
+                expected_uniform120,
+                delta=5.0,
+                msg="테스트 디자인 — 주기별 창(2530)과 uniform-120 값이 달라야 회귀 검증이 의미 있다",
+            )
+            notes: list[str] = []
+            loader = run_pipeline.make_fixture_loader(fixtures, notes)
+            (fixtures / "fredgraph_NASDAQCOM.csv").write_text(
+                "\n".join(lines) + "\n", encoding="utf-8"
+            )
+            standardized = run_pipeline.collect_standardized(loader, notes)
+            def_nasdaq = next(
+                ind for ind in INDICATOR_DEFS if ind.ids[0] == "NASDAQCOM"
+            )
+            self.assertIn(def_nasdaq, standardized)
+            got_last = standardized[def_nasdaq][-1][1]
+            self.assertAlmostEqual(
+                got_last,
+                expected,
+                places=6,
+                msg="일간 시리즈의 마지막 percentile은 2530 창 계산과 일치해야 한다(구 창 120 아님)",
+            )
+
+    def test_tiny_series_falls_back_and_notes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            root = Path(tmp_name)
+            fixtures = root / "fixtures"
+            fixtures.mkdir()
+            loader = run_pipeline.make_fixture_loader(fixtures, (notes := []))
+            (fixtures / "fredgraph_AB2M.csv").write_text(
+                "observation_date,AB2M\n2024-01-01,1.0\n2024-02-01,2.0\n",
+                encoding="utf-8",
+            )
+            fake_def = next(iter(INDICATOR_DEFS))
+            # 2관측 시리즈 — 주기 추정 불가 → 기본 창 폴백 + 사유 기록(전 구간 None)
+            import unittest.mock as mock
+
+            with mock.patch.object(
+                run_pipeline.indicators,
+                "INDICATOR_DEFS",
+                (run_pipeline.indicators.IndicatorDef(
+                    fake_def.element, "2관측 테스트", "fred", ("AB2M",), "level", False
+                ),),
+            ):
+                standardized = run_pipeline.collect_standardized(loader, notes)
+                self.assertTrue(
+                    any("주기 추정 불가" in note for note in notes),
+                    f"폴백 사유 기록 필요: {notes}",
+                )
+                def_two = next(d for d in standardized)
+                self.assertTrue(all(pct is None for _, pct in standardized[def_two]))
 
 
 if __name__ == "__main__":

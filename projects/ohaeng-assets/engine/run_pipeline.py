@@ -65,29 +65,34 @@ PIPELINE_STEPS: tuple[str, ...] = (
 
 MONTHS_HISTORY: int = 6  # 국면 규칙 '6개월 전' 이력 깊이(req-v2 §2 — classifier.MONTHS_LOOKBACK)
 
-# 백테스트 자산 프록시(PM 확정 — req-v2 §3). 화: cl.f 실측 불가 시 gld.us 폴백.
-# 수: req 표기 'IRX'는 fredgraph 404(② 실측 2026-11-02 — 카드 코멘트, 야후 심볼
-# 관행) → fredgraph 검증 시리즈 DTB3(3M T-bill)로 대체. README v2a ③ 섹션 병기.
+# 백테스트 자산 프록시(⑥ CEO 확정 2026-11-03 — stooq 차단(ISSUE-2)으로 FRED 우선:
+# 목=NASDAQCOM(나스닥 종합·1971~ 일간), 화=DCOILWTICO(WTI 현물·1986~), 토=CSUSHPINSA
+# (주택가격 지수·1987~), 금=DGS10(10년물 금리 — 듀레이션 근사 총수익), 수=DTB3(3M
+# 단기금리 — 월수익 = 연율/12 근사). stooq는 PoW 클라이언트로도 CSV 차단('Access
+# denied' 실측) — 폴백 후보로만 유지. 프록시 한계는 PROXY_NOTES·README 병기.
 PROXY_ASSETS: dict[str, tuple[tuple[str, str], ...]] = {
-    "목": (("stooq", "^spx"),),
-    "화": (("stooq", "cl.f"), ("stooq", "gld.us")),
-    "토": (("stooq", "vnq.us"),),
-    "금": (("stooq", "iet.us"),),
+    "목": (("fred", "NASDAQCOM"), ("fred", "SP500"), ("stooq", "^spx")),
+    "화": (("fred", "DCOILWTICO"), ("stooq", "cl.f"), ("stooq", "gld.us")),
+    "토": (("fred", "CSUSHPINSA"), ("stooq", "vnq.us")),
+    "금": (("fred", "DGS10"), ("stooq", "iet.us")),
     "수": (("fred", "DTB3"),),
 }
 
-# 비교 기준선 — 60/40(^spx 60 + iet.us 40)은 오행 좌표계로 목 60·금 40(프록시 대응).
+# 비교 기준선 — 60/40(주식 60 = 나스닥 FRED 레그 + 중기 국채 40 = DGS10 듀레이션 근사 레그)
+# 은 오행 좌표계로 목 60·금 40(프록시 대응).
 FIXED_60_40: dict[str, float] = {"목": 60.0, "화": 0.0, "토": 0.0, "금": 40.0, "수": 0.0}
 
 BASIS_ALLOCATION_LABEL: str = "무보정 오행 고정(木30 火10 土20 金25 水15 — v1 기준 배분 재사용)"
 
 PROXY_NOTES: tuple[str, ...] = (
-    "프록시 한계: 각 오행 자산은 단일 공개 프록시로 근사한다 — 目=S&P 500(^spx), "
-    "火=WTI 원유 계약(cl.f, 실측 불가 시 GLD gld.us), 土=미국 REIT ETF(vnq.us), "
-    "金=중기 국채 ETF(iet.us), 水=3M T-bill 금리(DTB3). 추적 오차·ETF 보유 비용·"
-    "원유 선물 롤오버 효과는 반영되지 않는다(req-v2 §3).",
-    "水(초단기 금리)는 가격이 아닌 연율 금리 시리즈 — 월수익 = 연율/12의 근사 변환을 "
-    "적용한다(T-bill 무위험 수익 근사).",
+    "프록시 한계(⑥ 재구성 — FRED 우선): 목=나스닥 종합(NASDAQCOM, 일간 가격 지수 — S&P "
+    "성장 프록시로 채택; S&P 500은 FRED 10년 한계라 후보 2순위), 화=WTI 현물(DCOILWTICO "
+    "— 선물 롤오버·베이시스 효과 미반영), 토=미국 주택가격 지수(CSUSHPINSA — 리츠 총수익과 "
+    "달리 배당·레버리지·공실 미반영), 금=10년물 수익률(DGS10 → 듀레이션 6.5년 근사 총수익 "
+    "— 쿠폰 재투자·만기 수렴 단순화), 수=3M 단기금리(DTB3 — 월수익 = 연율/12 근사).",
+    "Stooq 폴백(^spx·cl.f·gld.us·vnq.us·iet.us)은 JS proof-of-work 챌린지 + CSV 단 "
+    "'Access denied'(2026-11-03 CEO 실측 — PoW verify 성공 후에도 차단) — 실측 소스로 "
+    "신뢰 불가. README 병기.",
     "국면 판정이 None인 월은 기준 배분(무보정 오행 고정)으로 운용한다 — 국면을 강제 "
     "배정하지 않는 req-v2 §2 정책의 배분 확장이며, 사유는 백테스트 노트로 기록된다.",
     "이 백테스트는 규칙 기반 v2a의 한계를 정량화하는 게 목적이며, 수익 우위는 필수가 "
@@ -182,6 +187,11 @@ def collect_standardized(
 
     수집 실패·전 구간 부족(10년 창 미달 → None) 지표는 결과에서 생략 + 사유 기록 —
     나머지 지표로만 오행 지수를 계산한다(강제 매칭 금지, req-v2 §2).
+
+    창 규격(⑥ — ISSUE-1 수정): window는 시리즈 주기에서 유도한다 —
+    `scores.window_count_for(날짜들)`(일 2530·주 520·월 120·분기 40·연 10 —
+    docs/indicator-map.md §4-7 확정). 관측 3건 미만(주기 추정 불가)은
+    DEFAULT_WINDOW_MONTHS로 폴백(전 구간 None — strict 계약 유지).
     """
     standardized: dict[indicators.IndicatorDef, Series] = {}
     for ind in indicators.INDICATOR_DEFS:
@@ -194,7 +204,17 @@ def collect_standardized(
         if not series:
             notes.append(f"수집 실패: {ind.element}·{ind.name}({','.join(ind.ids)}) — 지표 누락")
             continue
-        std = scores.standardize_indicator(series, transform=ind.transform, inverse=ind.inverse)
+        if len(series) >= 3:
+            window = scores.window_count_for([d for d, _ in series])
+        else:
+            window = scores.DEFAULT_WINDOW_MONTHS
+            notes.append(
+                f"주기 추정 불가(관측 3건 미만): {ind.element}·{ind.name}({ind.ids[0]}) — "
+                f"기본 창 {scores.DEFAULT_WINDOW_MONTHS} 사용(10년 창 미달 → None 예상)"
+            )
+        std = scores.standardize_indicator(
+            series, transform=ind.transform, inverse=ind.inverse, window=window
+        )
         if all(pct is None for _, pct in std):
             notes.append(
                 f"표준화 부족(10년 창 미달): {ind.element}·{ind.name}({ind.ids[0]}) — 전 구간 None"
@@ -355,6 +375,12 @@ def asset_returns_by_element(
                     (month, (value / 100.0) / 12.0)
                     for month, value in _month_levels(month_closes)
                 ]
+            elif element == "금" and chosen[0] == "fred":
+                # 10년물 연율 수익률(가격 아닌 수준) — 듀레이션 근사 총수익(backtest 순수 변환).
+                raw = backtest.monthly_bond_returns_from_yields(
+                    _month_levels(month_closes),
+                    duration_years=backtest.BOND_DURATION_YEARS_DEFAULT,
+                )
             else:
                 raw = [
                     (d[:7], ret) for d, ret in backtest.monthly_returns_from_prices(month_closes)
