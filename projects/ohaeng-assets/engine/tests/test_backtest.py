@@ -491,5 +491,56 @@ class MonthlyResampleHelperTests(unittest.TestCase):
             backtest.recent_window([("2024-01-31", 1.0)], months_back=0)
 
 
+class MonthlyBondReturnsTests(unittest.TestCase):
+    """⑥ — DGS10 연율 수익률 → 듀레이션 근사 총수익 변환(수 레그 근사와 대칭 계약)."""
+
+    def test_manual_example_matches_formula(self) -> None:
+        levels = [("2024-01", 4.0), ("2024-02", 4.1), ("2024-03", 3.9)]
+        got = backtest.monthly_bond_returns_from_yields(levels)
+        # 2월: 쿠폰 4.0/1200 − 6.5×0.10/1.04
+        r_feb = (4.0 / 1200.0) - 6.5 * 0.001 / 1.04
+        # 3월: 쿠폰 4.1/1200 − 6.5×(−0.20)/1.041
+        r_mar = (4.1 / 1200.0) + 6.5 * 0.002 / 1.041
+        self.assertEqual([m for m, _ in got], ["2024-02", "2024-03"])
+        self.assertAlmostEqual(got[0][1], r_feb, places=12)
+        self.assertAlmostEqual(got[1][1], r_mar, places=12)
+
+    def test_first_month_excluded(self) -> None:
+        got = backtest.monthly_bond_returns_from_yields(
+            [("2024-01", 3.0), ("2024-02", 3.0)]
+        )
+        self.assertEqual(len(got), 1)
+        yield_month, r = got[0]
+        self.assertEqual(yield_month, "2024-02")
+        self.assertAlmostEqual(r, 3.0 / 1200.0, places=12)  # Δy=0 → 쿠폰만
+
+    def test_none_rows_skipped_with_prior_kept(self) -> None:
+        got = backtest.monthly_bond_returns_from_yields(
+            [("2024-01", 4.0), ("2024-02", None), ("2024-03", 4.0)]
+        )
+        self.assertEqual([m for m, _ in got], ["2024-03"])  # None 건너뜀 — prev 4.0 기준
+        self.assertAlmostEqual(got[0][1], 4.0 / 1200.0, places=12)
+
+    def test_nonpositive_yield_and_bad_duration_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            backtest.monthly_bond_returns_from_yields([("2024-01", 0.0)])
+        with self.assertRaises(ValueError):
+            backtest.monthly_bond_returns_from_yields(
+                [("2024-01", -1.0)]
+            )
+        with self.assertRaises(ValueError):
+            backtest.monthly_bond_returns_from_yields(
+                [("2024-01", 4.0), ("2024-02", 4.0)], duration_years=0.0
+            )
+        with self.assertRaises(ValueError):
+            backtest.monthly_bond_returns_from_yields(
+                [("2024-01", 4.0), ("2024-02", 4.0)], duration_years=float("nan")
+            )
+
+    def test_bad_month_key_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            backtest.monthly_bond_returns_from_yields([("202401", 4.0)])
+
+
 if __name__ == "__main__":
     unittest.main()

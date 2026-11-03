@@ -3,10 +3,14 @@
 순수 함수만 유지한다(FS·네트워크 없음 — 회계 정확성은 고정 fixture로 유닛 테스트,
 req-v2 §5.3: 복리 계산·비용 차감·MDD 정의). 실 fetch는 sources.py만,
 
-자산 프록시(PM 확정 — 카드 t_55b34df2; 근거·한계는 README v2a ③ 섹션+리포트 고지):
-- 목 = stooq ^spx(S&P 500), 화 = stooq cl.f(WTI 원유 — 실측 실패 시 gld.us 폴백),
-  토 = stooq vnq.us(미국 REIT ETF), 금 = stooq iet.us(중기 국채 ETF),
-  수 = FRED DTB3(3개월 단기금리 — fredgraph IRX는 404 미실측 → reviewer 검증 DTB3 채택).
+자산 프록시(⑥ CEO 확정 2026-11-03 — stooq 차단(ISSUE-2)으로 FRED 우선 재구성):
+- 목 = FRED NASDAQCOM(나스닥 종합 — 일간 가격 지수, 1971~)·폴백 SP500(10년 한계),
+  화 = FRED DCOILWTICO(WTI 현물 — 선물 롤오버 유인 없음), 토 = FRED CSUSHPINSA
+  (주택가격 지수 — 리츠 총수익과 달리 배당·레버리지 미반영), 금 = FRED DGS10(10년물
+  연율 수익률 — 듀레이션 근사 총수익 변환(monthly_bond_returns_from_yields)), 수 =
+  FRED DTB3(3개월 단기금리 — fredgraph IRX는 404 → reviewer 검증 DTB3 채택).
+  stooq(^spx·cl.f·gld.us·vnq.us·iet.us)은 폴백 후보로 유지 — PoW 클라이언트로도
+  CSV 차단('Access denied') 실측(README 병기).
 - v2a 백테스트는 '규칙 기반 v2a의 한계'를 정량화하는 게 목적이며 수익 우위 필수 아님 —
   결과는 그대로 보고한다.
 
@@ -42,6 +46,7 @@ ALLOCATION_SUM: float = 100.0  # 배분 행 합계(%p)
 ALLOCATION_TOLERANCE: float = 1e-6
 MONTHS_IN_YEAR: int = 12
 RECENT_MONTHS: int = 180  # 최근 15년 × 12개월(req-v2 §3)
+BOND_DURATION_YEARS_DEFAULT: float = 6.5  # 10년물 듀레이션 근사(⑥ — 총수익 변환용)
 
 # v1 기준 배분(README 표 — 木30 火10 土20 金25 水15; element 순서 목화토금수) 재사용.
 BASIS_ALLOCATION: dict[str, float] = {"목": 30.0, "화": 10.0, "토": 20.0, "금": 25.0, "수": 15.0}
@@ -370,6 +375,42 @@ def monthly_returns_from_prices(series: Sequence[tuple[str, float]]) -> Series:
     return out
 
 
+def monthly_bond_returns_from_yields(
+    month_levels: Sequence[tuple[str, float]],
+    *,
+    duration_years: float = BOND_DURATION_YEARS_DEFAULT,
+) -> Series:
+    """연율 수익률(%) 월말 레벨 시리즈 → 중기 국채 월 총수익 근사 Series(순수 — ⑥).
+
+    근사 공식(문서화 — README 프록시 한계 병기):
+      r_t ≈ y_{t-1}/12 − duration × (y_t − y_{t-1}) / (1 + y_{t-1}/100)
+    - 쿠폰 부분: 직전 월말 수익률을 월비율로 수취.
+    - 가격 부분: 듀레이션(기본 6.5년 = 10년물 근사) × 수익률 변화.
+    첫 월은 직전 레벨이 없어 제외. 결측(None) 행은 건너뛴다(직전 유효 레벨 기준).
+    yield ≤ 0·duration ≤ 0·비수치는 ValueError. 만기 수렴·쿠폰 재투자 단순화는 근사
+    한계이며, 총수익 정확성 요구는 v2b(백테스트 정교화) 경계다.
+    """
+    d = _finite(duration_years, "duration_years")
+    if d <= 0.0:
+        raise ValueError(f"duration_years는 양수: {duration_years!r}")
+    out: Series = []
+    prev_yield: float | None = None
+    for m, raw in month_levels:
+        if raw is None:
+            continue  # 결측 월 건너뜀 — 직전 유효 레벨 기준 유지
+        if not isinstance(m, str) or len(m) != 7:
+            raise ValueError(f"월 키는 'YYYY-MM': {m!r}")
+        y = _finite(raw, f"yield {m}")
+        if y <= 0.0:
+            raise ValueError(f"수익률 레벨은 양수여야 함(%p): {m}={y!r}")
+        if prev_yield is not None:
+            coupon = (prev_yield / 100.0) / MONTHS_IN_YEAR
+            price = -d * ((y - prev_yield) / 100.0) / (1.0 + prev_yield / 100.0)
+            out.append((m, coupon + price))
+        prev_yield = y
+    return out
+
+
 def recent_window(series: Sequence[tuple[str, float]], *, months_back: int = RECENT_MONTHS) -> Series:
     """마지막 관측 기준 직전 months_back개 월로 절삭(마지막 관측 포함).
 
@@ -392,6 +433,7 @@ __all__ = [
     "ALLOCATION_SUM",
     "ALLOCATION_TOLERANCE",
     "BASIS_ALLOCATION",
+    "BOND_DURATION_YEARS_DEFAULT",
     "COST_PER_TRADE_DEFAULT",
     "DEFAULT_CRISIS_WINDOWS",
     "MONTHS_IN_YEAR",
@@ -404,6 +446,7 @@ __all__ = [
     "crisis_defense",
     "max_drawdown",
     "month_end_close",
+    "monthly_bond_returns_from_yields",
     "monthly_returns_from_prices",
     "recent_window",
     "run_backtest",
