@@ -61,6 +61,10 @@ curl -sS https://rental-web-aeh.pages.dev/ | grep -o "<title>[^<]*</title>"     
   검증해 조용히 수동 모드로 유지한다(실측 모드 fetch 계약).
   **이번 배포는 `data/state.json` 없이 배포**(부재 → 수동 모드 — 수용기준 5의 無 케이스 실측이기도 하다);
   CEO 월간 크론이 `engine/data/state.json` → `data/state.json` 복사 후 재배포하면 실측 모드로 전환된다(아래).
+- **배포 후 아티팩트 검증 방법(⑤ 실측 절차)**: (1) `git ls-files`(engine/·docs/ 제외 — 정적 웹 산출물 30종)의
+  md5를 배포 URL 응답과 1:1 대조 — 전 파일 MATCH여야 한다(스크래치 도구). (2) 존재해서 안 되는 경로
+  (`data/state.json`·`engine/*`)는 CF Pages 단일 페이지 폴백 200+text/html임을 확인 — 파일 존재가 아님.
+  (3) `/`·`/ui/app.js` HTTP 200. 각 재배포의 스냅샷 ID는 배포 시점마다 갱신되므로 보고(칸반)에 기록한다.
 
 ## 실측 모드(배치 산출 반영) — 티켓 ⑤ (req-v2 §4)
 
@@ -102,6 +106,13 @@ rm -rf data                                  # (有 실측 종료) 배포 아티
   hardlink 제한으로 불가(qa-v2a-report §5와 동일 사유) → **표준 DOM 엔진(jsdom) + 실제 http.server +
   실제 ui/app.js 모듈 그래프**로 동일 경로를 실측했다(레포 의존성 아님 — 스크래치 도구; 상대경로 fetch 해석은
   브라우저와 1:1). 시각 픽셀 렌더링만 미검증 — DOM·CSS 계약은 테스트(155개)+이 DOM 실측으로 고정.
+- **2026-11-03 v2a ⑤ 검증 런 독립 재실측(동일 방식 — 39항목 전부 일치)**: 無(404) 9항목 → 有 12항목
+  (배너 문구·생성시각 「2026-11-03 11:17:34+00:00」·근거 8행·1행 문구 「지수 입력: 목=37 · 화=78 · 토=16 ·
+  금=45 · 수=63」·프록시 고지 본문·제안 5행·제안 1행 「木 감소 제안 — 기준 30%p → 목표 20%p (Δ −10%p)」·
+  국면 D·국면 D 설명·지수 5종 37/78/16/45/63·레이더 실측 다각형·localStorage batch 미포함·콘솔 0건) →
+  無 복귀 9항목 → **배포 URL(https://feaas-ohaeng.pages.dev) 無 9항목**(SPA 폴백 본문에서 조용한 포기 —
+  수동 모드 유지). 브라우저 CLI 부재·hardlink 제한은 본 런에서 재확인(`hermes pm install agent-browser` →
+  uv sync hardlink 오류 재현) — 동일 jsdom 방식 유지.
 - 배포본 도달 실측(無 케이스 — 위 v2a 재배포 실적): `https://feaas-ohaeng.pages.dev` 200·`/ui/app.js` 200 +
   배포 URL 기준 DOM 실측 8항목 전부 일치(fetch가 배포 URL 기준으로 해석→미분기 케이스에서 수동 모드 유지).
 
