@@ -34,16 +34,76 @@ cd projects/ohaeng-assets && python3 -m http.server 8000
 # 최초 1회 — 프로젝트 생성 (production branch: main)
 HOME=/root npx --yes wrangler pages project create feaas-ohaeng --production-branch=main
 
-# 배포(재배포 동일) — repo 루트에서 실행
-HOME=/root npx --yes wrangler pages deploy projects/ohaeng-assets --project-name=feaas-ohaeng --branch=main --commit-dirty=true
+# 배포(재배포 동일) — repo 루트에서 실행. engine/은 배포 아티팩트에서 제외해야 한다:
+#  2026-11-03 실측 — wrangler 4.156은 .wranglerignore를 읽지 않는다(repo 내 파일은 의도 문서일 뿐).
+#  그래서 배포 시 engine/을 잠깐 프로젝트 밖으로 옮겼다가 배포 직후 되돌리는 절차로 제외한다
+#  (engine을 그대로 두면 27.4MiB numpy 라이브러리 > Pages 25MiB 제한으로 업로드 자체가 실패한다 — 실측).
+#  2026-11-03 실측 — npx 무지정 wrangler@4.157+miniflare 신규 beta는 workerd 로딩 실패(Android/aarch64) →
+#  4.156.0 고정(v1 첫 배포와 동일 버전).
+ENGINE_STASH=/root/engine-deploy-stash
+mv projects/ohaeng-assets/engine "$ENGINE_STASH"
+HOME=/root npx --yes wrangler@4.156.0 pages deploy projects/ohaeng-assets --project-name=feaas-ohaeng --branch=main --commit-dirty=true
+mv "$ENGINE_STASH" projects/ohaeng-assets/engine   # 배포 종료 후 반드시 되돌린다(엔진 복수 존재 확인)
 
-# 도달 확인 (수용기준 3번)
+# 도달 확인 (수용기준 3번·5번)
 curl -sS -o /dev/null -w '%{http_code}\n' https://feaas-ohaeng.pages.dev/                 # → 200
 curl -sS -o /dev/null -w '%{http_code}\n' https://feaas-ohaeng.pages.dev/ui/app.js       # → 200 (ES 모듈 진입점)
 curl -sS https://rental-web-aeh.pages.dev/ | grep -o "<title>[^<]*</title>"              # → <title>임대관리 앱</title> (대조 — 영향 없음)
 ```
 
 - 2026-11-02 첫 배포 실적: 29파일 업로드, `/`·`ui/app.js`·`src/*.js` 전부 HTTP 200, 배포 스냅샷 `https://a316f1d5.feaas-ohaeng.pages.dev`
+- 2026-11-03 v2a 재배포 실적(티켓 ⑤): **engine/ 제외**(위 절차) — 배포 파일 35개 = engine 제외 전체 산출물
+  (`find projects/ohaeng-assets -path engine -prune -o -type f` 전부; 첫 배포 29 대비 +6 — `ui/batch.js`·
+  `tests/batch-mode.test.js`·`.wranglerignore`·`docs/qa-v2a-report.md`·README·docs 갱신. venv·캐시·out 유출 0 —
+  engine 존재 시 업로드가 25MiB 제한으로 실패했던 실측이 방어선). 배포 스냅샷 `https://e92c2fed.feaas-ohaeng.pages.dev`.
+  `/`·`/ui/app.js`·`/ui/batch.js`·`/docs/requirements-v2.md` HTTP 200 실측. **`/data/state.json`·`/engine/*`는
+  CF Pages 단일 페이지 폴백으로 200+index.html(text/html) — 파일 존재가 아님**; 웹앱은 본문이 JSON이 아님을
+  검증해 조용히 수동 모드로 유지한다(실측 모드 fetch 계약).
+  **이번 배포는 `data/state.json` 없이 배포**(부재 → 수동 모드 — 수용기준 5의 無 케이스 실측이기도 하다);
+  CEO 월간 크론이 `engine/data/state.json` → `data/state.json` 복사 후 재배포하면 실측 모드로 전환된다(아래).
+
+## 실측 모드(배치 산출 반영) — 티켓 ⑤ (req-v2 §4)
+
+웹앱은 `data/state.json`(index.html 상대경로)를 `fetch`로 확인해 두 가지로 분기한다:
+
+| state.json | 동작 |
+|---|---|
+| **부재(404·네트워크 실패·무결 위반)** | **조용히 포기** — 배너 노출·콘솔 에러 노출 0, 기존 수동 모드 그대로(회귀 없음) |
+| **존재(무결)** | 배너 **「실측 모드(배치 시각: <생성시각>)」** + 지수 5종(레이더 실측 다각형 오버레이·지표 슬라이더)·국면·목표 배분·배치 제안 리밸런싱·프록시 한계 고지를 실측 값으로 반영 — UI·계산은 v1을 그대로 재사용(코어 barrel 경유, 목표 배분은 v1 REGIME_PRESETS 대조 무결 검증 — 어긋나면 배치 전체 거부) |
+
+- 배치 메타(배너·근거·고지·제안)는 세션 스코프 — localStorage 직렬화에서 제외된다(재방문 시 재fetch로 갱신).
+- 배치 산출물 반영 계약은 `ui/batch.js`(순수 ES 모듈, tests/batch-mode.test.js 33케이스)가 담당한다.
+
+**배치 산출물 연결 절차(월간 크론 작업 내용 — CEO 직접 실행 대상, 워커 금지 — req-v2 §4)**:
+
+```bash
+cd projects/ohaeng-assets
+# (1) 엔진 배치 — engine/data/state.json 갱신(상세는「배치 실행 절차(run_pipeline)」섹션)
+engine/.venv/bin/python engine/run_pipeline.py --refresh
+# (2) 배포본에 산출물 반영 — engine/data/state.json → data/state.json 복사
+mkdir -p data && cp engine/data/state.json data/state.json
+# (3) 재배포(위「배포」절 동일 — engine/ 옮기기→배포→복귀) → 사이트가 실측 모드로 전환(배너 생성시각 갱신)
+```
+
+**DOM 실측 절차(req-v2 §5-5 — 수용기준 5 대상 실측 방법)**:
+
+```bash
+cd projects/ohaeng-assets
+cp engine/data/state.json data/state.json   # (有 케이스) 실측 배치 임시 배치
+python3 -m http.server 8000                  # 프로젝트 디렉토리에서 정적 서버
+# → http://localhost:8000 접속: 배너·근거·지수·국면·목표·제안·고지 확인 → 확인 후 임시 파일 제거
+rm -rf data                                  # (有 실측 종료) 배포 아티팩트에 포함되지 않게 제거
+```
+
+- **2026-11-03 실측 실적(22항목 전부 일치)**: 無(404·콘솔 0건·배너 히든·수동 값 유지) 9항목 →
+  有(배너 「실측 모드(배치 시각: 2026-11-03 11:17:34+00:00)」·근거 8행·프록시 고지·지표 37·78·16·45·63·
+  국면 D·목표 20/5/18/32/25·제안 5행·레이더 실측 다각형·콘솔 0건·수동 UI 잔존) 10항목 →
+  無 복귀(배너 재히든·수동 초기값) 3항목. 단, 본 실행 환경에는 브라우저 CLI가 없고 설치도 파일시스템
+  hardlink 제한으로 불가(qa-v2a-report §5와 동일 사유) → **표준 DOM 엔진(jsdom) + 실제 http.server +
+  실제 ui/app.js 모듈 그래프**로 동일 경로를 실측했다(레포 의존성 아님 — 스크래치 도구; 상대경로 fetch 해석은
+  브라우저와 1:1). 시각 픽셀 렌더링만 미검증 — DOM·CSS 계약은 테스트(155개)+이 DOM 실측으로 고정.
+- 배포본 도달 실측(無 케이스 — 위 v2a 재배포 실적): `https://feaas-ohaeng.pages.dev` 200·`/ui/app.js` 200 +
+  배포 URL 기준 DOM 실측 8항목 전부 일치(fetch가 배포 URL 기준으로 해석→미분기 케이스에서 수동 모드 유지).
 
 ## 테스트 방법
 
@@ -57,7 +117,9 @@ node --test "tests/**/*.test.js"   # 또는: npm test
 - `tests/structure.test.js` — 러너·Node 버전 구조 확인(플레이스홀더)
 - `tests/skeleton.test.js` — 골격 계약 테스트: 코어 7모듈의 export 시그니처 존재성, 데이터 상수 형상(키 완전성·합 100·허용 범위 내), 각 모듈 핵심 실동작 요약 단언
 - `tests/*.test.js` (모듈별) — 실제 수치·행위 케이스(req 9장 수용기준 1번 8종) — 코어 엔진 TDD 티켓이 RED→GREEN으로 채움
-- `tests/ui-*.test.js` (UI 3종) — 상태 모듈 계약({ok, state|error}·원자적 복원), 레이더·상생 SVG 빌더, index.html 구조 계약 — UI 티켓 TDD로 채움. 현재 **122/122 통과(코어 78 + UI 44)**
+- `tests/ui-*.test.js` (UI 3종) — 상태 모듈 계약({ok, state|error}·원자적 복원), 레이더·상생 SVG 빌더, index.html 구조 계약 — UI 티켓 TDD로 채움
+- `tests/batch-mode.test.js` (실측 모드 33종 — 티켓 ⑤) — engine 배치 state.json 무결 파싱(스키마 7필드·전체 거부)·有/無 fetch 각 경로·배너·값 반영(지수·국면·목표·제안)·커밋된 엔진 배치 스모크·레이더 실측 오버레이
+- 현재 **155/155 통과(코어 78 + UI 44 + 실측 모드 33** — v1 동결분 122 유지)**
 
 ## FEAAS v2a — Python 엔진 (engine/)
 
@@ -242,10 +304,13 @@ engine/.venv/bin/python engine/run_pipeline.py --fixtures engine/data/fixtures
 projects/ohaeng-assets/
 ├── index.html            # 한국어 단일 페이지 정적 진단기 — 7섹션 전체 (ui/app.js가 module 진입점)
 ├── ui/                   # UI 레이어 — 계산은 src barrel import 전용(UI에서 재구현 금지)
-│   ├── app.js            # 엔트리 — DOM 생성·이벤트·렌더 바인딩 ({ok, state|error} 계약 경유)
+│   ├── app.js            # 엔트리 — DOM 생성·이벤트·렌더 바인딩 ({ok, state|error} 계약 경유) + 실측 모드 부팅(⑤)
+│   ├── batch.js          # 실측 모드 계층(⑤) — engine 배치 state.json fetch·무결·적용(순수 ES, node --test 대상)
 │   ├── state.js          # 상태 모듈 — 항목 추가·수정·삭제, 지표/국면/토글, 직렬화·완전검증 복원
-│   ├── radar.js          # 오각형 레이더·상생 순환 SVG 빌더 (허용 범위 밴드·기준 배분 오버레이)
-│   └── styles.css        # 스타일 — 고지 스티키 바, 375px 모바일 우선 레이아웃
+│   ├── radar.js          # 오각형 레이더·상생 순환 SVG 빌더 (허용 범위 밴드·기준 배분·실측 지수 오버레이 ⑤)
+│   └── styles.css        # 스타일 — 고지 스티키 바, 375px 모바일 우선 레이아웃, 실측 모드 스킨(⑤)
+├── data/                 # 배포본 실측 산출(⑤) — 크론이 engine/data/state.json를 복사(README「실측 모드」절).
+│                         #   부재가 정상(수동 모드) — 실측/배포 절차서 대로만 존재
 ├── src/                  # 코어 로직 — UI와 분리된 순수 ES 모듈 (req 8장)
 │   ├── vectors.js        # 유형별 기본 5요소 벡터 상수 (req 6장, Gold=金 반영)
 │   ├── classify.js       # 유형 분류: 투자 대상 → 오행 자산군 (req 2장)
@@ -255,20 +320,22 @@ projects/ohaeng-assets/
 │   ├── rebalance.js      # 리밸런싱 제안 (±5%p 트리거, req 7장)
 │   ├── circulate.js      # 상생 매핑 상수 木→火→土→金→水 (req 5장)
 │   └── index.js          # barrel — UI는 이 모듈만 import, 계산 재구현 금지
-├── tests/                # node --test (Node 22 내장 러너) — 웹 v1 전용
-├── engine/               # v2a Python 엔진 — 「FEAAS v2a — Python 엔진」섹션
+├── tests/                # node --test (Node 22 내장 러너) — 웹 v1 수동 모드 + ⑤ 실측 모드
+├── engine/               # v2a Python 엔진 — 「FEAAS v2a — Python 엔진」섹션 (배포 아티팩트 제외)
 │   ├── feaas/            # sources·indicators·scores·classifier·backtest·report (순수 함수)
 │   ├── run_pipeline.py   # v2a 배치 진입점 — 지수·국면·state.json·백테스트 산출 (③)
 │   ├── tests/            # v2a unittest — 표준 라이브러리(venv 기준, pytest 예외)
 │   ├── data/fixtures/    # FRED fredgraph.csv 샘플 4종 + Stooq 샘플 1종 (② 확정)
-│   ├── data/state.json   # 실측 모드 산출 — run_pipeline 배치가 생성(③ fixture 실적; 실측값은 ④ 이후)
+│   ├── data/state.json   # 실측 모드 산출 — run_pipeline 배치가 생성(⑥ 실측 국면 D; CEO 크론이 data/로 복사)
 │   ├── out/              # 백테스트 리포트 backtest.json+.md — 프록시/정렬 월 부족 시 미산출(스킵)
 │   └── requirements.txt  # numpy 최소 · pandas/scipy 선택 주석
 ├── docs/
 │   ├── requirements.md        # v1(web MVP) 유일 근거문서 v2.0
 │   ├── requirements-v2.md     # v2a 엔진 유일 근거문서
 │   ├── indicator-map.md       # v2a 지표 정의서 — 오행×ID 매핑·기각 근거·표준화 정책 (②)
+│   ├── qa-v2a-report.md       # v2a ④ QA 독립 재현 리포트 — ISSUE-1·2(→⑥ 해소)
 │   └── v2-ideas.md            # v2 기록 전용 (MVP 금지 항목)
+├── .wranglerignore       # 배포 제외 의도 문서(engine/) — wrangler 4.156 미적용 실측 → 실제 제외는 배포 절차의 mv 방식(README「배포」절)
 └── package.json          # 테스트 실행 안내 수준 (의존성 0)
 ```
 
