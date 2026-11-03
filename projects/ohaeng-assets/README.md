@@ -92,12 +92,13 @@ cd projects/ohaeng-assets/engine
 | `engine/feaas/sources.py` | FRED·Stooq CSV fetcher + 로컬 캐시·retry — **네트워크·FS 격리 계약**: 실 fetch는 이 모듈만 | **② v2a 구현 완료** (총 3시도 retry·백오프·timeout 30s·캐시 히트 0네트워크) |
 | `engine/feaas/indicators.py` | 지표 정의서 — 오행×데이터 ID 매핑 | **② v2a 구현 완료** — `INDICATOR_DEFS` 17종 확정 → [`docs/indicator-map.md`](docs/indicator-map.md) |
 | `engine/feaas/scores.py` | 표준화 — 10년 rolling percentile → 0~100 | **② v2a 구현 완료** (carry-forward·역방향 100−p·평균 round·clamp·부족=누락 표기) |
-| `engine/feaas/classifier.py` | 국면 A~E 판정(복수 지표 조합 규칙) | skeleton(stub) — ③ |
-| `engine/feaas/backtest.py` | 국면→배분 시프트 시뮬레이션·성과지표 | skeleton(stub) |
-| `engine/feaas/report.py` | state.json 구성·스키마 검증(순수) | skeleton(stub) |
-| `engine/run_pipeline.py` | 배치 진입점 stub — 실행 순서 문서화 | stub(NotImplementedError) |
+| `engine/feaas/classifier.py` | 국면 A~E 판정(복수 지표 조합 규칙) | **③ v2a 구현 완료** (PM 확정 규칙 — 아래「FEAAS v2a ③」섹션, test_classifier.py 경계·우선순위·부족 null 계약) |
+| `engine/feaas/backtest.py` | 국면→배분 시프트 시뮬레이션·성과지표 | **③ v2a 구현 완료** (복리·거래비용 0.1%/회·MDD·위기 방어도 — test_backtest.py 고정 fixture 계약) |
+| `engine/feaas/report.py` | state.json 구성·스키마 검증(순수) | **③ v2a 구현 완료** (7필드 스키마·오류 list 반환·전체 방어 — test_report.py) |
+| `engine/run_pipeline.py` | 배치 진입점 — fixture/캐시 로더·국면·state.json·백테스트 산출 | **③ v2a 구현 완료** (test_pipeline.py — 아래「FEAAS v2a ③」섹션) |
 
-함수 본문(구현)은 계층 ②(지수·판정)·③(백테스트·실측 모드) 티켓이 TDD(RED→GREEN)로 채운다.
+함수 본문은 계층 ②(지수·판정)·③(백테스트·실측 모드) 티켓이 TDD(RED→GREEN)로 채웠다 —
+venv unittest 전체 **230 tests OK**(skeleton·sources·indicators·scores·classifier·backtest·report·pipeline).
 
 ### FRED fixture 포맷 (`engine/data/fixtures/`)
 
@@ -120,6 +121,91 @@ fetch 실측 포맷과 일치시켜 ② 티켓이 그대로 재사용하는 샘�
   100−p·평균 round·clamp·**부족 10년 → 누락 표기 확정**)을 전부 기록
 - fetch 정책(② 확정): 총 3시도(재시도 2회·백오프 0.5→1.0s)·timeout 30s·실패 시 `FetchError`·
   캐시 히트 시 네트워크 0호출(refresh=True만 재수집) — 캐시 파일은 `engine/data/cache/`(FRED `<ID>.csv`·Stooq `stooq-<심볼>-<주기>.csv`)
+
+### FEAAS v2a ③ — 국면 판정·15년 백테스트·state.json
+
+**국면 판정(PM 확정 — req-v2 §2, test_classifier.py 경계 고정)**. 10년 rolling percentile 표준화 오행 지수(0~100) 입력:
+
+| 국면 | 규칙 |
+|---|---|
+| A(성장 확장기) | 목≥60 且 수≥50 |
+| B(인플레이션 상승기) | 화≥60 且 (금<50 或 **화−금≥10** — 지수 차 ≥10점) |
+| C(실물경제 안정기) | 토≥55 且 화<60 且 금≥50 |
+| D(금융 불안기) | 금<50 且 (수<40 或 수↑) |
+| E(유동성 회복기) | 수≥45 且 목 6개월 전 대비 상승 |
+
+- **충돌 우선순위 D > B > E > A > C** — 복수 규칙 충족 시 D가 B/E/A/C를 제치고 채택된다.
+- '**수↑**'과 '목 6개월 전 대비 상승'은 동일 규격: **현재값 − 6개월 전값 > 0**.
+- 판정 입력 **≥2개 오행 지수**(단일 지표 판정 금지). 데이터 부족 → **국면=null + 사유**(부족 지표 명기) — 강제 매칭 금지.
+
+**백테스트 회계(req-v2 §3, test_backtest.py 고정 fixture 계약)**: 최근 15년(데이터 존재 범위), 월말 리밸런싱,
+거래비용 **0.1%/회** 거래액 차감(초기 취득 전량 매입 포함), 복리 NAV. 산출: 연율화 수익(CAGR)·연율화 변동성·
+MDD(고점 대비 최대 하락, 양수)·샤프(rf=0)·거래비용 총액·위기 방어도(구간 시작→종료 누적 수익 — 2008: 2007-10~2009-03,
+2020-03: 2020-02-19~2020-03-31, 관측 부족 시 미산출). 비교 기준선 2종: **60/40**(^spx 60+iet.us 40 — 오행 좌표
+목 60·금 40)·**무보정 오행 고정**(木30 火10 土20 金25 水15 — v1 기준 배분 재사용).
+**수익 우위 필수 아님** — 규칙 기반 v2a의 한계 정량화 목적, 결과 그대로 보고.
+
+**국면별 목표 배분 = v1 국면 프리셋(`src/regimeShift.js` REGIME_PRESETS) 매핑 재사용 — 재설계 금지**:
+
+| 국면 | 목 | 화 | 토 | 금 | 수 | 합 |
+|---|---|---|---|---|---|---|
+| A | 38 | 6 | 16 | 25 | 15 | 100 |
+| B | 22 | 12 | 16 | 32 | 18 | 100 |
+| C | 24 | 6 | 28 | 26 | 16 | 100 |
+| D | 20 | 5 | 18 | 32 | 25 | 100 |
+| E | 36 | 8 | 16 | 28 | 12 | 100 |
+
+국면 판정 None 월은 기준 배분(무보정)으로 운용 — 국면 강제 배정 금지(req-v2 §2)의 배분 확장이며 노트로 기록된다.
+
+**자산 프록시(PM 확정 — 선택 근거·한계, ② reviewer 전달 2026-11-02 반영)**:
+
+| 오행 | 프록시 | 선택 근거·한계 |
+|---|---|---|
+| 目 | Stooq `^spx` | S&P 500 — 미국 주식 대표(지수라 배당 제외) |
+| 火 | Stooq `cl.f`(WTI 원유) → 실측 불가 시 `gld.us` 폴백 | 원자재 대표 — 선물 롤오버 효과 미반영 |
+| 土 | Stooq `vnq.us` | 미국 REIT ETF — 부동산 실물 대응 |
+| 金 | Stooq `iet.us` | 중기 국채 ETF — 10y 채권 프록시 |
+| 水 | FRED **DTB3**(3M T-bill 금리) | req §3 표기 'IRX'는 fredgraph **404**(② 실측 2026-11-02 — 야후 심볼 관행) → fredgraph 검증 시리즈 DTB3 대체. 가격이 아닌 연율 금리 — **월수익 = 연율/12 근사 변환** |
+
+- **Stooq 프로그램적 다운로드는 JS proof-of-work 챌린지면(200·HTML)이 관측됨(② 2026-11-02)** — 프록시 4종이
+  stooq 의존이라 실 fetch 검증(④ 스모크 게이트)이 실패해도 fixture/캐시 기반 산출이 가능하며, 실패 원인은
+  파이프라인 [note]로 기록된다. fetch 성공 데이터는 캐시(`engine/data/cache/`)에 원자적 저장(캐시 히트 0네트워크).
+- 표준화·지수 산출은 ② 파이프라인(`standardize_indicator`·`element_score`·`window_count_for`·`WINDOW_COUNTS`)을
+  그대로 순수 재사용 — ③은 조합 계층만 추가한다.
+
+**state.json 스키마(req-v2 §4 — report.STATE_SCHEMA_FIELDS 고정)**:
+
+| 필드(snake_case) | 한글 | 타입·규격 |
+|---|---|---|
+| `generated_at` | 생성시각 | tz-aware UTC ISO 8601(예: `2026-11-03T01:29:50+00:00`) |
+| `element_scores` | 지수 5종 | {목,화,토,금,수}: 0~100 숫자 또는 null(부족 지표) |
+| `regime` | 국면 | "A".."E" 또는 null(판정 불가) |
+| `regime_reasons` | 판정 근거 | 문자열 list — 지수 입력·규칙 평가·부족 사유 |
+| `target_allocation` | 목표 배분 | {목,화,토,금,수} 합 100%p, 또는 null |
+| `rebalance_proposals` | 제안 리밸런싱 | [{element, basis_pct, target_pct, delta_pct}] 또는 [] |
+| `proxy_note` | 프록시 한계 고지 | 비어있지 않은 문자열 |
+
+- `validate_state`는 예외 대신 **오류 메시지 list**(빈 list=유효)를 반환하고 어떤 입력에도 예외를 던지지 않는다
+  (전체 방어 계약 — 배치가 조용한 무결성 위반을 낼 수 없게 함).
+
+**배치 실행 절차(run_pipeline) — 크론 등록은 금지(CEO 세션 영역, req-v2 §4)**:
+
+```bash
+cd projects/ohaeng-assets
+# (a) 실측 배치 — 캐시 우선(engine/data/cache), 캐시 미스 시 네트워크 fetch
+engine/.venv/bin/python engine/run_pipeline.py            # → engine/data/state.json + engine/out/backtest.json+.md
+engine/.venv/bin/python engine/run_pipeline.py --refresh  # 캐시 무시하고 재수집
+# (b) 오프라인 재현 — fixture만 사용(네트워크 호출 0)
+engine/.venv/bin/python engine/run_pipeline.py --fixtures engine/data/fixtures
+```
+
+- 옵션: `--state-path`(기본 engine/data/state.json)·`--out-dir`(기본 engine/out)·`--months-back`(기본 180=15년)·`--no-backtest`.
+- 종료 코드: **0** = state.json 산출 성공(백테스트 레그 스킵은 WARN), **2** = state 스키마 무효·지표 전무(파일 미산출).
+- 프록시 5종이 모두 수집되지 않거나 지수 그리드와 정렬 가능한 월이 2개 미만이면 **백테스트 레그를 스킵**하고
+  사유([note] 행)를 출력한다 — **backtest.json 부재 = 스킵 의미**(미산출 ≠ 오류).
+- **현재 커밋된 `engine/data/state.json`은 (b) fixture 실행 실적(2026-11-03)** — 실측 fixture는 지표 4종+stooq 1종의
+  짧은 샘플이라 10년 rolling percentile 창(`window_count_for`: 월 120·일 2530 관측) 미달 → 지수 전부 null·
+  국면 null+부족 사유가 정상(AC2 경로). 값이 채워진 실측 state.json은 ④ 스모크(실 fetch 게이트) 이후 산출된다.
 
 ### v2a / v2b 경계
 
@@ -148,9 +234,11 @@ projects/ohaeng-assets/
 ├── tests/                # node --test (Node 22 내장 러너) — 웹 v1 전용
 ├── engine/               # v2a Python 엔진 — 「FEAAS v2a — Python 엔진」섹션
 │   ├── feaas/            # sources·indicators·scores·classifier·backtest·report (순수 함수)
-│   ├── run_pipeline.py   # 배치 진입점 stub — 실행은 ②③ 티켓
+│   ├── run_pipeline.py   # v2a 배치 진입점 — 지수·국면·state.json·백테스트 산출 (③)
 │   ├── tests/            # v2a unittest — 표준 라이브러리(venv 기준, pytest 예외)
 │   ├── data/fixtures/    # FRED fredgraph.csv 샘플 4종 + Stooq 샘플 1종 (② 확정)
+│   ├── data/state.json   # 실측 모드 산출 — run_pipeline 배치가 생성(③ fixture 실적; 실측값은 ④ 이후)
+│   ├── out/              # 백테스트 리포트 backtest.json+.md — 프록시/정렬 월 부족 시 미산출(스킵)
 │   └── requirements.txt  # numpy 최소 · pandas/scipy 선택 주석
 ├── docs/
 │   ├── requirements.md        # v1(web MVP) 유일 근거문서 v2.0
