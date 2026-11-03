@@ -119,23 +119,8 @@ class SkeletonStubBodyContract(unittest.TestCase):
         import feaas.report as report
 
         calls: list[tuple[str, object, tuple]] = [
-            ("backtest.compound", backtest.compound, ((0.01, -0.01),)),
-            ("backtest.annualized_return", backtest.annualized_return, (0.1, 12)),
-            ("backtest.annualized_vol", backtest.annualized_vol, ((0.01, 0.02),)),
-            ("backtest.sharpe_ratio", backtest.sharpe_ratio, ((0.01, 0.02),)),
-            ("backtest.max_drawdown", backtest.max_drawdown, ((100.0, 90.0, 105.0),)),
-            (
-                "backtest.crisis_defense",
-                backtest.crisis_defense,
-                ({"2008": ("2020-01-01", "2020-03-01")},),
-                {},
-            ),
-            (
-                "backtest.run_backtest",
-                backtest.run_backtest,
-                (({"목": 100.0},),),
-                {},
-            ),
+            # backtest.*는 ③에서 구현 완료(git 94422ab 이후 backtest 커밋) — 본 계약에서 제외,
+            # 회계 정확성은 tests/test_backtest.py 고정 fixture 계약으로 이관(req-v2 §5.3).
             ("report.validate_state", report.validate_state, (dict(),)),
         ]
         for item in calls:
