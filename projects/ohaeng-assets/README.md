@@ -125,6 +125,10 @@ cd projects/ohaeng-assets
 node --test "tests/**/*.test.js"   # 또는: npm test
 ```
 
+**CI(GitHub Actions)**: push/PR to main 시 `.github/workflows/ci.yml`가 자동 실행 —
+rental-web QA + **ohaeng-assets 웹 테스트(node --test) + v2a 엔진 unittest(venv+numpy)**.
+로컬 푸시·월간 크론 푸시 모두 CI가 게이트로 동작한다(레드 시 채널로 결과 보고).
+
 - `tests/structure.test.js` — 러너·Node 버전 구조 확인(플레이스홀더)
 - `tests/skeleton.test.js` — 골격 계약 테스트: 코어 7모듈의 export 시그니처 존재성, 데이터 상수 형상(키 완전성·합 100·허용 범위 내), 각 모듈 핵심 실동작 요약 단언
 - `tests/*.test.js` (모듈별) — 실제 수치·행위 케이스(req 9장 수용기준 1번 8종) — 코어 엔진 TDD 티켓이 RED→GREEN으로 채움

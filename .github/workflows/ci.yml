@@ -28,3 +28,39 @@ jobs:
       run: |
         cd projects/rental-web
         node qa/run-sync.js
+
+  # ohaeng-assets (FEAAS) — 웹 진단기: node --test (Node 22 내장 러너, 의존성 0)
+  test-ohaeng-web:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: "22"
+
+    - name: Web tests (node --test)
+      working-directory: projects/ohaeng-assets
+      run: node --test "tests/**/*.test.js"
+
+  # ohaeng-assets — v2a Python 엔진: venv + numpy + unittest (FRED fixture 기반, 네트워크 0)
+  test-ohaeng-engine:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: venv bootstrap + install
+      working-directory: projects/ohaeng-assets/engine
+      run: |
+        python -m venv .venv
+        .venv/bin/pip install --quiet -r requirements.txt
+
+    - name: Engine unittest (v2a)
+      working-directory: projects/ohaeng-assets/engine
+      run: .venv/bin/python -m unittest discover -s tests
