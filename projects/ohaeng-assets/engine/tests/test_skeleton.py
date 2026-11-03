@@ -133,11 +133,11 @@ class SkeletonStubBodyContract(unittest.TestCase):
                     fn(*args, **kwargs)
                 self.assertTrue(str(ctx.exception), "예외 메시지는 후속 티켓 지시를 담는다")
 
-    def test_run_pipeline_main_stub_raises(self) -> None:
+    def test_run_pipeline_main_callable(self) -> None:
         import run_pipeline
 
-        with self.assertRaises(NotImplementedError):
-            run_pipeline.main()
+        self.assertTrue(callable(run_pipeline.main))
+        self.assertIn("README", str(inspect.getdoc(run_pipeline.main) or ""))
 
 
 class FixtureFormatContract(unittest.TestCase):
